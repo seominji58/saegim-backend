@@ -1,0 +1,15 @@
+# FastAPI 및 관련 패키지
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# 데이터베이스
+sqlmodel==0.0.14
+alembic==1.13.1
+
+# 설정 관리
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# 개발 도구
+pytest==7.4.3
+pytest-asyncio==0.21.1

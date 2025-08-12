@@ -1,0 +1,1100 @@
+---
+description: 새김(Saegim) 백엔드 개발 규칙 - FastAPI + SQLModel + PostgreSQL + Redis
+globs:
+  - 'app/**/*.py'
+  - '*.py'
+  - 'alembic/**/*.py'
+  - 'tests/**/*.py'
+  - 'requirements*.txt'
+  - 'pyproject.toml'
+  - 'Dockerfile'
+  - 'docker-compose*.yml'
+excludeGlobs:
+  - '__pycache__/**'
+  - '.venv/**'
+  - 'venv/**'
+  - '.env*'
+  - '*.pyc'
+  - '*.pyo'
+  - '*.pyd'
+  - '.pytest_cache/**'
+  - '.mypy_cache/**'
+alwaysApply: false
+---
+
+# 새김(Saegim) Backend Development Rules
+
+## 🎯 프로젝트 개요
+
+- **서비스명**: 새김(Saegim) - 감성 AI 다이어리
+- **기술 스택**: FastAPI 0.100+ + Python 3.11+ + SQLModel + PostgreSQL 14+ + Redis 7.x
+- **프론트엔드**: Next.js 15 (별도 서버)
+- **언어**: 한국어 기반, 영어 코드/문서
+- **아키텍처**: RESTful API, 마이크로서비스 준비
+
+## 📁 디렉터리 구조 (app/ 기반)
+
+```
+app/
+├── __init__.py
+├── main.py              # FastAPI 애플리케이션 진입점
+├── api/                 # API 라우터
+│   ├── __init__.py
+│   ├── auth.py         # 소셜 인증 관련 API
+│   ├── diary.py        # 다이어리 CRUD API
+│   ├── ai.py           # AI 글귀 생성 API
+│   ├── image.py        # 이미지 업로드/처리 API
+│   ├── notification.py # 알림 관련 API
+│   └── health.py       # 헬스체크
+├── core/               # 핵심 설정 및 의존성
+│   ├── __init__.py
+│   ├── config.py       # 환경 설정 (Pydantic Settings)
+│   ├── deps.py         # 의존성 주입
+│   └── security.py     # JWT, 암호화 유틸리티
+├── db/                 # 데이터베이스 관련
+│   ├── __init__.py
+│   ├── database.py     # SQLModel 엔진, 세션 관리
+│   └── init_db.py      # 초기 데이터 생성
+├── models/             # SQLModel 데이터베이스 모델
+│   ├── __init__.py
+│   ├── base.py         # 기본 모델 클래스
+│   ├── user.py         # 사용자 모델
+│   ├── diary.py        # 다이어리 모델
+│   ├── image.py        # 이미지 모델
+│   ├── notification.py # 알림 모델
+│   └── ai_usage.py     # AI 사용 로그 모델
+├── schemas/            # Pydantic API 스키마
+│   ├── __init__.py
+│   ├── base.py         # 기본 응답 스키마
+│   ├── user.py         # 사용자 요청/응답 스키마
+│   ├── diary.py        # 다이어리 요청/응답 스키마
+│   ├── ai.py           # AI 관련 스키마
+│   └── image.py        # 이미지 관련 스키마
+├── services/           # 비즈니스 로직
+│   ├── __init__.py
+│   ├── auth.py         # 인증 서비스
+│   ├── diary.py        # 다이어리 비즈니스 로직
+│   ├── ai.py           # AI 서비스 연동
+│   ├── image.py        # 이미지 처리 서비스
+│   └── notification.py # 알림 서비스
+└── utils/              # 유틸리티
+    ├── __init__.py
+    ├── encryption.py   # 암호화 유틸리티
+    ├── validators.py   # 입력 검증
+    └── helpers.py      # 일반 헬퍼 함수
+```
+
+## 📝 네이밍 컨벤션
+
+### 파일/폴더
+
+- 파일: `snake_case.py` (예: `auth_service.py`, `diary_model.py`)
+- 폴더: `snake_case` (예: `api/`, `core/`, `services/`)
+- 테스트 파일: `test_*.py` (예: `test_auth.py`)
+
+### 코드
+
+- **클래스**: `PascalCase` (예: `DiaryCreate`, `UserModel`, `AuthService`)
+- **함수/변수**: `snake_case` (예: `get_current_user`, `diary_count`)
+- **상수**: `UPPER_SNAKE_CASE` (예: `DATABASE_URL`, `SECRET_KEY`)
+- **열거형**: `PascalCase` + 값은 `snake_case` (예: `EmotionType.happy`)
+- **SQLModel 모델**: `PascalCase` (예: `User`, `DiaryEntry`)
+- **Pydantic 스키마**: `PascalCase` + 접미사 (예: `UserCreate`, `DiaryResponse`)
+
+## ⚡ FastAPI 규칙
+
+### 애플리케이션 구조
+
+```python
+# ✅ 올바른 FastAPI 앱 구조
+from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.api import auth, diary, ai, image
+
+app = FastAPI(
+    title="새김 API",
+    description="감성 AI 다이어리 백엔드 API",
+    version="1.0.0",
+    openapi_url="/openapi.json" if settings.ENVIRONMENT == "development" else None
+)
+
+# 미들웨어 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_HOSTS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+
+# 라우터 등록
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(diary.router, prefix="/api/diary", tags=["diary"])
+
+# ❌ 잘못된 패턴
+app = FastAPI()  # 메타데이터 누락
+@app.get("/")    # 라우터 없이 직접 정의
+```
+
+### API 라우터 패턴
+
+```python
+# ✅ 올바른 라우터 패턴
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session
+from app.core.deps import get_current_user, get_session
+from app.models.user import User
+from app.schemas.diary import DiaryCreate, DiaryResponse
+from app.services.diary import DiaryService
+
+router = APIRouter()
+
+@router.post("/", response_model=DiaryResponse, status_code=status.HTTP_201_CREATED)
+async def create_diary(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    diary_in: DiaryCreate,
+) -> DiaryResponse:
+    """다이어리 생성"""
+    diary_service = DiaryService(session)
+    diary = await diary_service.create_diary(user_id=current_user.id, diary_in=diary_in)
+    return DiaryResponse.from_orm(diary)
+
+# ❌ 잘못된 패턴
+@router.post("/diary")  # response_model, status_code 누락
+def create_diary(data: dict):  # 타입 힌트 부족
+    pass
+```
+
+### 의존성 주입 패턴
+
+```python
+# ✅ 올바른 의존성 주입 패턴
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlmodel import Session, select
+from app.core.database import get_session
+from app.models.user import User
+from app.core.security import decode_access_token
+
+security = HTTPBearer()
+
+async def get_current_user(
+    session: Session = Depends(get_session),
+    token: HTTPAuthorizationCredentials = Depends(security),
+) -> User:
+    """현재 사용자 조회"""
+    try:
+        payload = decode_access_token(token.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않은 토큰"
+            )
+        
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="사용자를 찾을 수 없음"
+            )
+        return user
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="토큰 검증 실패"
+        )
+```
+
+## 🗄️ SQLModel 데이터베이스 규칙
+
+### 모델 정의 패턴
+
+```python
+# ✅ 올바른 SQLModel 모델 패턴
+from typing import Optional, List
+from sqlmodel import SQLModel, Field, Relationship
+from datetime import datetime
+from app.models.base import BaseModel
+
+class DiaryBase(SQLModel):
+    """다이어리 기본 모델"""
+    title: str = Field(max_length=255, index=True)
+    content: str = Field()
+    user_emotion: Optional[str] = Field(max_length=20, index=True)
+    ai_emotion: Optional[str] = Field(max_length=20)
+    ai_emotion_confidence: Optional[float] = Field(ge=0.0, le=1.0)
+
+class DiaryEntry(DiaryBase, BaseModel, table=True):
+    """다이어리 테이블 모델"""
+    __tablename__ = "diaries"
+    
+    user_id: int = Field(foreign_key="users.id", index=True)
+    ai_generated_text: Optional[str] = Field()
+    is_public: bool = Field(default=False)
+    keywords: Optional[str] = Field()  # JSON 저장
+    
+    # 관계 설정
+    user: "User" = Relationship(back_populates="diaries")
+    images: List["Image"] = Relationship(back_populates="diary")
+
+class DiaryCreate(DiaryBase):
+    """다이어리 생성 스키마"""
+    pass
+
+class DiaryUpdate(DiaryBase):
+    """다이어리 업데이트 스키마"""
+    title: Optional[str] = None
+    content: Optional[str] = None
+    user_emotion: Optional[str] = None
+
+# ❌ 잘못된 패턴
+class Diary(SQLModel, table=True):
+    id: int  # Field() 사용 안함, primary_key 누락
+    title: str  # 길이 제한 없음
+    content: str  # 인덱스 고려 없음
+```
+
+### 관계 설정 패턴
+
+```python
+# ✅ 올바른 관계 설정
+from sqlmodel import Relationship
+from typing import List, Optional
+
+class User(BaseModel, table=True):
+    __tablename__ = "users"
+    
+    email: str = Field(unique=True, index=True, max_length=255)
+    provider: str = Field(max_length=20)
+    
+    # 관계: 사용자 -> 다이어리 (1:N)
+    diaries: List["DiaryEntry"] = Relationship(back_populates="user")
+
+class DiaryEntry(DiaryBase, BaseModel, table=True):
+    __tablename__ = "diaries"
+    
+    user_id: int = Field(foreign_key="users.id", index=True)
+    
+    # 관계: 다이어리 -> 사용자 (N:1)
+    user: "User" = Relationship(back_populates="diaries")
+    # 관계: 다이어리 -> 이미지 (1:N)
+    images: List["Image"] = Relationship(back_populates="diary")
+
+# ❌ 잘못된 관계 설정
+class User(SQLModel, table=True):
+    diaries: List[DiaryEntry] = []  # Relationship() 사용 안함
+```
+
+### 데이터베이스 세션 관리
+
+```python
+# ✅ 올바른 세션 관리 패턴
+from sqlmodel import create_engine, Session, SQLModel
+from app.core.config import settings
+
+# 엔진 생성 (싱글톤)
+engine = create_engine(
+    settings.DATABASE_URL,
+    echo=settings.DATABASE_ECHO,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
+
+def create_db_and_tables():
+    """데이터베이스 테이블 생성"""
+    SQLModel.metadata.create_all(engine)
+
+def get_session():
+    """데이터베이스 세션 의존성"""
+    with Session(engine) as session:
+        yield session
+
+# ✅ 서비스에서 세션 사용
+class DiaryService:
+    def __init__(self, session: Session):
+        self.session = session
+    
+    async def create_diary(self, user_id: int, diary_in: DiaryCreate) -> DiaryEntry:
+        diary = DiaryEntry(**diary_in.dict(), user_id=user_id)
+        self.session.add(diary)
+        self.session.commit()
+        self.session.refresh(diary)
+        return diary
+```
+
+## 📋 API 응답 표준화
+
+### 기본 응답 구조
+
+```python
+# ✅ 표준화된 응답 모델
+from typing import Optional, Any, List, Generic, TypeVar
+from pydantic import BaseModel, Field
+from datetime import datetime
+import uuid
+
+T = TypeVar('T')
+
+class BaseResponse(BaseModel, Generic[T]):
+    """기본 응답 모델"""
+    success: bool = True
+    data: Optional[T] = None
+    message: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+class ErrorDetail(BaseModel):
+    """에러 상세 정보"""
+    code: str  # "AUTH_SOCIAL_PROVIDER_ERROR"
+    error_id: int  # 1001
+    field: Optional[str] = None
+    message: str
+
+class ErrorResponse(BaseModel):
+    """에러 응답 모델"""
+    success: bool = False
+    data: Optional[Any] = None
+    message: str
+    errors: Optional[List[ErrorDetail]] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+class PaginationInfo(BaseModel):
+    """페이지네이션 정보"""
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1, le=100)
+    total_items: int = Field(ge=0)
+    total_pages: int = Field(ge=0)
+    has_next: bool
+    has_previous: bool
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """페이지네이션 응답 모델"""
+    success: bool = True
+    data: List[T]
+    pagination: PaginationInfo
+    message: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+# ✅ 사용 예시
+@router.get("/", response_model=BaseResponse[List[DiaryResponse]])
+async def get_diaries(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+) -> BaseResponse[List[DiaryResponse]]:
+    diaries = session.exec(select(DiaryEntry).where(DiaryEntry.user_id == current_user.id)).all()
+    diary_responses = [DiaryResponse.from_orm(diary) for diary in diaries]
+    return BaseResponse(data=diary_responses, message="다이어리 목록 조회 성공")
+```
+
+### 에러 처리 패턴
+
+```python
+# ✅ 구조화된 에러 처리
+from enum import Enum
+from fastapi import HTTPException, status, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
+class ErrorCode(str, Enum):
+    """에러 코드 정의"""
+    # 인증 관련
+    AUTH_SOCIAL_PROVIDER_ERROR = "AUTH_SOCIAL_PROVIDER_ERROR"
+    AUTH_SOCIAL_TOKEN_INVALID = "AUTH_SOCIAL_TOKEN_INVALID" 
+    AUTH_TOKEN_EXPIRED = "AUTH_TOKEN_EXPIRED"
+    
+    # 다이어리 관련
+    DIARY_NOT_FOUND = "DIARY_NOT_FOUND"
+    DIARY_ACCESS_DENIED = "DIARY_ACCESS_DENIED"
+    
+    # AI 관련
+    AI_SERVICE_UNAVAILABLE = "AI_SERVICE_UNAVAILABLE"
+    AI_TOKEN_LIMIT_EXCEEDED = "AI_TOKEN_LIMIT_EXCEEDED"
+
+# 에러 코드 매핑
+ERROR_MESSAGES = {
+    ErrorCode.AUTH_SOCIAL_PROVIDER_ERROR: (1001, "소셜 로그인 제공자 오류가 발생했습니다."),
+    ErrorCode.DIARY_NOT_FOUND: (2001, "다이어리를 찾을 수 없습니다."),
+    ErrorCode.AI_SERVICE_UNAVAILABLE: (3001, "AI 서비스를 일시적으로 사용할 수 없습니다."),
+}
+
+def create_error_response(
+    error_code: ErrorCode, 
+    field: Optional[str] = None,
+    custom_message: Optional[str] = None
+) -> ErrorResponse:
+    """에러 응답 생성"""
+    error_id, default_message = ERROR_MESSAGES[error_code]
+    message = custom_message or default_message
+    
+    return ErrorResponse(
+        message="요청 처리 중 오류가 발생했습니다.",
+        errors=[ErrorDetail(
+            code=error_code,
+            error_id=error_id,
+            field=field,
+            message=message
+        )]
+    )
+
+# 글로벌 예외 핸들러
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for error in exc.errors():
+        errors.append(ErrorDetail(
+            code="VALIDATION_FAILED",
+            error_id=5001,
+            field=".".join(str(loc) for loc in error["loc"]),
+            message=error["msg"]
+        ))
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=ErrorResponse(
+            message="입력 데이터 검증 실패",
+            errors=errors
+        ).dict()
+    )
+```
+
+## 🔒 보안 규칙
+
+### JWT 인증 구현
+
+```python
+# ✅ 안전한 JWT 구현
+import jwt
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+from app.core.config import settings
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    """비밀번호 해싱 (bcrypt, cost factor 12)"""
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """비밀번호 검증"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """JWT 액세스 토큰 생성"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=1)
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "jti": str(uuid.uuid4())
+    })
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+
+def decode_access_token(token: str) -> dict:
+    """JWT 토큰 디코딩"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="토큰이 만료되었습니다")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
+```
+
+### 데이터 암호화
+
+```python
+# ✅ 데이터 암호화 구현
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import base64
+import os
+
+class DataEncryption:
+    """AES-256-GCM 데이터 암호화"""
+    
+    def __init__(self, key: bytes):
+        self.cipher = AESGCM(key)
+    
+    def encrypt(self, plaintext: str) -> str:
+        """암호화 (Base64 인코딩된 문자열 반환)"""
+        nonce = os.urandom(12)  # 96-bit nonce for GCM
+        ciphertext = self.cipher.encrypt(nonce, plaintext.encode(), None)
+        # nonce + ciphertext를 base64로 인코딩
+        return base64.b64encode(nonce + ciphertext).decode()
+    
+    def decrypt(self, encrypted_data: str) -> str:
+        """복호화"""
+        data = base64.b64decode(encrypted_data.encode())
+        nonce = data[:12]
+        ciphertext = data[12:]
+        plaintext = self.cipher.decrypt(nonce, ciphertext, None)
+        return plaintext.decode()
+
+# 사용 예시
+encryptor = DataEncryption(settings.ENCRYPTION_KEY.encode())
+
+class DiaryService:
+    async def create_diary(self, user_id: int, diary_in: DiaryCreate) -> DiaryEntry:
+        # 민감한 데이터 암호화
+        encrypted_content = encryptor.encrypt(diary_in.content)
+        
+        diary = DiaryEntry(
+            **diary_in.dict(exclude={"content"}),
+            content=encrypted_content,
+            user_id=user_id
+        )
+        # ... 저장 로직
+```
+
+### 입력 검증 및 Sanitization
+
+```python
+# ✅ 입력 검증 패턴
+from pydantic import BaseModel, Field, validator, root_validator
+from typing import Optional
+import re
+
+class DiaryCreate(BaseModel):
+    """다이어리 생성 스키마 (입력 검증 포함)"""
+    title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
+    content: str = Field(..., min_length=1, max_length=10000, strip_whitespace=True)
+    emotion: Optional[str] = Field(None, regex=r"^(happy|sad|angry|peaceful|worried)$")
+    
+    @validator('title', 'content')
+    def validate_no_html(cls, v):
+        """HTML 태그 제거"""
+        if re.search(r'<[^<]+?>', v):
+            raise ValueError('HTML 태그는 허용되지 않습니다')
+        return v
+    
+    @validator('content')
+    def validate_content_safety(cls, v):
+        """악성 콘텐츠 검증"""
+        dangerous_patterns = ['javascript:', 'data:', 'vbscript:']
+        v_lower = v.lower()
+        for pattern in dangerous_patterns:
+            if pattern in v_lower:
+                raise ValueError('허용되지 않는 콘텐츠입니다')
+        return v
+
+    @root_validator
+    def validate_diary(cls, values):
+        """전체 검증"""
+        title = values.get('title', '')
+        content = values.get('content', '')
+        
+        if title.lower() in content.lower() and len(title) > 10:
+            values['title'] = title[:50] + '...' if len(title) > 50 else title
+        
+        return values
+```
+
+## 🚫 금지 사항
+
+### 절대 하지 말 것
+
+- **동기 I/O 사용**: `requests` 대신 `httpx`, `psycopg2` 대신 `asyncpg` 사용
+- **평문 비밀번호**: 모든 비밀번호는 bcrypt로 해싱
+- **하드코딩된 시크릿**: 환경변수 또는 보안 볼트 사용
+- **SQL 인젝션 위험**: 원시 SQL 쿼리 사용 금지, SQLModel ORM 사용
+- **타입 힌트 생략**: 모든 함수, 변수에 타입 힌트 필수
+- **Exception 무시**: `pass`로 예외 처리 금지
+- **글로벌 변수**: 의존성 주입 사용
+- **임의 데이터 반환**: 정의된 스키마만 사용
+
+### FastAPI 특화 금지사항
+
+- `@app.route()` 데코레이터 (Flask 스타일) 대신 `@router.get()` 사용
+- 라우터 없이 직접 앱에 엔드포인트 정의
+- `response_model` 없는 API 엔드포인트
+- 의존성 주입 없이 직접 데이터베이스 접근
+- 동기 함수에서 비동기 함수 호출
+
+### 보안 금지사항
+
+- 민감한 정보를 로그에 기록 (비밀번호, 토큰, 개인정보)
+- CORS에서 `allow_origins=["*"]` 사용 (프로덕션)
+- 암호화되지 않은 민감 데이터 저장
+- JWT 시크릿을 코드에 하드코딩
+- 사용자 입력을 검증 없이 데이터베이스에 저장
+
+## ✅ 베스트 프랙티스
+
+### 성능 최적화
+
+```python
+# ✅ 비동기 처리 패턴
+import asyncio
+import httpx
+from typing import List
+
+async def call_openai_api(prompt: str) -> str:
+    """OpenAI API 비동기 호출"""
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.openai.com/v1/completions",
+            headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+            json={"prompt": prompt, "max_tokens": 100},
+            timeout=30.0
+        )
+        return response.json()["choices"][0]["text"]
+
+# ✅ 데이터베이스 쿼리 최적화
+async def get_user_diaries_optimized(
+    session: Session, 
+    user_id: int, 
+    limit: int = 20
+) -> List[DiaryEntry]:
+    """최적화된 다이어리 조회 (N+1 문제 방지)"""
+    statement = (
+        select(DiaryEntry)
+        .where(DiaryEntry.user_id == user_id)
+        .options(selectinload(DiaryEntry.images))  # 관련 이미지 미리 로딩
+        .order_by(DiaryEntry.created_at.desc())
+        .limit(limit)
+    )
+    results = session.exec(statement)
+    return results.all()
+
+# ✅ 캐싱 전략
+from functools import lru_cache
+import redis
+
+redis_client = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+
+@lru_cache(maxsize=128)
+def get_emotion_keywords(emotion: str) -> List[str]:
+    """감정별 키워드 캐싱 (메모리)"""
+    # 캐시된 키워드 반환
+    return EMOTION_KEYWORDS.get(emotion, [])
+
+async def get_user_monthly_stats(user_id: int, year: int, month: int) -> dict:
+    """사용자 월간 통계 (Redis 캐싱)"""
+    cache_key = f"user_stats:{user_id}:{year}:{month}"
+    cached = redis_client.get(cache_key)
+    
+    if cached:
+        return json.loads(cached)
+    
+    # 데이터베이스에서 계산
+    stats = await calculate_monthly_stats(user_id, year, month)
+    
+    # 24시간 캐싱
+    redis_client.setex(cache_key, 86400, json.dumps(stats))
+    return stats
+```
+
+### 코드 품질
+
+```python
+# ✅ 서비스 계층 분리
+class DiaryService:
+    """다이어리 비즈니스 로직"""
+    
+    def __init__(self, session: Session):
+        self.session = session
+        self.encryptor = DataEncryption(settings.ENCRYPTION_KEY.encode())
+    
+    async def create_diary(self, user_id: int, diary_in: DiaryCreate) -> DiaryEntry:
+        """다이어리 생성 (비즈니스 로직)"""
+        # 1. 일일 작성 한도 확인
+        today_count = self._get_today_diary_count(user_id)
+        if today_count >= settings.DAILY_DIARY_LIMIT:
+            raise HTTPException(
+                status_code=400,
+                detail="일일 다이어리 작성 한도를 초과했습니다."
+            )
+        
+        # 2. 콘텐츠 암호화
+        encrypted_content = self.encryptor.encrypt(diary_in.content)
+        
+        # 3. AI 감정 분석 (비동기)
+        ai_emotion, confidence = await self._analyze_emotion(diary_in.content)
+        
+        # 4. 다이어리 생성
+        diary = DiaryEntry(
+            **diary_in.dict(exclude={"content"}),
+            content=encrypted_content,
+            ai_emotion=ai_emotion,
+            ai_emotion_confidence=confidence,
+            user_id=user_id
+        )
+        
+        self.session.add(diary)
+        self.session.commit()
+        self.session.refresh(diary)
+        
+        # 5. 월간 통계 업데이트 (백그라운드)
+        asyncio.create_task(self._update_monthly_stats(user_id, diary.user_emotion))
+        
+        return diary
+    
+    async def _analyze_emotion(self, content: str) -> Tuple[str, float]:
+        """AI 감정 분석 (private 메서드)"""
+        # AI 서비스 호출 로직
+        pass
+    
+    def _get_today_diary_count(self, user_id: int) -> int:
+        """오늘 작성한 다이어리 개수"""
+        today = datetime.now().date()
+        return self.session.exec(
+            select(func.count(DiaryEntry.id))
+            .where(DiaryEntry.user_id == user_id)
+            .where(func.date(DiaryEntry.created_at) == today)
+        ).one()
+
+# ✅ 의존성 주입과 테스트 가능한 코드
+from abc import ABC, abstractmethod
+
+class AIServiceInterface(ABC):
+    """AI 서비스 인터페이스"""
+    
+    @abstractmethod
+    async def analyze_emotion(self, text: str) -> Tuple[str, float]:
+        pass
+    
+    @abstractmethod
+    async def generate_text(self, prompt: str, style: dict) -> str:
+        pass
+
+class OpenAIService(AIServiceInterface):
+    """OpenAI 구현"""
+    
+    async def analyze_emotion(self, text: str) -> Tuple[str, float]:
+        # OpenAI API 호출
+        pass
+
+class MockAIService(AIServiceInterface):
+    """테스트용 Mock 구현"""
+    
+    async def analyze_emotion(self, text: str) -> Tuple[str, float]:
+        return "happy", 0.8
+```
+
+### 로깅과 모니터링
+
+```python
+# ✅ 구조화된 로깅
+import logging
+import json
+from datetime import datetime
+from fastapi import Request
+
+# 로그 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+
+class StructuredLogger:
+    """구조화된 로깅"""
+    
+    @staticmethod
+    def log_api_request(request: Request, user_id: Optional[int] = None):
+        """API 요청 로깅"""
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "method": request.method,
+            "url": str(request.url),
+            "user_id": user_id,
+            "user_agent": request.headers.get("user-agent"),
+            "ip": request.client.host if request.client else None,
+        }
+        logger.info(f"API_REQUEST: {json.dumps(log_data)}")
+    
+    @staticmethod
+    def log_error(error: Exception, context: dict = None):
+        """에러 로깅"""
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+            "context": context or {},
+        }
+        logger.error(f"ERROR: {json.dumps(log_data)}")
+
+# 미들웨어로 사용
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start_time = datetime.now()
+    
+    # 요청 로깅
+    StructuredLogger.log_api_request(request)
+    
+    response = await call_next(request)
+    
+    # 응답 시간 로깅
+    process_time = (datetime.now() - start_time).total_seconds()
+    logger.info(f"REQUEST_COMPLETED: {request.method} {request.url} - {response.status_code} - {process_time:.3f}s")
+    
+    return response
+```
+
+## 🎯 새김 프로젝트 특화 규칙
+
+### 감정 데이터 처리
+
+```python
+# ✅ 감정 타입 정의 및 검증
+from enum import Enum
+
+class EmotionType(str, Enum):
+    """감정 타입"""
+    HAPPY = "happy"
+    SAD = "sad"
+    ANGRY = "angry"
+    PEACEFUL = "peaceful"
+    WORRIED = "worried"
+
+def is_valid_emotion(emotion: str) -> bool:
+    """감정 유효성 검증"""
+    try:
+        EmotionType(emotion)
+        return True
+    except ValueError:
+        return False
+
+# 감정별 색상 매핑 (프론트엔드 연동)
+EMOTION_COLORS = {
+    EmotionType.HAPPY: "#FFE066",
+    EmotionType.SAD: "#87CEEB",
+    EmotionType.ANGRY: "#FFB6C1",
+    EmotionType.PEACEFUL: "#98FB98",
+    EmotionType.WORRIED: "#DDA0DD",
+}
+
+# 감정별 키워드 추천
+EMOTION_KEYWORDS = {
+    EmotionType.HAPPY: ["기쁨", "행복", "즐거움", "만족", "웃음"],
+    EmotionType.SAD: ["슬픔", "우울", "외로움", "아쉬움", "그리움"],
+    # ... 다른 감정들
+}
+```
+
+### AI 서비스 연동 패턴
+
+```python
+# ✅ AI 서비스 제한 및 에러 처리
+import asyncio
+from typing import Dict, Any
+import httpx
+
+class AIService:
+    """OpenAI API 연동 서비스"""
+    
+    def __init__(self):
+        self.client = httpx.AsyncClient(timeout=30.0)
+        self.api_key = settings.OPENAI_API_KEY
+        self.base_url = "https://api.openai.com/v1"
+    
+    async def generate_diary_text(
+        self, 
+        user_input: str, 
+        emotion: EmotionType,
+        style: Dict[str, Any]
+    ) -> str:
+        """다이어리 글귀 생성"""
+        try:
+            prompt = self._create_prompt(user_input, emotion, style)
+            
+            response = await self.client.post(
+                f"{self.base_url}/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-3.5-turbo-instruct",
+                    "prompt": prompt,
+                    "max_tokens": style.get("length", 150),
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=503,
+                    detail=create_error_response(ErrorCode.AI_SERVICE_UNAVAILABLE)
+                )
+            
+            result = response.json()
+            generated_text = result["choices"][0]["text"].strip()
+            
+            # 토큰 사용량 로깅
+            await self._log_ai_usage(user_input, generated_text, result["usage"])
+            
+            return generated_text
+            
+        except httpx.TimeoutException:
+            raise HTTPException(
+                status_code=503,
+                detail="AI 서비스 응답 시간 초과"
+            )
+        except Exception as e:
+            logger.error(f"AI 서비스 호출 실패: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="AI 서비스를 일시적으로 사용할 수 없습니다"
+            )
+    
+    def _create_prompt(self, user_input: str, emotion: EmotionType, style: Dict) -> str:
+        """프롬프트 생성"""
+        emotion_desc = {
+            EmotionType.HAPPY: "기쁘고 밝은",
+            EmotionType.SAD: "슬프고 차분한",
+            # ... 다른 감정들
+        }
+        
+        return f"""
+        사용자의 감정: {emotion_desc.get(emotion, '중립적인')}
+        사용자 입력: {user_input}
+        
+        다음 조건에 맞는 한국어 글귀를 생성해주세요:
+        - 톤: {style.get('tone', 'healing')}
+        - 길이: {style.get('length_desc', '적당한 길이')}
+        - 형식: {style.get('type', 'prose')}
+        
+        생성된 글귀:
+        """
+    
+    async def _log_ai_usage(self, input_text: str, output_text: str, usage: dict):
+        """AI 사용량 로깅"""
+        # 사용량을 데이터베이스에 기록
+        pass
+```
+
+### 소셜 인증 처리
+
+```python
+# ✅ 소셜 인증 통합 처리
+from typing import Dict, Any
+import httpx
+
+class SocialAuthService:
+    """소셜 인증 통합 서비스"""
+    
+    PROVIDERS = {
+        "google": {
+            "auth_url": "https://accounts.google.com/oauth2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "user_info_url": "https://www.googleapis.com/oauth2/v2/userinfo"
+        },
+        "kakao": {
+            "auth_url": "https://kauth.kakao.com/oauth/authorize",
+            "token_url": "https://kauth.kakao.com/oauth/token",
+            "user_info_url": "https://kapi.kakao.com/v2/user/me"
+        },
+        "naver": {
+            "auth_url": "https://nid.naver.com/oauth2.0/authorize",
+            "token_url": "https://nid.naver.com/oauth2.0/token", 
+            "user_info_url": "https://openapi.naver.com/v1/nid/me"
+        }
+    }
+    
+    async def handle_callback(
+        self, 
+        provider: str, 
+        code: str, 
+        state: str
+    ) -> Tuple[User, str, str]:
+        """소셜 로그인 콜백 처리"""
+        if provider not in self.PROVIDERS:
+            raise HTTPException(
+                status_code=400,
+                detail=create_error_response(
+                    ErrorCode.AUTH_SOCIAL_PROVIDER_ERROR,
+                    custom_message=f"지원하지 않는 소셜 제공자: {provider}"
+                )
+            )
+        
+        try:
+            # 1. 액세스 토큰 획득
+            access_token = await self._get_access_token(provider, code)
+            
+            # 2. 사용자 정보 조회
+            user_info = await self._get_user_info(provider, access_token)
+            
+            # 3. 사용자 생성 또는 조회
+            user = await self._get_or_create_user(provider, user_info)
+            
+            # 4. JWT 토큰 생성
+            access_token_jwt = create_access_token({"sub": str(user.id)})
+            refresh_token_jwt = create_refresh_token({"sub": str(user.id)})
+            
+            return user, access_token_jwt, refresh_token_jwt
+            
+        except Exception as e:
+            logger.error(f"소셜 인증 처리 실패 - Provider: {provider}, Error: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=create_error_response(ErrorCode.AUTH_SOCIAL_TOKEN_INVALID)
+            )
+```
+
+### 알림 시스템
+
+```python
+# ✅ 알림 시스템 구현
+from enum import Enum
+from datetime import datetime, time
+import asyncio
+
+class NotificationType(str, Enum):
+    """알림 타입"""
+    DIARY_REMINDER = "diary_reminder"
+    REPORT_READY = "report_ready" 
+    AI_COMPLETE = "ai_complete"
+
+class NotificationService:
+    """알림 서비스"""
+    
+    async def send_diary_reminder(self, user: User):
+        """다이어리 작성 알림 전송"""
+        if not await self._should_send_reminder(user):
+            return
+        
+        notification = NotificationModel(
+            user_id=user.id,
+            type=NotificationType.DIARY_REMINDER,
+            title="다이어리 작성 알림",
+            message="오늘의 감정을 새김에 기록해보세요.",
+            scheduled_at=datetime.now()
+        )
+        
+        # 데이터베이스에 저장
+        session.add(notification)
+        session.commit()
+        
+        # 브라우저 푸시 알림 전송 (백그라운드)
+        asyncio.create_task(self._send_browser_push(user, notification))
+    
+    async def _should_send_reminder(self, user: User) -> bool:
+        """알림 전송 여부 확인"""
+        # 사용자 알림 설정 확인
+        settings = await self._get_user_notification_settings(user.id)
+        if not settings.diary_reminder_enabled:
+            return False
+        
+        # 오늘 이미 작성했는지 확인
+        today_diary_count = session.exec(
+            select(func.count(DiaryEntry.id))
+            .where(DiaryEntry.user_id == user.id)
+            .where(func.date(DiaryEntry.created_at) == datetime.now().date())
+        ).one()
+        
+        return today_diary_count == 0
+```
+
+이 규칙을 따라 안전하고 고품질의 새김 백엔드 코드를 작성하세요!

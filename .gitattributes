@@ -1,0 +1,120 @@
+# 새김(Saegim) Backend - Git Attributes Configuration
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text eol=lf
+*.pyi text eol=lf
+*.pyx text eol=lf
+
+# Python configuration files
+*.cfg text eol=lf
+*.ini text eol=lf
+requirements*.txt text eol=lf
+pyproject.toml text eol=lf
+setup.py text eol=lf
+setup.cfg text eol=lf
+
+# Alembic migration files
+alembic.ini text eol=lf
+alembic/**/*.py text eol=lf
+alembic/**/*.mako text eol=lf
+
+# Web files (API documentation)
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.rst text eol=lf
+*.txt text eol=lf
+LICENSE text eol=lf
+CHANGELOG* text eol=lf
+README* text eol=lf
+
+# Configuration files
+.env* text eol=lf
+.dockerignore text eol=lf
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+
+# Git files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.gitkeep text eol=lf
+
+# CI/CD files
+.github/**/*.yml text eol=lf
+.github/**/*.yaml text eol=lf
+.github/**/*.md text eol=lf
+
+# IDE and editor files
+.vscode/**/*.json text eol=lf
+.cursor/**/*.md text eol=lf
+*.code-workspace text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Binary files (explicitly declare as binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.whl binary
+*.egg binary
+
+# Python bytecode (should be in .gitignore but just in case)
+*.pyc binary
+*.pyo binary
+*.pyd binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Language detection overrides for GitHub
+*.py linguist-language=Python
+*.pyi linguist-language=Python
+*.pyx linguist-language=Python
+alembic/versions/*.py linguist-language=Python
+
+# Mark test files for GitHub statistics
+tests/**/*.py linguist-documentation
+**/test_*.py linguist-documentation
+
+# Mark generated files
+alembic/versions/* linguist-generated=true
+*.log linguist-generated=true
+
+# Security - ensure sensitive files are not accidentally committed as text
+.env* filter=git-crypt diff=git-crypt
+*.key filter=git-crypt diff=git-crypt
+*.pem filter=git-crypt diff=git-crypt
+*.p12 filter=git-crypt diff=git-crypt
+
+# Export ignore for GitHub releases
+.github/ export-ignore
+.cursor/ export-ignore
+.vscode/ export-ignore
+tests/ export-ignore
+.pytest_cache/ export-ignore
+.mypy_cache/ export-ignore
+__pycache__/ export-ignore
+*.pyc export-ignore
+.coverage export-ignore
+htmlcov/ export-ignore
+.env* export-ignore
