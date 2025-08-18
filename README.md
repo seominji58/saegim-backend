@@ -48,6 +48,33 @@ token = create_access_token({"sub": "user_id"})
 payload = decode_access_token(token)
 ```
 
+### 📁 이미지 업로드 기능
+
+MinIO 객체 스토리지를 사용한 이미지 업로드 기능을 제공합니다.
+
+#### 사용법
+
+```python
+from app.utils.minio_upload import upload_image_to_minio, delete_image_from_minio
+
+# 이미지 업로드
+async def upload_example(file: UploadFile):
+    file_id, image_url = await upload_image_to_minio(file)
+    return {"file_id": file_id, "url": image_url}
+
+# 이미지 삭제
+def delete_example(object_key: str):
+    success = delete_image_from_minio(object_key)
+    return {"deleted": success}
+```
+
+#### 특징
+
+- **파일 크기 제한**: 최대 15MB
+- **지원 형식**: JPEG, PNG, GIF, WebP, BMP
+- **자동 폴더 구성**: `images/YYYY/MM/DD/파일ID.확장자`
+- **안전한 파일명**: UUID 기반 고유 식별자
+
 ### 설치 및 실행
 
 #### 1. 환경설정
@@ -73,7 +100,37 @@ echo "SECRET_KEY=$(openssl rand -base64 32)"
 echo "ENCRYPTION_KEY=$(openssl rand -base64 32)"
 ```
 
-#### 3. 의존성 설치 및 실행
+#### 3. MinIO 설치 및 실행 (이미지 업로드용)
+
+**Docker로 MinIO 실행 (권장):**
+
+```bash
+# MinIO 서버 실행
+docker run -d \
+  --name minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e "MINIO_ROOT_USER=minioadmin" \
+  -e "MINIO_ROOT_PASSWORD=minioadmin" \
+  minio/minio server /data --console-address ":9001"
+
+# MinIO 웹 콘솔 접속: http://localhost:9001
+# 로그인: minioadmin / minioadmin
+```
+
+**로컬 설치:**
+
+```bash
+# macOS (Homebrew)
+brew install minio/stable/minio
+
+# Linux/Windows - 바이너리 다운로드
+wget https://dl.min.io/server/minio/release/linux-amd64/minio
+chmod +x minio
+./minio server /data
+```
+
+#### 4. 의존성 설치 및 실행
 
 ```bash
 # 의존성 설치
@@ -97,6 +154,11 @@ uvicorn app.main:app --reload
 | `DATABASE_URL` | PostgreSQL 연결 URL | `postgresql://user:pass@localhost:5432/saegim` |
 | `ALLOWED_HOSTS` | CORS 허용 도메인 | `http://localhost:3000,http://localhost:8080` |
 | `ENVIRONMENT` | 실행 환경 | `development`, `production` |
+| `MINIO_ENDPOINT` | MinIO 서버 엔드포인트 | `localhost:9000` |
+| `MINIO_ACCESS_KEY` | MinIO 액세스 키 | `minioadmin` |
+| `MINIO_SECRET_KEY` | MinIO 시크릿 키 | `minioadmin` |
+| `MINIO_SECURE` | HTTPS 사용 여부 | `false`, `true` |
+| `MINIO_BUCKET_NAME` | MinIO 버킷명 | `saegim-images` |
 
 **⚠️ 보안 주의사항:**
 
