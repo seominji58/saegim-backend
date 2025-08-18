@@ -1,6 +1,27 @@
 ---
 description: 새김(Saegim) 백엔드 개발 규칙 - FastAPI + SQLModel + PostgreSQL + Redis
 globs:
+<<<<<<< HEAD
+=======
+    - "app/**/*.py"
+    - "*.py"
+    - "alembic/**/*.py"
+    - "tests/**/*.py"
+    - "requirements*.txt"
+    - "pyproject.toml"
+    - "Dockerfile"
+    - "docker-compose*.yml"
+excludeGlobs:
+    - "__pycache__/**"
+    - ".venv/**"
+    - "venv/**"
+    - ".env*"
+    - "*.pyc"
+    - "*.pyo"
+    - "*.pyd"
+    - ".pytest_cache/**"
+    - ".mypy_cache/**"
+>>>>>>> develop
 alwaysApply: false
 ---
 
@@ -549,7 +570,11 @@ class DiaryCreate(BaseModel):
     """다이어리 생성 스키마 (입력 검증 포함)"""
     title: str = Field(..., min_length=1, max_length=255, strip_whitespace=True)
     content: str = Field(..., min_length=1, max_length=10000, strip_whitespace=True)
+<<<<<<< HEAD
     emotion: Optional[str] = Field(None, regex=r"^(happy|sad|angry|peaceful|unrest)$")
+=======
+    emotion: Optional[str] = Field(None, regex=r"^(happy|sad|angry|peaceful|worried)$")
+>>>>>>> develop
 
     @validator('title', 'content')
     def validate_no_html(cls, v):
