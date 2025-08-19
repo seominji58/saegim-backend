@@ -1,0 +1,43 @@
+[run]
+# 커버리지 측정 대상
+source = app
+
+# 제외할 파일 패턴
+omit =
+    */tests/*
+    */test_*
+    */__init__.py
+    */conftest.py
+    */venv/*
+    */.venv/*
+
+[report]
+# 커버리지 리포트 설정
+precision = 2
+show_missing = True
+skip_covered = False
+
+# 목표 커버리지 (경고만, 실패하지 않음)
+# fail_under = 80  # 주석 처리하여 실패하지 않도록 함
+
+# 리포트에서 제외할 라인
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+[html]
+# HTML 리포트 설정
+directory = htmlcov
+title = Saegim Backend Coverage Report
+
+[xml]
+# XML 리포트 설정 (CI/CD용)
+output = coverage.xml

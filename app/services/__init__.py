@@ -1,1 +1,7 @@
-# 비즈니스 로직 서비스 패키지
+"""
+비즈니스 로직 서비스
+"""
+
+from .diary import DiaryService
+
+__all__ = ["DiaryService"]
