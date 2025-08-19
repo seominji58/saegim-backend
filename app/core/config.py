@@ -49,6 +49,10 @@ class Settings(BaseSettings):
         "http://localhost:8080",
     ]
 
+    # FCM 설정
+    fcm_project_id: str = os.getenv("FCM_PROJECT_ID", "")
+    fcm_service_account_json: str = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")
+
     @field_validator("allowed_hosts", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v):

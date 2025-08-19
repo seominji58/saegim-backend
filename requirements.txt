@@ -1,6 +1,7 @@
 # FastAPI 및 관련 패키지
 fastapi==0.104.1
 uvicorn==0.24.0
+httpx==0.25.2
 
 # 데이터베이스
 sqlmodel==0.0.14

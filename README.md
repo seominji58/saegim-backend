@@ -75,6 +75,49 @@ def delete_example(object_key: str):
 - **자동 폴더 구성**: `images/YYYY/MM/DD/파일ID.확장자`
 - **안전한 파일명**: UUID 기반 고유 식별자
 
+### 🔥 FCM 푸시 알림 기능
+
+Firebase Cloud Messaging을 사용한 푸시 알림 기능을 제공합니다.
+
+#### 사용법
+
+```python
+from app.utils.fcm_push import send_push_notification, send_diary_reminder
+
+# 기본 푸시 알림 전송
+await send_push_notification(
+    token="user_fcm_token",
+    title="알림 제목",
+    body="알림 내용",
+    data={"key": "value"}  # 선택사항
+)
+
+# 다이어리 작성 알림
+await send_diary_reminder(
+    token="user_fcm_token",
+    user_name="홍길동"
+)
+
+# AI 분석 완료 알림
+await send_ai_analysis_complete(
+    token="user_fcm_token",
+    diary_id="diary_123"
+)
+```
+
+#### 테스트 방법
+
+```bash
+# 1. FCM 데모 실행 (대화형 토큰 입력)
+python examples/fcm_demo.py
+
+# 2. FCM 데모 실행 (명령행 토큰 지정)
+python examples/fcm_demo.py --token YOUR_FCM_TOKEN
+
+# 3. 도움말 확인
+python examples/fcm_demo.py --help
+```
+
 ### 설치 및 실행
 
 #### 1. 환경설정
@@ -84,7 +127,7 @@ def delete_example(object_key: str):
 cp .env.example .env
 
 # .env 파일 편집 (필수!)
-# SECRET_KEY와 ENCRYPTION_KEY를 반드시 변경하세요
+# SECRET_KEY, ENCRYPTION_KEY, FCM 설정을 반드시 변경하세요
 vim .env
 ```
 
@@ -145,20 +188,54 @@ uvicorn app.main:app --reload
 
 ### 🔧 환경변수 설정
 
-주요 환경변수들:
+#### 기본 환경변수
 
 | 변수명 | 설명 | 예시값 |
 |--------|------|--------|
 | `SECRET_KEY` | JWT 시크릿 키 (필수) | `your_jwt_secret_key` |
 | `ENCRYPTION_KEY` | 데이터 암호화 키 (필수) | `your_encryption_key` |
 | `DATABASE_URL` | PostgreSQL 연결 URL | `postgresql://user:pass@localhost:5432/saegim` |
+| `REDIS_URL` | Redis 연결 URL | `redis://localhost:6379/0` |
 | `ALLOWED_HOSTS` | CORS 허용 도메인 | `http://localhost:3000,http://localhost:8080` |
 | `ENVIRONMENT` | 실행 환경 | `development`, `production` |
+
+#### MinIO 파일 저장소 설정
+
+| 변수명 | 설명 | 예시값 |
+|--------|------|--------|
 | `MINIO_ENDPOINT` | MinIO 서버 엔드포인트 | `localhost:9000` |
 | `MINIO_ACCESS_KEY` | MinIO 액세스 키 | `minioadmin` |
 | `MINIO_SECRET_KEY` | MinIO 시크릿 키 | `minioadmin` |
 | `MINIO_SECURE` | HTTPS 사용 여부 | `false`, `true` |
 | `MINIO_BUCKET_NAME` | MinIO 버킷명 | `saegim-images` |
+
+#### 🔥 FCM 푸시 알림 설정
+
+| 변수명 | 필수 | 설명 | 예시값 |
+|--------|------|------|--------|
+| `FCM_PROJECT_ID` | ✅ | Firebase 프로젝트 ID | `your-firebase-project-id` |
+| `FCM_SERVICE_ACCOUNT_JSON` | ✅ | Service Account JSON 문자열 | `'{"type":"service_account",...}'` |
+
+*✅ = 필수*
+
+#### 🔥 FCM 설정 방법
+
+1. **Firebase Console 설정**
+
+   ```bash
+   # 1. Firebase Console 접속
+   open https://console.firebase.google.com
+
+   # 2. 프로젝트 선택 > 프로젝트 설정 > 서비스 계정
+   # 3. "새 비공개 키 생성" 클릭 > JSON 파일 다운로드
+   ```
+
+2. **Service Account 설정**
+
+   ```bash
+   # JSON 문자열로 설정
+   FCM_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project",...}'
+   ```
 
 **⚠️ 보안 주의사항:**
 
