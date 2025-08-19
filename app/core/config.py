@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # 데이터베이스 설정
-    database_url: str = "postgresql://user:password@localhost:5432/saegim"
+    database_url: str = "postgresql://saegim_admin:saegim_pass1234!@seongjunlee.dev:55432/saegim_dev"
     database_echo: bool = False
 
     # 보안 설정 (환경변수에서 가져오거나 기본값 사용)
