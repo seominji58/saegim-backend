@@ -247,23 +247,49 @@ uvicorn app.main:app --reload
 
 #### 테스트 실행
 
+**🔧 pytest 명령어 (Windows/Linux/macOS 호환)**
+
 ```bash
-# 모든 테스트 실행 (깔끔한 출력)
+# 모든 테스트 (커버리지 경고만)
 python -m pytest
 
-# 암호화 모듈 테스트만 실행
-python -m pytest tests/test_encryption.py -v
+# 빠른 테스트 (커버리지 없음)
+python -m pytest --no-cov
 
-# 커버리지 포함 테스트
-python -m pytest --cov=app --cov-report=html
+# 엄격한 커버리지 모드 (80% 미만 시 실패)
+python -m pytest --cov-fail-under=80
+
+# 특정 모듈 테스트
+python -m pytest tests/test_encryption.py -v
+python -m pytest tests/test_minio_upload.py -v
+python -m pytest tests/test_fcm_push.py -v
+
+# 마커별 테스트
+python -m pytest -m integration      # 통합 테스트만
+python -m pytest -m unit            # 단위 테스트만
+python -m pytest -m "not slow"      # 빠른 테스트만
+
+# MinIO 테스트만 실행
+python -m pytest tests/test_minio_upload.py tests/test_minio_integration.py --no-cov
+
+# 임시 파일 정리 (크로스 플랫폼)
+python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/__pycache__')]; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/.pytest_cache')]; pathlib.Path('htmlcov').exists() and shutil.rmtree('htmlcov', ignore_errors=True)"
 ```
 
 #### 테스트 커버리지
 
+- **커버리지 정책**: 기본적으로 경고만 표시, 필요 시 엄격 모드 사용
 - **암호화 모듈**: 94% 커버리지
-- **총 45개 테스트 케이스** (비밀번호 해싱, 데이터 암호화, 엣지 케이스 등)
+- **MinIO 업로드**: 테스트 환경에서 `test` 버킷 강제 사용
+- **총 86개 테스트 케이스** (암호화, MinIO, FCM 등)
 - 성능 테스트 및 보안 테스트 포함
 - **Deprecated 경고 완전 제거**: `bcrypt` 직접 사용으로 전환
+
+**커버리지 설정:**
+
+- `.coveragerc`: 세부 커버리지 설정 (제외 패턴, 리포트 형식 등)
+- `pytest.ini`: 기본 커버리지 경고만 표시
+- `--cov-fail-under=80`: 80% 미만 시 실패하는 엄격 모드
 
 #### 테스트 종류
 

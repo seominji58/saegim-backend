@@ -11,15 +11,30 @@ from fastapi import HTTPException
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_env():
-    """테스트용 환경변수 설정"""
+    """테스트용 환경변수 설정 - 무조건 test 버킷 사용"""
     # .env 파일 로드
     from dotenv import load_dotenv
 
     load_dotenv()
 
-    # 버킷명만 테스트용으로 오버라이드
+    # 버킷명을 무조건 테스트용으로 설정
     original_bucket_name = os.environ.get("MINIO_BUCKET_NAME")
     os.environ["MINIO_BUCKET_NAME"] = "test"
+
+    # 테스트가 test 버킷을 사용하는지 확인
+    assert os.environ["MINIO_BUCKET_NAME"] == "test", (
+        "테스트는 반드시 'test' 버킷을 사용해야 합니다"
+    )
+
+    # 설정 캐시 클리어 (lru_cache 때문에 캐시된 설정을 클리어)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    # 전역 MinIO 업로더 인스턴스 초기화 (싱글톤 패턴 재설정)
+    import app.utils.minio_upload
+
+    app.utils.minio_upload._minio_uploader = None
 
     yield
 
@@ -28,6 +43,11 @@ def setup_test_env():
         os.environ.pop("MINIO_BUCKET_NAME", None)
     else:
         os.environ["MINIO_BUCKET_NAME"] = original_bucket_name
+
+    # 설정 캐시 다시 클리어 (원래 설정으로 복원)
+    get_settings.cache_clear()
+    # 전역 업로더 인스턴스도 다시 초기화
+    app.utils.minio_upload._minio_uploader = None
 
 
 @pytest.fixture
@@ -89,6 +109,23 @@ def invalid_type_file():
 class TestMinIOUploader:
     """MinIOUploader 클래스 테스트"""
 
+    @pytest.fixture(autouse=True)
+    def reset_minio_uploader(self):
+        """각 테스트마다 MinIO 업로더 인스턴스 초기화"""
+        import app.utils.minio_upload
+
+        app.utils.minio_upload._minio_uploader = None
+
+        # 설정 캐시도 클리어
+        from app.core.config import get_settings
+
+        get_settings.cache_clear()
+
+        yield
+
+        # 테스트 후 다시 초기화
+        app.utils.minio_upload._minio_uploader = None
+
     @pytest.fixture
     def mock_minio_client(self):
         """MinIO 클라이언트 Mock"""
@@ -97,6 +134,20 @@ class TestMinIOUploader:
             mock.return_value = client
             client.bucket_exists.return_value = True
             yield client
+
+    def test_bucket_name_is_test(self, mock_minio_client):
+        """테스트 환경에서 버킷명이 'test'인지 확인"""
+        from app.utils.minio_upload import MinIOUploader
+
+        uploader = MinIOUploader()
+
+        # 테스트 환경에서는 반드시 'test' 버킷을 사용해야 함
+        assert uploader.bucket_name == "test", (
+            f"테스트는 'test' 버킷을 사용해야 하지만 '{uploader.bucket_name}'을 사용 중입니다"
+        )
+        assert os.environ.get("MINIO_BUCKET_NAME") == "test", (
+            "환경변수 MINIO_BUCKET_NAME이 'test'로 설정되지 않았습니다"
+        )
 
     def test_init_success(self, mock_minio_client):
         """MinIOUploader 초기화 성공 테스트"""

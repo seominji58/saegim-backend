@@ -73,6 +73,14 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Additional pytest and coverage files
+.coveragerc.local
+pytest-*
+junit.xml
+test-results.xml
+test-output/
+.pytest_cache*
+
 # Translations
 *.mo
 *.pot

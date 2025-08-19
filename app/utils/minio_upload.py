@@ -17,7 +17,6 @@ from app.core.config import get_settings
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class MinIOUploader:
@@ -26,6 +25,9 @@ class MinIOUploader:
     def __init__(self):
         """MinIO 클라이언트 초기화"""
         try:
+            # 설정을 동적으로 가져옴 (테스트 시 환경변수 변경 반영)
+            settings = get_settings()
+
             self.client = Minio(
                 endpoint=settings.minio_endpoint,
                 access_key=settings.minio_access_key,
@@ -37,7 +39,9 @@ class MinIOUploader:
             # 버킷 생성 (존재하지 않을 경우)
             self._ensure_bucket_exists()
 
-            logger.info(f"MinIO 클라이언트 초기화 성공: {settings.minio_endpoint}")
+            logger.info(
+                f"MinIO 클라이언트 초기화 성공: {settings.minio_endpoint}, 버킷: {self.bucket_name}"
+            )
 
         except Exception as e:
             logger.error(f"MinIO 클라이언트 초기화 실패: {e}")
@@ -170,6 +174,7 @@ class MinIOUploader:
 
     def _generate_image_url(self, object_key: str) -> str:
         """이미지 URL 생성"""
+        settings = get_settings()
         protocol = "https" if settings.minio_secure else "http"
         return f"{protocol}://{settings.minio_endpoint}/{self.bucket_name}/{object_key}"
 
