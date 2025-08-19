@@ -1,300 +1,79 @@
-# 새김 백엔드
+# 새김(Saegim) 백엔드
 
-새김(Saegim) 감성 AI 다이어리 백엔드 서비스
+새김 감성 AI 다이어리 서비스의 백엔드 API 서버입니다.
 
-## 🔐 보안 기능
+## 🚀 기술 스택
 
-### 암호화 지원
+- **Framework**: FastAPI
+- **Database**: PostgreSQL + SQLModel
+- **Cache**: Redis
+- **Storage**: MinIO (이미지 업로드)
+- **Push Notification**: Firebase Cloud Messaging
+- **Security**: JWT + AES-256-GCM 암호화
 
-- **비밀번호 해싱**: bcrypt (cost factor: 12)
-- **민감 데이터 암호화**: AES-256-GCM
-- **JWT 인증**: HS256 알고리즘
+## 📁 프로젝트 구조
 
-### 사용법
-
-#### 비밀번호 해싱
-
-```python
-from app.utils.encryption import hash_password, verify_password
-
-# 비밀번호 해싱
-hashed = hash_password("my_password")
-
-# 비밀번호 검증
-is_valid = verify_password("my_password", hashed)
+```
+app/
+├── api/          # API 라우터
+├── core/         # 설정 및 보안
+├── db/           # 데이터베이스 설정
+├── models/       # 데이터 모델
+├── schemas/      # Pydantic 스키마
+├── services/     # 비즈니스 로직
+└── utils/        # 유틸리티 (암호화, 파일 업로드, FCM)
 ```
 
-#### 데이터 암호화
+## 🛠️ 설치 및 실행
 
-```python
-from app.utils.encryption import encrypt_data, decrypt_data
-
-# 데이터 암호화
-encrypted = encrypt_data("민감한 정보")
-
-# 데이터 복호화
-decrypted = decrypt_data(encrypted)
-```
-
-#### JWT 토큰
-
-```python
-from app.core.security import create_access_token, decode_access_token
-
-# 토큰 생성
-token = create_access_token({"sub": "user_id"})
-
-# 토큰 디코딩
-payload = decode_access_token(token)
-```
-
-### 📁 이미지 업로드 기능
-
-MinIO 객체 스토리지를 사용한 이미지 업로드 기능을 제공합니다.
-
-#### 사용법
-
-```python
-from app.utils.minio_upload import upload_image_to_minio, delete_image_from_minio
-
-# 이미지 업로드
-async def upload_example(file: UploadFile):
-    file_id, image_url = await upload_image_to_minio(file)
-    return {"file_id": file_id, "url": image_url}
-
-# 이미지 삭제
-def delete_example(object_key: str):
-    success = delete_image_from_minio(object_key)
-    return {"deleted": success}
-```
-
-#### 특징
-
-- **파일 크기 제한**: 최대 15MB
-- **지원 형식**: JPEG, PNG, GIF, WebP, BMP
-- **자동 폴더 구성**: `images/YYYY/MM/DD/파일ID.확장자`
-- **안전한 파일명**: UUID 기반 고유 식별자
-
-### 🔥 FCM 푸시 알림 기능
-
-Firebase Cloud Messaging을 사용한 푸시 알림 기능을 제공합니다.
-
-#### 사용법
-
-```python
-from app.utils.fcm_push import send_push_notification, send_diary_reminder
-
-# 기본 푸시 알림 전송
-await send_push_notification(
-    token="user_fcm_token",
-    title="알림 제목",
-    body="알림 내용",
-    data={"key": "value"}  # 선택사항
-)
-
-# 다이어리 작성 알림
-await send_diary_reminder(
-    token="user_fcm_token",
-    user_name="홍길동"
-)
-
-# AI 분석 완료 알림
-await send_ai_analysis_complete(
-    token="user_fcm_token",
-    diary_id="diary_123"
-)
-```
-
-#### 테스트 방법
+### 1. 의존성 설치
 
 ```bash
-# 1. FCM 데모 실행 (대화형 토큰 입력)
-python examples/fcm_demo.py
-
-# 2. FCM 데모 실행 (명령행 토큰 지정)
-python examples/fcm_demo.py --token YOUR_FCM_TOKEN
-
-# 3. 도움말 확인
-python examples/fcm_demo.py --help
+pip install -r requirements.txt
 ```
 
-### 설치 및 실행
-
-#### 1. 환경설정
+### 2. 환경 설정
 
 ```bash
 # 환경설정 파일 생성
 cp .env.example .env
 
-# .env 파일 편집 (필수!)
-# SECRET_KEY, ENCRYPTION_KEY, FCM 설정을 반드시 변경하세요
-vim .env
+# 필수 환경변수 설정
+SECRET_KEY=your_jwt_secret_key
+ENCRYPTION_KEY=your_encryption_key
+DATABASE_URL=postgresql://user:pass@localhost:5432/saegim
 ```
 
-#### 2. 보안 키 생성
-
-*OpenSSL 사용 (권장):*
+### 3. 서버 실행
 
 ```bash
-# JWT 시크릿 키 생성
-echo "SECRET_KEY=$(openssl rand -base64 32)"
-
-# 데이터 암호화 키 생성
-echo "ENCRYPTION_KEY=$(openssl rand -base64 32)"
-```
-
-#### 3. MinIO 설치 및 실행 (이미지 업로드용)
-
-**Docker로 MinIO 실행 (권장):**
-
-```bash
-# MinIO 서버 실행
-docker run -d \
-  --name minio \
-  -p 9000:9000 \
-  -p 9001:9001 \
-  -e "MINIO_ROOT_USER=minioadmin" \
-  -e "MINIO_ROOT_PASSWORD=minioadmin" \
-  minio/minio server /data --console-address ":9001"
-
-# MinIO 웹 콘솔 접속: http://localhost:9001
-# 로그인: minioadmin / minioadmin
-```
-
-**로컬 설치:**
-
-```bash
-# macOS (Homebrew)
-brew install minio/stable/minio
-
-# Linux/Windows - 바이너리 다운로드
-wget https://dl.min.io/server/minio/release/linux-amd64/minio
-chmod +x minio
-./minio server /data
-```
-
-#### 4. 의존성 설치 및 실행
-
-```bash
-# 의존성 설치
-pip install -r requirements.txt
-
-# 데모 실행 (암호화 기능 테스트)
-python examples/encryption_demo.py
-
-# 서버 실행
+# 개발 서버 실행
 uvicorn app.main:app --reload
+
+# API 문서 확인
+open http://localhost:8000/docs
 ```
 
-### 🔧 환경변수 설정
-
-#### 기본 환경변수
-
-| 변수명 | 설명 | 예시값 |
-|--------|------|--------|
-| `SECRET_KEY` | JWT 시크릿 키 (필수) | `your_jwt_secret_key` |
-| `ENCRYPTION_KEY` | 데이터 암호화 키 (필수) | `your_encryption_key` |
-| `DATABASE_URL` | PostgreSQL 연결 URL | `postgresql://user:pass@localhost:5432/saegim` |
-| `REDIS_URL` | Redis 연결 URL | `redis://localhost:6379/0` |
-| `ALLOWED_HOSTS` | CORS 허용 도메인 | `http://localhost:3000,http://localhost:8080` |
-| `ENVIRONMENT` | 실행 환경 | `development`, `production` |
-
-#### MinIO 파일 저장소 설정
-
-| 변수명 | 설명 | 예시값 |
-|--------|------|--------|
-| `MINIO_ENDPOINT` | MinIO 서버 엔드포인트 | `localhost:9000` |
-| `MINIO_ACCESS_KEY` | MinIO 액세스 키 | `minioadmin` |
-| `MINIO_SECRET_KEY` | MinIO 시크릿 키 | `minioadmin` |
-| `MINIO_SECURE` | HTTPS 사용 여부 | `false`, `true` |
-| `MINIO_BUCKET_NAME` | MinIO 버킷명 | `saegim-images` |
-
-#### 🔥 FCM 푸시 알림 설정
-
-| 변수명 | 필수 | 설명 | 예시값 |
-|--------|------|------|--------|
-| `FCM_PROJECT_ID` | ✅ | Firebase 프로젝트 ID | `your-firebase-project-id` |
-| `FCM_SERVICE_ACCOUNT_JSON` | ✅ | Service Account JSON 문자열 | `'{"type":"service_account",...}'` |
-
-*✅ = 필수*
-
-#### 🔥 FCM 설정 방법
-
-1. **Firebase Console 설정**
-
-   ```bash
-   # 1. Firebase Console 접속
-   open https://console.firebase.google.com
-
-   # 2. 프로젝트 선택 > 프로젝트 설정 > 서비스 계정
-   # 3. "새 비공개 키 생성" 클릭 > JSON 파일 다운로드
-   ```
-
-2. **Service Account 설정**
-
-   ```bash
-   # JSON 문자열로 설정
-   FCM_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project",...}'
-   ```
-
-**⚠️ 보안 주의사항:**
-
-- `SECRET_KEY`와 `ENCRYPTION_KEY`는 반드시 강력한 랜덤 값으로 설정
-- `.env` 파일은 Git에 커밋하지 말 것
-- 운영환경에서는 모든 기본값을 변경할 것
-
-### 🧪 테스트
-
-#### 테스트 실행
-
-**🔧 pytest 명령어 (Windows/Linux/macOS 호환)**
+## 🧪 테스트
 
 ```bash
-# 모든 테스트 (커버리지 경고만)
+# 모든 테스트 실행
 python -m pytest
 
-# 빠른 테스트 (커버리지 없음)
-python -m pytest --no-cov
-
-# 엄격한 커버리지 모드 (80% 미만 시 실패)
-python -m pytest --cov-fail-under=80
-
-# 특정 모듈 테스트
-python -m pytest tests/test_encryption.py -v
-python -m pytest tests/test_minio_upload.py -v
-python -m pytest tests/test_fcm_push.py -v
-
-# 마커별 테스트
-python -m pytest -m integration      # 통합 테스트만
-python -m pytest -m unit            # 단위 테스트만
-python -m pytest -m "not slow"      # 빠른 테스트만
-
-# MinIO 테스트만 실행
-python -m pytest tests/test_minio_upload.py tests/test_minio_integration.py --no-cov
-
-# 임시 파일 정리 (크로스 플랫폼)
-python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/__pycache__')]; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/.pytest_cache')]; pathlib.Path('htmlcov').exists() and shutil.rmtree('htmlcov', ignore_errors=True)"
+# 커버리지 포함 테스트
+python -m pytest --cov=app
 ```
 
-#### 테스트 커버리지
+## 📚 문서
 
-- **커버리지 정책**: 기본적으로 경고만 표시, 필요 시 엄격 모드 사용
-- **암호화 모듈**: 94% 커버리지
-- **MinIO 업로드**: 테스트 환경에서 `test` 버킷 강제 사용
-- **총 86개 테스트 케이스** (암호화, MinIO, FCM 등)
-- 성능 테스트 및 보안 테스트 포함
-- **Deprecated 경고 완전 제거**: `bcrypt` 직접 사용으로 전환
+자세한 설정 및 사용법은 다음 문서를 참고하세요:
 
-**커버리지 설정:**
+- [보안 기능 가이드](docs/SECURITY.md) - 암호화, JWT, 보안 설정
+- [배포 가이드](docs/DEPLOYMENT.md) - 환경 설정, MinIO, FCM 설정
+- [기능 사용법](docs/FEATURES.md) - API 기능별 상세 사용법
+- [테스트 가이드](docs/TESTING.md) - 테스트 실행 및 커버리지
 
-- `.coveragerc`: 세부 커버리지 설정 (제외 패턴, 리포트 형식 등)
-- `pytest.ini`: 기본 커버리지 경고만 표시
-- `--cov-fail-under=80`: 80% 미만 시 실패하는 엄격 모드
+## 🔗 관련 링크
 
-#### 테스트 종류
-
-- **단위 테스트**: 개별 함수 및 클래스 테스트
-- **통합 테스트**: 모듈 간 상호작용 테스트
-- **보안 테스트**: 암호화 및 해싱 보안성 검증
-- **성능 테스트**: 암호화 성능 및 비밀번호 해싱 시간 측정
-- **엣지 케이스**: 빈 문자열, 특수문자, 긴 데이터 등
+- [API 문서](http://localhost:8000/docs) (서버 실행 후)
+- [프론트엔드](https://github.com/aicc6/saegim-frontend) - Next.js 프론트엔드
