@@ -2,7 +2,7 @@
 다이어리 API 스키마 (캘린더용)
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, List
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import uuid
@@ -19,7 +19,7 @@ class DiaryResponse(BaseModel):
     user_id: str
     ai_generated_text: Optional[str] = None
     is_public: bool
-    keywords: Optional[str] = None
+    keywords: Optional[List[str]] = None  # keywords를 리스트 타입으로 수정
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -39,8 +39,10 @@ class DiaryListResponse(BaseModel):
     """다이어리 목록 응답 스키마 (캘린더용)"""
     id: str
     title: str
+    ai_generated_text: Optional[str] = None  # ai_generated_text 필드 추가
     user_emotion: Optional[str] = None
     ai_emotion: Optional[str] = None
+    keywords: Optional[List[str]] = None  # keywords를 리스트 타입으로 수정
     created_at: datetime
     is_public: bool
 

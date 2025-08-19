@@ -51,7 +51,7 @@ async def get_diaries(
 async def get_diary(
     *,
     session: Session = Depends(get_session),
-    diary_id: int = Path(..., description="다이어리 ID")
+    diary_id: str = Path(..., description="다이어리 ID (UUID)")
 ) -> BaseResponse[DiaryResponse]:
     """특정 다이어리 조회"""
 
@@ -74,7 +74,7 @@ async def get_diary(
 async def get_calendar_diaries(
     *,
     session: Session = Depends(get_session),
-    user_id: int = Path(..., description="사용자 ID"),
+    user_id: str = Path(..., description="사용자 ID (UUID)"),
     start_date: date = Query(..., description="시작 날짜 (YYYY-MM-DD)"),
     end_date: date = Query(..., description="종료 날짜 (YYYY-MM-DD)")
 ) -> BaseResponse[List[DiaryListResponse]]:
