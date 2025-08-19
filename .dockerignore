@@ -1,0 +1,158 @@
+# 새김(Saegim) 백엔드 .dockerignore
+# Docker 빌드 컨텍스트에서 제외할 파일들
+
+# Git 관련
+.git
+.github
+.gitignore
+.gitattributes
+
+# Python 관련
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 가상환경
+venv/
+.venv/
+ENV/
+env/
+.env/
+.conda
+
+# 테스트 및 커버리지
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+coverage.xml
+*.cover
+*.py,cover
+test-results.xml
+junit.xml
+pytest-*
+
+# IDE 및 에디터
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 로그 파일
+*.log
+logs/
+.logs/
+
+# 데이터베이스
+*.db
+*.sqlite
+*.sqlite3
+
+# 환경설정 파일 (민감 정보 포함)
+.env
+.env.*
+!.env.example
+
+# 문서 및 예제
+docs/
+examples/
+README.md
+*.md
+!docker.md
+
+# Alembic 마이그레이션 (필요 시 제외)
+# alembic/versions/
+
+# 백업 파일
+*.bak
+*.backup
+*.orig
+
+# 임시 파일
+tmp/
+temp/
+.tmp/
+.temp/
+
+# 개발 도구
+Dockerfile.dev
+docker-compose*.yml
+docker-compose*.yaml
+
+# 성능 프로파일링
+.prof
+
+# MyPy 캐시
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre 타입 체커
+.pyre/
+
+# pytype 정적 타입 분석기
+.pytype/
+
+# Cython 디버그 심볼
+cython_debug/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# 패키지 매니저
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 배포 관련
+dist/
+build/
+*.tar.gz
+*.zip
+
+# 로컬 개발 파일
+.local
+local_settings.py
+
+# 캐시 파일
+.cache
+.ruff_cache/
+
+# Firebase 관련 (개발용)
+.firebase/
+.firebaserc
+.runtimeconfig.json
+
+# MinIO 테스트 데이터
+minio_data/
+
+# 보안 관련
+*.key
+*.pem
+*.p12
+*.crt
+*.csr
+service-account*.json
+
+# 성능 및 모니터링
+*.prof
+*.pstats
+
+# Copilot 처리 파일
+Copilot-Processing.md
