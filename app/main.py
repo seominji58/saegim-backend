@@ -8,10 +8,10 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from fastapi_limiter import FastAPILimiter
-from fastapi_limiter.depends import RateLimiter
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-import redis.asyncio as redis
 import logging
 from datetime import datetime
 
@@ -66,16 +66,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
+# Rate Limiter 설정
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=settings.redis_url if settings.is_production else "memory://"
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # 시작 이벤트
 @app.on_event("startup")
 async def startup_event():
     # 데이터베이스 테이블 생성
     create_db_and_tables()
-    
-    # Redis 연결 및 rate limiter 설정
-    if settings.is_production:
-        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
-        await FastAPILimiter.init(redis_client)
 
 # 종료 이벤트
 @app.on_event("shutdown")

@@ -1,7 +1,7 @@
 # FastAPI 및 관련 패키지
 fastapi==0.104.1
 uvicorn==0.24.0
-fastapi-limiter==0.1.5
+slowapi==0.1.9
 
 # 데이터베이스
 sqlmodel==0.0.14
