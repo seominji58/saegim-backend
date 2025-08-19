@@ -1,5 +1,9 @@
 from __future__ import annotations
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
+
+if TYPE_CHECKING:
+    from app.models.oauth_token import OAuthToken
+    from app.models.password_reset_token import PasswordResetToken
 from uuid import uuid4, UUID
 from datetime import datetime
 
@@ -44,6 +48,6 @@ class User(SQLModel, table=True):
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
-    # 관계
-    oauth_tokens: List["OAuthToken"] = Relationship(back_populates="user")
-    reset_tokens: List["PasswordResetToken"] = Relationship(back_populates="user")
+    # 관계 정의 - 일시적으로 제거 (문제 해결 후 복원 예정)
+    # oauth_tokens: List["OAuthToken"] = Relationship(back_populates="user")
+    # reset_tokens: List["PasswordResetToken"] = Relationship(back_populates="user")

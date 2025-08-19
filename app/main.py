@@ -8,15 +8,16 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
 import logging
 from datetime import datetime
 
+from app.core.env_config import load_env_file
 from app.core.config import get_settings
-from app.api import health
+
+# 환경 변수 먼저 로드
+load_env_file()
+from app.api import health, router as api_router
 from app.db.database import create_db_and_tables
 
 # 로깅 설정
@@ -66,14 +67,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# Rate Limiter 설정
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=settings.redis_url if settings.is_production else "memory://"
-)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 # 시작 이벤트
 @app.on_event("startup")
 async def startup_event():
@@ -102,4 +95,4 @@ async def status():
     }
 
 # API 라우터 등록
-app.include_router(health.router, prefix="/api", tags=["health"])
+app.include_router(api_router)  # 모든 API 라우터 포함

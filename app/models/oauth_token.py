@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import uuid4, UUID
 from datetime import datetime
 
@@ -9,6 +9,9 @@ from sqlalchemy import (
     Column, String, DateTime, Text, ForeignKey
 )
 from sqlalchemy.sql import func
+
+if TYPE_CHECKING:
+    from app.models.user import User  # noqa: F401
 
 
 class OAuthToken(SQLModel, table=True):
@@ -43,4 +46,5 @@ class OAuthToken(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     )
 
-    user: "User" = Relationship(back_populates="oauth_tokens")
+    # 관계 정의 - 일시적으로 제거 (문제 해결 후 복원 예정)
+    # user: "User" = Relationship(back_populates="oauth_tokens")

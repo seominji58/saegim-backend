@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     rate_limit_auth_per_min: int = 10
     
     # OAuth 설정
-    google_client_id: str = ""
-    google_client_secret: str = ""
+    google_client_id: str = Field(..., description="Google OAuth client ID")
+    google_client_secret: str = Field(..., description="Google OAuth client secret")
     google_auth_uri: str = "https://accounts.google.com/o/oauth2/auth"
     google_token_uri: str = "https://oauth2.googleapis.com/token"
     google_certs_uri: str = "https://www.googleapis.com/oauth2/v1/certs"
