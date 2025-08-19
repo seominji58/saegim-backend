@@ -73,6 +73,14 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Additional pytest and coverage files
+.coveragerc.local
+pytest-*
+junit.xml
+test-results.xml
+test-output/
+.pytest_cache*
+
 # Translations
 *.mo
 *.pot
@@ -224,3 +232,12 @@ pip-selfcheck.json
 # End of https://www.toptal.com/developers/gitignore/api/venv,python,visualstudiocode,git,dotenv
 
 .conda
+
+### Firebase ###
+.idea
+**/node_modules/*
+**/.firebaserc
+
+### Firebase Patch ###
+.runtimeconfig.json
+.firebase/

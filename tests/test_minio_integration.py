@@ -11,14 +11,29 @@ from fastapi import UploadFile
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_integration_test_env():
-    """통합 테스트용 환경변수 설정"""
+    """통합 테스트용 환경변수 설정 - 무조건 test 버킷 사용"""
     from dotenv import load_dotenv
 
     load_dotenv()
 
-    # 통합 테스트용 버킷명 설정
+    # 버킷명을 무조건 테스트용으로 설정
     original_bucket_name = os.environ.get("MINIO_BUCKET_NAME")
     os.environ["MINIO_BUCKET_NAME"] = "test"
+
+    # 테스트가 test 버킷을 사용하는지 확인
+    assert os.environ["MINIO_BUCKET_NAME"] == "test", (
+        "테스트는 반드시 'test' 버킷을 사용해야 합니다"
+    )
+
+    # 설정 캐시 클리어 (lru_cache 때문에 캐시된 설정을 클리어)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    # 전역 MinIO 업로더 인스턴스 초기화 (싱글톤 패턴 재설정)
+    import app.utils.minio_upload
+
+    app.utils.minio_upload._minio_uploader = None
 
     yield
 
@@ -27,6 +42,11 @@ def setup_integration_test_env():
         os.environ.pop("MINIO_BUCKET_NAME", None)
     else:
         os.environ["MINIO_BUCKET_NAME"] = original_bucket_name
+
+    # 설정 캐시 다시 클리어 (원래 설정으로 복원)
+    get_settings.cache_clear()
+    # 전역 업로더 인스턴스도 다시 초기화
+    app.utils.minio_upload._minio_uploader = None
 
 
 @pytest.fixture
@@ -153,11 +173,42 @@ def test_minio_connection():
         print(f"   엔드포인트: {os.getenv('MINIO_ENDPOINT')}")
         print(f"   버킷명: {uploader.bucket_name}")
 
-        assert uploader.bucket_name == "test"
+        # 테스트 환경에서는 반드시 'test' 버킷을 사용해야 함
+        assert uploader.bucket_name == "test", (
+            f"통합 테스트는 'test' 버킷을 사용해야 하지만 '{uploader.bucket_name}'을 사용 중입니다"
+        )
+        assert os.environ.get("MINIO_BUCKET_NAME") == "test", (
+            "환경변수 MINIO_BUCKET_NAME이 'test'로 설정되지 않았습니다"
+        )
 
     except Exception as e:
         print(f"❌ MinIO 연결 실패: {e}")
         pytest.skip("MinIO 서버에 연결할 수 없어 테스트를 건너뜁니다.")
+
+
+@pytest.mark.integration
+def test_bucket_name_enforcement():
+    """통합 테스트에서 버킷명 강제 확인"""
+    # 환경변수 확인
+    assert os.environ.get("MINIO_BUCKET_NAME") == "test", (
+        "통합 테스트는 반드시 'test' 버킷명을 사용해야 합니다"
+    )
+
+    try:
+        from app.utils.minio_upload import get_minio_uploader
+
+        uploader = get_minio_uploader()
+
+        # 업로더 인스턴스의 버킷명 확인
+        assert uploader.bucket_name == "test", (
+            f"업로더가 잘못된 버킷명 '{uploader.bucket_name}'을 사용하고 있습니다"
+        )
+
+        print("✅ 버킷명 확인 완료: 'test' 버킷 사용 중")
+
+    except Exception as e:
+        print(f"❌ 버킷명 확인 실패: {e}")
+        pytest.fail("버킷명 강제 확인에 실패했습니다")
 
 
 if __name__ == "__main__":
