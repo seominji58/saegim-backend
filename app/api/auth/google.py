@@ -3,14 +3,19 @@
 """
 from typing import Dict
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session
+import uuid
+import time
 
 from app.core.config import get_settings
 from app.db.database import get_session
 from app.services.oauth import GoogleOAuthService
 from app.core.security import create_access_token, create_refresh_token
+
+# 임시 토큰 저장소 (실제로는 Redis를 사용하는 것이 좋습니다)
+temp_tokens = {}
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
 settings = get_settings()
@@ -39,7 +44,7 @@ async def google_login() -> RedirectResponse:
 async def google_callback(
     code: str,
     db: Session = Depends(get_session),
-) -> Dict[str, str]:
+) -> RedirectResponse:
     """구글 OAuth 콜백 처리
 
     Args:
@@ -47,17 +52,47 @@ async def google_callback(
         db: 데이터베이스 세션
 
     Returns:
-        Dict[str, str]: JWT 토큰
+        RedirectResponse: 프론트엔드 콜백 페이지로 리다이렉트
     """
-    oauth_service = GoogleOAuthService()
-    user, _ = await oauth_service.process_oauth_callback(code, db)
+    try:
+        oauth_service = GoogleOAuthService()
+        user, _ = await oauth_service.process_oauth_callback(code, db)
 
-    # JWT 토큰 생성
-    access_token = create_access_token({"sub": str(user.id)})
-    refresh_token = create_refresh_token({"sub": str(user.id)})
+        # JWT 토큰 생성
+        access_token = create_access_token({"sub": str(user.id)})
+        refresh_token = create_refresh_token({"sub": str(user.id)})
 
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+        # 임시 토큰 ID 생성
+        temp_token_id = str(uuid.uuid4())
+        temp_tokens[temp_token_id] = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "created_at": time.time()
+        }
+
+        # 프론트엔드 콜백 페이지로 리다이렉트
+        frontend_callback_url = f"http://localhost:3000/auth/callback?token_id={temp_token_id}"
+        
+        return RedirectResponse(url=frontend_callback_url)
+        
+    except Exception as e:
+        # 에러 발생 시 프론트엔드 에러 페이지로 리다이렉트
+        error_url = f"http://localhost:3000/auth/callback?error=login_failed"
+        return RedirectResponse(url=error_url)
+
+
+@router.get("/token/{token_id}")
+async def get_token(token_id: str) -> Dict[str, str]:
+    """임시 토큰 ID로 실제 토큰 반환"""
+    if token_id in temp_tokens:
+        token_data = temp_tokens.pop(token_id)  # 사용 후 삭제
+        
+        # 5분 이내에 생성된 토큰만 유효
+        if time.time() - token_data["created_at"] < 300:
+            return {
+                "access_token": token_data["access_token"],
+                "refresh_token": token_data["refresh_token"],
+                "token_type": "bearer",
+            }
+    
+    raise HTTPException(status_code=400, detail="Invalid or expired token")
