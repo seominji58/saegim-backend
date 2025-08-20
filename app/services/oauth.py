@@ -15,7 +15,8 @@ from app.core.config import get_settings
 from app.schemas.oauth import GoogleOAuthResponse, OAuthUserInfo
 from app.models.oauth_token import OAuthToken
 from app.models.user import User
-from sqlmodel import Session, select
+from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 settings = get_settings()
 
@@ -126,9 +127,9 @@ class GoogleOAuthService:
         user_info = await self.get_user_info(token_response.access_token)
 
         # 기존 사용자 확인 또는 새로 생성
-        user = db.exec(
-            select(User).where(User.email == user_info.email)
-        ).first()
+        stmt = select(User).where(User.email == user_info.email)
+        result = db.execute(stmt)
+        user = result.scalar_one_or_none()
 
         if not user:
             user = User(
@@ -145,12 +146,12 @@ class GoogleOAuthService:
             db.refresh(user)
 
         # OAuth 토큰 저장/업데이트
-        oauth_token = db.exec(
-            select(OAuthToken).where(
-                OAuthToken.user_id == user.id,
-                OAuthToken.provider == "google",
-            )
-        ).first()
+        stmt = select(OAuthToken).where(
+            OAuthToken.user_id == user.id,
+            OAuthToken.provider == "google",
+        )
+        result = db.execute(stmt)
+        oauth_token = result.scalar_one_or_none()
 
         if oauth_token:
             oauth_token.access_token = token_response.access_token

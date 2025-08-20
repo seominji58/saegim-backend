@@ -1,21 +1,22 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, List
+from uuid import uuid4, UUID
+from datetime import datetime
+
+from sqlalchemy import Column, String, DateTime, Boolean, Index, UniqueConstraint, CheckConstraint, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 if TYPE_CHECKING:
     from app.models.oauth_token import OAuthToken
     from app.models.password_reset_token import PasswordResetToken
+    from app.models.email_verification import EmailVerification
     from app.models.diary import DiaryEntry
-from uuid import uuid4, UUID
-from datetime import datetime
 
-from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import (
-    Index, UniqueConstraint, CheckConstraint, text, Column, String, DateTime
-)
-from sqlalchemy.sql import func
+from app.models.base import Base
 
 
-class User(SQLModel, table=True):
+class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
@@ -29,27 +30,28 @@ class User(SQLModel, table=True):
               postgresql_where=text("deleted_at IS NULL")),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    email: str = Field(nullable=False, index=True, max_length=255)
-    password_hash: Optional[str] = Field(default=None, nullable=True, max_length=255)
-    account_type: str = Field(default="social", nullable=False, max_length=6)
-    nickname: str = Field(nullable=False, max_length=50)
-    provider: Optional[str] = Field(default=None, nullable=True, max_length=20)
-    provider_id: Optional[str] = Field(default=None, nullable=True, max_length=255)
-    profile_image_url: Optional[str] = Field(default=None, nullable=True, max_length=500)
-    is_active: bool = Field(default=True, nullable=False)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    account_type: Mapped[str] = mapped_column(String(6), nullable=False, default="social")
+    nickname: Mapped[str] = mapped_column(String(50), nullable=False)
+    provider: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    provider_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    profile_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    updated_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    deleted_at: Optional[datetime] = Field(
-        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
-    # 관계 정의 - 로그인 관련만 (임시로 제거)
-    # oauth_tokens: List["OAuthToken"] = Relationship(back_populates="user")
-    # reset_tokens: List["PasswordResetToken"] = Relationship(back_populates="user")
-    # diaries: List["DiaryEntry"] = Relationship(back_populates="user", sa_relationship_kwargs={"lazy": "selectin"})
+    # 관계 정의 - SQLAlchemy 2.0 방식
+    oauth_tokens: Mapped[List["OAuthToken"]] = relationship(back_populates="user", lazy="selectin")
+    reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(back_populates="user", lazy="selectin")
+    email_verifications: Mapped[List["EmailVerification"]] = relationship(back_populates="user", lazy="selectin")
+    # diaries: Mapped[List["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")

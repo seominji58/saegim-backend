@@ -1,13 +1,14 @@
 """Alembic Environment Configuration"""
 from logging.config import fileConfig
-from sqlmodel import SQLModel
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from urllib.parse import unquote
 
 from alembic import context
 from app.core.config import get_settings
+from app.models.base import Base
 
-# Import all models to ensure they are registered with SQLModel
+# Import all models to ensure they are registered with SQLAlchemy
 from app.models.user import User
 from app.models.email_verification import EmailVerification
 from app.models.oauth_token import OAuthToken
@@ -20,12 +21,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Get database URL from application settings
+# Get database URL from application settings and decode it
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+decoded_database_url = unquote(settings.database_url)
+config.set_main_option("sqlalchemy.url", decoded_database_url)
 
 # MetaData object for models
-target_metadata = SQLModel.metadata
+target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode"""
