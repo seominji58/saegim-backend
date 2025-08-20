@@ -45,6 +45,10 @@ async def google_callback(
     code: str,
     db: Session = Depends(get_session),
 ) -> RedirectResponse:
+    # 디버깅: 설정값 확인
+    print(f"Debug - Frontend callback URL: {settings.frontend_callback_url}")
+    print(f"Debug - Frontend URL: {settings.frontend_url}")
+    print(f"Debug - Google client ID: {settings.google_client_id[:8]}...")
     """구글 OAuth 콜백 처리
 
     Args:
@@ -70,9 +74,10 @@ async def google_callback(
             "created_at": time.time()
         }
 
-        # 프론트엔드 콜백 페이지로 리다이렉트
-        frontend_callback_url = f"http://localhost:3000/auth/callback?token_id={temp_token_id}"
+        # 프론트엔드 콜백 페이지로 리다이렉트 (토큰 ID 포함)
+        frontend_callback_url = f"{settings.frontend_callback_url}?token_id={temp_token_id}"
         
+        print(f"Frontend callback URL: {settings.frontend_callback_url}")
         print(f"Redirecting to: {frontend_callback_url}")
         print(f"User logged in: {user.email}")
         print(f"Token ID: {temp_token_id}")
@@ -80,8 +85,11 @@ async def google_callback(
         return RedirectResponse(url=frontend_callback_url)
         
     except Exception as e:
-        # 에러 발생 시 프론트엔드 에러 페이지로 리다이렉트
-        error_url = f"http://localhost:3000/auth/callback?error=login_failed"
+        # 에러 발생 시 프론트엔드 콜백 페이지로 리다이렉트 (에러 파라미터 포함)
+        error_url = f"{settings.frontend_callback_url}?error=login_failed"
+        print(f"Frontend callback URL (error): {settings.frontend_callback_url}")
+        print(f"Error URL: {error_url}")
+        print(f"OAuth Error: {e}")
         return RedirectResponse(url=error_url)
 
 

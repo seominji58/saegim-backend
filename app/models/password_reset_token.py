@@ -31,5 +31,5 @@ class PasswordResetToken(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
 
-    # 관계 정의 - 일시적으로 제거 (문제 해결 후 복원 예정)
+    # 관계 정의 - 일시적으로 제거 (OAuth 인증 문제 해결 후 복원 예정)
     # user: "User" = Relationship(back_populates="reset_tokens")

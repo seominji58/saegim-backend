@@ -24,17 +24,22 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # 데이터베이스 설정
-    database_url: str = "postgresql://saegim_admin:saegim_pass1234!@seongjunlee.dev:55432/saegim_dev"
-    database_echo: bool = False
+    database_url: str = os.getenv("DATABASE_URL", "")
+    database_echo: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
+    database_pool_size: int = int(os.getenv("DATABASE_POOL_SIZE", "10"))
+    database_max_overflow: int = int(os.getenv("DATABASE_MAX_OVERFLOW", "20"))
+    database_pool_timeout: int = int(os.getenv("DATABASE_POOL_TIMEOUT", "30"))
+    database_pool_recycle: int = int(os.getenv("DATABASE_POOL_RECYCLE", "3600"))
+    database_ssl_mode: str = os.getenv("DATABASE_SSL_MODE", "prefer")
 
     # 보안 설정 (환경변수에서 가져오거나 기본값 사용)
     secret_key: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
     encryption_key: str = os.getenv("ENCRYPTION_KEY", secrets.token_urlsafe(32))
 
     # JWT 설정
-    jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 60
-    jwt_refresh_token_expire_days: int = 7
+    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    jwt_access_token_expire_minutes: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    jwt_refresh_token_expire_days: int = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
     # MinIO 설정
     minio_endpoint: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -44,14 +49,23 @@ class Settings(BaseSettings):
     minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim-images")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
-    allowed_hosts: Union[List[str], str] = [
-        "http://localhost:3000",
-        "http://localhost:8080",
-    ]
+    allowed_hosts: Union[List[str], str] = os.getenv("ALLOWED_HOSTS", "http://localhost:3000,http://localhost:8080")
 
     # FCM 설정
     fcm_project_id: str = os.getenv("FCM_PROJECT_ID", "")
     fcm_service_account_json: str = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")
+
+    # Google OAuth 설정
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+    google_auth_uri: str = os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/oauth2/auth")
+    google_token_uri: str = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
+    google_userinfo_uri: str = os.getenv("GOOGLE_USERINFO_URI", "https://www.googleapis.com/oauth2/v2/userinfo")
+    
+    # 프론트엔드 URL 설정
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000/auth/callback")
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod

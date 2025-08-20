@@ -42,7 +42,7 @@ app = FastAPI(
 # 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -71,8 +71,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 # 시작 이벤트
 @app.on_event("startup")
 async def startup_event():
-    # 데이터베이스 테이블 생성
-    create_db_and_tables()
+    # 데이터베이스 테이블 생성 (임시로 비활성화)
+    try:
+        create_db_and_tables()
+    except Exception as e:
+        logger.warning(f"데이터베이스 연결 실패: {e}")
+        logger.info("데이터베이스 없이 서버를 시작합니다.")
 
 # 종료 이벤트
 @app.on_event("shutdown")
