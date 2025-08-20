@@ -4,8 +4,8 @@
 from contextlib import contextmanager
 from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
+from sqlmodel import Session
 from app.core.config import get_settings
 from app.models.base import Base
 
@@ -28,7 +28,9 @@ engine = create_engine(
 )
 
 # 세션 팩토리 생성
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def SessionLocal():
+    """SQLModel Session 팩토리"""
+    return Session(engine)
 
 
 def create_db_and_tables() -> None:

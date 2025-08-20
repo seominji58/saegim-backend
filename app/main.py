@@ -23,8 +23,7 @@ from app.db.database import create_db_and_tables
 
 # 로깅 설정
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -56,6 +55,7 @@ if settings.is_production:
 # Gzip 압축
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+
 # 전역 예외 핸들러
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -65,8 +65,9 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "내부 서버 오류가 발생했습니다.",
             "timestamp": datetime.now().isoformat(),
-        }
+        },
     )
+
 
 # 시작 이벤트
 @app.on_event("startup")
@@ -78,16 +79,19 @@ async def startup_event():
         logger.warning(f"데이터베이스 연결 실패: {e}")
         logger.info("데이터베이스 없이 서버를 시작합니다.")
 
+
 # 종료 이벤트
 @app.on_event("shutdown")
 async def shutdown_event():
     # 필요한 정리 작업 수행
     pass
 
+
 # 기본 라우트
 @app.get("/", tags=["root"])
 async def root():
     return {"message": "새김 API에 오신 것을 환영합니다!"}
+
 
 # 상태 확인 라우트
 @app.get("/status", tags=["status"])
@@ -96,9 +100,10 @@ async def status():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": settings.version,
-        "environment": settings.environment
+        "environment": settings.environment,
     }
 
+
 # API 라우터 등록
-app.include_router(api_router, prefix="/api")  # 일반 API 라우터 (prefix 포함)
-app.include_router(google_router)  # Google OAuth 라우터 (prefix 없음)
+app.include_router(api_router)  # 일반 API 라우터 (prefix 포함)
+# app.include_router(google_router)  # Google OAuth 라우터 (prefix 없음)
