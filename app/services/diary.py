@@ -19,10 +19,12 @@ class DiaryService:
         user_id: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        searchTerm: Optional[str] = None,
         emotion: Optional[str] = None,
         is_public: Optional[bool] = None,
         start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+        end_date: Optional[date] = None,
+        sort_order: str = "desc"
     ) -> Tuple[List[DiaryEntry], int]:
         """다이어리 목록 조회 (페이지네이션 포함)"""
 
@@ -32,6 +34,13 @@ class DiaryService:
         # 사용자별 필터링
         if user_id is not None:
             statement = statement.where(DiaryEntry.user_id == user_id)
+
+        # 통합 검색 (제목 또는 내용)
+        if searchTerm:
+            statement = statement.where(
+            (DiaryEntry.title.ilike(f"%{searchTerm}%")) |
+            (DiaryEntry.content.ilike(f"%{searchTerm}%"))
+            )
 
         # 감정별 필터링
         if emotion:
@@ -47,8 +56,13 @@ class DiaryService:
         if end_date:
             statement = statement.where(func.date(DiaryEntry.created_at) <= end_date)
 
-        # 정렬 (최신순)
-        statement = statement.order_by(DiaryEntry.created_at.desc())
+        # # 정렬 (최신순) old
+        # statement = statement.order_by(DiaryEntry.created_at.desc())
+        # 정렬 적용
+        if sort_order.lower() == "desc":
+            statement = statement.order_by(DiaryEntry.created_at.desc())
+        else:
+            statement = statement.order_by(DiaryEntry.created_at.asc())
 
         # 전체 개수 조회
         total_count = self.session.exec(
