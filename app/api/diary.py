@@ -21,10 +21,16 @@ async def get_diaries(
     session: Session = Depends(get_session),
     page: int = Query(1, ge=1, description="페이지 번호"),
     page_size: int = Query(20, ge=1, le=100, description="페이지 크기"),
+    searchTerm: Optional[str] = Query(None, description="제목/내용 통합 검색"),
     emotion: Optional[str] = Query(None, description="감정 필터"),
     is_public: Optional[bool] = Query(None, description="공개 여부"),
     start_date: Optional[date] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
-    end_date: Optional[date] = Query(None, description="종료 날짜 (YYYY-MM-DD)")
+    end_date: Optional[date] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    sort_order: str = Query(
+        "desc", 
+        description="정렬 순서 (asc: 오름차순, desc: 내림차순)",
+        regex="^(asc|desc)$"
+    ),
 ) -> BaseResponse[List[DiaryListResponse]]:
     """다이어리 목록 조회 (페이지네이션 포함)"""
 
@@ -32,10 +38,12 @@ async def get_diaries(
     diaries, total_count = diary_service.get_diaries(
         page=page,
         page_size=page_size,
+        searchTerm=searchTerm,
         emotion=emotion,
         is_public=is_public,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        sort_order=sort_order
     )
 
     # 응답 데이터 변환
