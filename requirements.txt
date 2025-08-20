@@ -1,15 +1,21 @@
 # FastAPI 및 관련 패키지
 fastapi==0.104.1
 uvicorn==0.24.0
-httpx==0.25.2
+slowapi==0.1.9
 
 # 데이터베이스
 sqlmodel==0.0.14
 alembic==1.13.1
 psycopg2-binary==2.9.9
 
-# 시스템 모니터링
-psutil==5.9.6
+# 캐싱 및 세션
+redis==5.0.1
+aioredis==2.0.1
+
+# 보안
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
 
 # 설정 관리
 pydantic-settings==2.5.2
@@ -24,4 +30,10 @@ PyJWT==2.8.0
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-pytest-mock==3.12.0
+black==23.12.1
+flake8==7.0.0
+isort==5.13.2
+
+# 모니터링 및 로깅
+prometheus-fastapi-instrumentator==6.1.0
+python-json-logger==2.0.7

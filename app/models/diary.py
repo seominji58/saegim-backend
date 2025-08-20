@@ -3,24 +3,37 @@
 """
 
 from typing import Optional, List
-from sqlmodel import SQLModel, Field, Relationship
-from .base import BaseModel
+from uuid import uuid4, UUID
+from datetime import datetime
+from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+
+from app.models.base import Base
 
 
-class DiaryEntry(BaseModel, table=True):
+class DiaryEntry(Base):
     """다이어리 테이블 모델"""
 
     __tablename__ = "diaries"
 
-    title: str = Field(max_length=255, index=True)
-    content: str = Field()
-    user_emotion: Optional[str] = Field(max_length=20, index=True)
-    ai_emotion: Optional[str] = Field(max_length=20)
-    ai_emotion_confidence: Optional[float] = Field(ge=0.0, le=1.0)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    ai_generated_text: Optional[str] = Field()
-    is_public: bool = Field(default=False)
-    keywords: Optional[str] = Field()  # JSON 저장
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String(255), index=True)
+    content: Mapped[str] = mapped_column()
+    user_emotion: Mapped[Optional[str]] = mapped_column(String(20), index=True)
+    ai_emotion: Mapped[Optional[str]] = mapped_column(String(20))
+    ai_emotion_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    ai_generated_text: Mapped[Optional[str]] = mapped_column()
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    keywords: Mapped[Optional[str]] = mapped_column()  # JSON 저장
 
-    # 관계 설정
-    user: "User" = Relationship(back_populates="diaries")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # 관계 설정 - 단방향 관계로 설정 (서버 시작을 위한 최소 수정)
+    user: Mapped["User"] = relationship()
