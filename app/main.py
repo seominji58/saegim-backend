@@ -18,6 +18,7 @@ from app.core.config import get_settings
 # 환경 변수 먼저 로드
 load_env_file()
 from app.api import health, router as api_router
+from app.api.auth.google import router as google_router
 from app.db.database import create_db_and_tables
 
 # 로깅 설정
@@ -95,4 +96,5 @@ async def status():
     }
 
 # API 라우터 등록
-app.include_router(api_router)  # 모든 API 라우터 포함
+app.include_router(api_router, prefix="/api")  # 일반 API 라우터 (prefix 포함)
+app.include_router(google_router)  # Google OAuth 라우터 (prefix 없음)

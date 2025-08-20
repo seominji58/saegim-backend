@@ -73,6 +73,10 @@ async def google_callback(
         # 프론트엔드 콜백 페이지로 리다이렉트
         frontend_callback_url = f"http://localhost:3000/auth/callback?token_id={temp_token_id}"
         
+        print(f"Redirecting to: {frontend_callback_url}")
+        print(f"User logged in: {user.email}")
+        print(f"Token ID: {temp_token_id}")
+        
         return RedirectResponse(url=frontend_callback_url)
         
     except Exception as e:
