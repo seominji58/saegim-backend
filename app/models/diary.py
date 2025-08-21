@@ -2,7 +2,7 @@
 다이어리 모델
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import uuid4, UUID
 from datetime import datetime
 from sqlalchemy import (
@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     CheckConstraint,
     Index,
+    JSON,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -34,7 +35,9 @@ class DiaryEntry(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     ai_generated_text: Mapped[Optional[str]] = mapped_column()
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
-    keywords: Mapped[Optional[str]] = mapped_column()  # JSON 저장
+    keywords: Mapped[Optional[List[str]]] = mapped_column(
+        JSON, nullable=True
+    )  # JSON 타입으로 변경
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
