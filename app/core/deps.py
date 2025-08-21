@@ -2,7 +2,7 @@
 의존성 주입 (Dependency Injection)
 """
 from typing import Generator, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlmodel import Session, select
@@ -19,14 +19,15 @@ def get_db() -> Generator[Session, None, None]:
     return get_session()
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_session)  # get_session()을 직접 사용
+    request: Request,
+    db: Session = Depends(get_session)
 ) -> User:
     """
-    JWT 토큰을 통해 현재 로그인한 사용자 조회
+    쿠키 또는 Bearer 토큰을 통해 현재 로그인한 사용자 조회
+    (소셜 로그인: 쿠키, 이메일 로그인: Bearer 토큰)
 
     Args:
-        credentials: HTTP Authorization 헤더
+        request: FastAPI Request 객체
         db: 데이터베이스 세션
 
     Returns:
@@ -35,42 +36,55 @@ async def get_current_user(
     Raises:
         HTTPException: 토큰이 유효하지 않은 경우
     """
+    from app.core.security import get_current_user_id_from_cookie, decode_access_token
+    
     try:
-        # JWT 토큰 디코딩
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.secret_key,
-            algorithms=[settings.jwt_algorithm]
-        )
-        user_id: str = payload.get("sub")
-
+        user_id = None
+        
+        # 1. 먼저 쿠키에서 토큰 확인 (소셜 로그인)
+        try:
+            user_id = get_current_user_id_from_cookie(request)
+        except HTTPException:
+            pass
+        
+        # 2. 쿠키에 토큰이 없으면 Authorization 헤더 확인 (이메일 로그인)
+        if user_id is None:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                payload = decode_access_token(token)
+                user_id = payload.get("sub")
+        
+        # 3. 토큰이 없으면 인증 실패
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="유효하지 않은 토큰입니다."
+                detail="인증 토큰이 필요합니다."
+            )
+        
+        # 사용자 조회
+        stmt = select(User).where(User.id == user_id)
+        result = db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="사용자를 찾을 수 없습니다."
             )
 
-    except JWTError:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="비활성화된 계정입니다."
+            )
+
+        return user
+        
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 토큰입니다."
+            detail="인증에 실패했습니다."
         )
-
-    # 사용자 조회
-    stmt = select(User).where(User.id == user_id)
-    result = db.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="사용자를 찾을 수 없습니다."
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="비활성화된 계정입니다."
-        )
-
-    return user
