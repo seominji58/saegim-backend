@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from app.models.password_reset_token import PasswordResetToken
     from app.models.diary import DiaryEntry
     from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
+    from app.models.emotion_stats import EmotionStats
+    from app.models.ai_usage_log import AIUsageLog
 
 from app.models.base import Base
 
@@ -29,6 +31,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
+        UniqueConstraint("nickname", name="uq_users_nickname"),
         UniqueConstraint("provider", "provider_id", name="uq_users_provider_pid"),
         CheckConstraint(
             "account_type IN ('social','email')", name="ck_users_account_type"
@@ -80,7 +83,9 @@ class User(Base):
     reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(
         back_populates="user", lazy="selectin"
     )
-    # diaries: Mapped[List["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")
+    diaries: Mapped[List["DiaryEntry"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
 
     # FCM 관련 관계
     fcm_tokens: Mapped[List["FCMToken"]] = relationship(
@@ -93,5 +98,13 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     notification_history: Mapped[List["NotificationHistory"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+    # 새로 추가된 관계들
+    emotion_stats: Mapped[List["EmotionStats"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
+    ai_usage_logs: Mapped[List["AIUsageLog"]] = relationship(
         back_populates="user", lazy="selectin", cascade="all, delete-orphan"
     )
