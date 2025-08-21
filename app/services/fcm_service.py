@@ -34,20 +34,19 @@ class FCMService:
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
         try:
-            # 기존 토큰이 있는지 확인
+            # 기존 토큰이 있는지 확인 (같은 토큰으로 검색)
             stmt = select(FCMToken).where(
                 and_(
                     FCMToken.user_id == user_id,
-                    FCMToken.device_id == token_data.device_id,
+                    FCMToken.token == token_data.token,
                 )
             )
             existing_token = session.exec(stmt).first()
 
             if existing_token:
                 # 기존 토큰 업데이트
-                existing_token.token = token_data.token
                 existing_token.device_type = token_data.device_type
-                existing_token.app_version = token_data.app_version
+                existing_token.device_info = token_data.device_info
                 existing_token.is_active = True
                 existing_token.updated_at = datetime.now(timezone.utc)
                 
@@ -57,9 +56,9 @@ class FCMService:
                 
                 return FCMTokenResponse(
                     id=existing_token.id,
-                    device_id=existing_token.device_id,
+                    token=existing_token.token,
                     device_type=existing_token.device_type,
-                    app_version=existing_token.app_version,
+                    device_info=existing_token.device_info,
                     is_active=existing_token.is_active,
                     created_at=existing_token.created_at,
                     updated_at=existing_token.updated_at,
@@ -69,9 +68,8 @@ class FCMService:
                 new_token = FCMToken(
                     user_id=user_id,
                     token=token_data.token,
-                    device_id=token_data.device_id,
                     device_type=token_data.device_type,
-                    app_version=token_data.app_version,
+                    device_info=token_data.device_info,
                     is_active=True,
                 )
                 
@@ -81,9 +79,9 @@ class FCMService:
                 
                 return FCMTokenResponse(
                     id=new_token.id,
-                    device_id=new_token.device_id,
+                    token=new_token.token,
                     device_type=new_token.device_type,
-                    app_version=new_token.app_version,
+                    device_info=new_token.device_info,
                     is_active=new_token.is_active,
                     created_at=new_token.created_at,
                     updated_at=new_token.updated_at,
@@ -102,16 +100,16 @@ class FCMService:
         """사용자의 활성 FCM 토큰 목록 조회"""
         try:
             stmt = select(FCMToken).where(
-                and_(FCMToken.user_id == user_id, FCMToken.is_active == True)
+                and_(FCMToken.user_id == user_id, FCMToken.is_active)
             )
             tokens = session.exec(stmt).all()
 
             return [
                 FCMTokenResponse(
                     id=token.id,
-                    device_id=token.device_id,
+                    token=token.token,
                     device_type=token.device_type,
-                    app_version=token.app_version,
+                    device_info=token.device_info,
                     is_active=token.is_active,
                     created_at=token.created_at,
                     updated_at=token.updated_at,
@@ -256,7 +254,7 @@ class FCMService:
             all_tokens = []
             for user_id in notification_data.user_ids:
                 stmt = select(FCMToken).where(
-                    and_(FCMToken.user_id == user_id, FCMToken.is_active == True)
+                    and_(FCMToken.user_id == user_id, FCMToken.is_active)
                 )
                 user_tokens = session.exec(stmt).all()
                 all_tokens.extend(user_tokens)

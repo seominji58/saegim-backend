@@ -56,8 +56,8 @@ class FCMTokenRegisterRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     token: str = Field(..., description="FCM 토큰", max_length=255)
-    device_id: str = Field(..., description="디바이스 ID", max_length=255)
     device_type: DeviceType = Field(..., description="디바이스 타입")
+    device_info: Optional[Dict[str, Any]] = Field(None, description="디바이스 정보")
     app_version: Optional[str] = Field(None, description="앱 버전", max_length=50)
 
 
@@ -134,9 +134,9 @@ class FCMTokenResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    device_id: str
+    token: str
     device_type: DeviceType
-    app_version: Optional[str]
+    device_info: Optional[Dict[str, Any]]
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime]

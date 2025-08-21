@@ -78,6 +78,9 @@ class FCMToken(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="fcm_tokens")
+    notification_history: Mapped[list["NotificationHistory"]] = relationship(
+        "NotificationHistory", back_populates="fcm_token", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<FCMToken(id={self.id}, user_id={self.user_id}, device_type={self.device_type})>"
