@@ -6,6 +6,7 @@ from typing import Optional, Union, List
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import uuid
+import json
 
 
 class DiaryResponse(BaseModel):
@@ -31,6 +32,19 @@ class DiaryResponse(BaseModel):
             return str(v)
         return v
 
+    @field_validator('keywords', mode='before')
+    @classmethod
+    def parse_keywords(cls, v):
+        """keywords를 JSON 문자열에서 리스트로 변환"""
+        if isinstance(v, str):
+            try:
+                return json.loads(v) if v else []
+            except json.JSONDecodeError:
+                return []
+        elif isinstance(v, list):
+            return v
+        return []
+
     class Config:
         from_attributes = True
 
@@ -55,6 +69,19 @@ class DiaryListResponse(BaseModel):
             return str(v)
         return v
 
+    @field_validator('keywords', mode='before')
+    @classmethod
+    def parse_keywords(cls, v):
+        """keywords를 JSON 문자열에서 리스트로 변환"""
+        if isinstance(v, str):
+            try:
+                return json.loads(v) if v else []
+            except json.JSONDecodeError:
+                return []
+        elif isinstance(v, list):
+            return v
+        return []
+
     class Config:
         from_attributes = True
 
@@ -66,6 +93,19 @@ class DiaryUpdateRequest(BaseModel):
     user_emotion: Optional[str] = None
     is_public: Optional[bool] = None
     keywords: Optional[List[str]] = None
+
+    @field_validator('keywords', mode='before')
+    @classmethod
+    def parse_keywords(cls, v):
+        """keywords를 JSON 문자열에서 리스트로 변환"""
+        if isinstance(v, str):
+            try:
+                return json.loads(v) if v else []
+            except json.JSONDecodeError:
+                return []
+        elif isinstance(v, list):
+            return v
+        return []
 
     class Config:
         from_attributes = True
