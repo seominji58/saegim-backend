@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from sqlmodel import Session, select, func
 from datetime import datetime, date
 from app.models.diary import DiaryEntry
+from app.schemas.diary import DiaryUpdateRequest
 
 
 class DiaryService:
@@ -103,3 +104,27 @@ class DiaryService:
         ).order_by(DiaryEntry.created_at.desc())
 
         return self.session.exec(statement).all()
+
+    def update_diary(self, diary_id: str, diary_update: DiaryUpdateRequest) -> Optional[DiaryEntry]:
+        """다이어리 수정"""
+        diary = self.get_diary_by_id(diary_id)
+
+        if not diary:
+            return None
+
+        # 업데이트할 필드들만 수정
+        update_data = diary_update.dict(exclude_unset=True)
+
+        for field, value in update_data.items():
+            if hasattr(diary, field):
+                setattr(diary, field, value)
+
+        # updated_at 필드 자동 업데이트
+        diary.updated_at = datetime.utcnow()
+
+        # 데이터베이스에 저장
+        self.session.add(diary)
+        self.session.commit()
+        self.session.refresh(diary)
+
+        return diary

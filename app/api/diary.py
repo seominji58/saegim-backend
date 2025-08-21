@@ -8,7 +8,7 @@ from sqlmodel import Session
 from datetime import date
 import uuid
 from app.db.database import get_session
-from app.schemas.diary import DiaryResponse, DiaryListResponse
+from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryUpdateRequest
 from app.schemas.base import BaseResponse
 from app.services.diary import DiaryService
 
@@ -114,4 +114,35 @@ async def get_diary(
 
     return BaseResponse(
         data=DiaryResponse.from_orm(diary), message="다이어리 조회 성공"
+    )
+
+
+@router.put("/{diary_id}", response_model=BaseResponse[DiaryResponse])
+async def update_diary(
+    *,
+    session: Session = Depends(get_session),
+    diary_id: str = Path(..., description="다이어리 ID (UUID)"),
+    diary_update: DiaryUpdateRequest,
+) -> BaseResponse[DiaryResponse]:
+    """다이어리 수정"""
+
+    # UUID 형식 검증
+    try:
+        uuid.UUID(diary_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="올바른 UUID 형식이 아닙니다",
+        )
+
+    diary_service = DiaryService(session)
+    updated_diary = diary_service.update_diary(diary_id, diary_update)
+
+    if not updated_diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="다이어리를 찾을 수 없습니다"
+        )
+
+    return BaseResponse(
+        data=DiaryResponse.from_orm(updated_diary), message="다이어리 수정 성공"
     )
