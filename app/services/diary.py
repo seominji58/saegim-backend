@@ -65,10 +65,12 @@ class DiaryService:
         else:
             statement = statement.order_by(DiaryEntry.created_at.asc())
 
-        # 전체 개수 조회
-        total_count = self.session.exec(
-            select(func.count(DiaryEntry.id))
-        ).one()
+        # 전체 개수 조회 (user_id 필터 적용)
+        count_statement = select(func.count(DiaryEntry.id))
+        if user_id is not None:
+            count_statement = count_statement.where(DiaryEntry.user_id == user_id)
+
+        total_count = self.session.exec(count_statement).one()
 
         # 페이지네이션 적용
         offset = (page - 1) * page_size
