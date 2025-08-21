@@ -5,7 +5,7 @@
 from typing import Optional, List
 from uuid import uuid4, UUID
 from datetime import datetime
-from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -37,3 +37,15 @@ class DiaryEntry(Base):
 
     # 관계 설정 - 단방향 관계로 설정 (서버 시작을 위한 최소 수정)
     user: Mapped["User"] = relationship()
+
+    # 감정 값 제약 조건 추가
+    __table_args__ = (
+        CheckConstraint(
+            "user_emotion IN ('happy', 'sad', 'angry', 'peaceful', 'unrest')",
+            name="diaries_user_emotion_check"
+        ),
+        CheckConstraint(
+            "ai_emotion IN ('happy', 'sad', 'angry', 'peaceful', 'unrest')",
+            name="diaries_ai_emotion_check"
+        ),
+    )
