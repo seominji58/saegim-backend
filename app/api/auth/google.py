@@ -82,7 +82,8 @@ async def google_callback(
             secure=False,  # 개발환경에서는 False
             samesite="lax",
             max_age=3600,  # 1시간
-            path="/"  # 모든 경로에서 접근 가능
+            path="/",  # 모든 경로에서 접근 가능
+            domain="localhost"
         )
         
         response.set_cookie(
@@ -92,7 +93,8 @@ async def google_callback(
             secure=False,  # 개발환경에서는 False
             samesite="lax",
             max_age=604800,  # 7일
-            path="/"  # 모든 경로에서 접근 가능
+            path="/",  # 모든 경로에서 접근 가능
+            domain="localhost"
         )
         
         print(f"User logged in: {user.email}")
