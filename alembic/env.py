@@ -1,4 +1,5 @@
 """Alembic Environment Configuration"""
+
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -13,6 +14,7 @@ from app.models.user import User
 from app.models.email_verification import EmailVerification
 from app.models.oauth_token import OAuthToken
 from app.models.password_reset_token import PasswordResetToken
+from app.models.fcm import FCMToken, NotificationSettings
 
 # Alembic Config object
 config = context.config
@@ -28,6 +30,7 @@ config.set_main_option("sqlalchemy.url", decoded_database_url)
 
 # MetaData object for models
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode"""
@@ -52,9 +55,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
