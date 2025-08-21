@@ -19,6 +19,7 @@ router = APIRouter()
 async def get_diaries(
     *,
     session: Session = Depends(get_session),
+    user_id: Optional[str] = Query(None, description="사용자 ID (UUID)"),
     page: int = Query(1, ge=1, description="페이지 번호"),
     page_size: int = Query(20, ge=1, le=100, description="페이지 크기"),
     searchTerm: Optional[str] = Query(None, description="제목/내용 통합 검색"),
@@ -34,8 +35,19 @@ async def get_diaries(
 ) -> BaseResponse[List[DiaryListResponse]]:
     """다이어리 목록 조회 (페이지네이션 포함)"""
 
+    # user_id가 제공된 경우 UUID 형식 검증
+    if user_id:
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="올바른 UUID 형식이 아닙니다",
+            )
+
     diary_service = DiaryService(session)
     diaries, total_count = diary_service.get_diaries(
+        user_id=user_id,
         page=page,
         page_size=page_size,
         searchTerm=searchTerm,

@@ -10,7 +10,6 @@ from sqlalchemy.sql import func
 if TYPE_CHECKING:
     from app.models.oauth_token import OAuthToken
     from app.models.password_reset_token import PasswordResetToken
-    from app.models.email_verification import EmailVerification
     from app.models.diary import DiaryEntry
 
 from app.models.base import Base
@@ -53,5 +52,4 @@ class User(Base):
     # 관계 정의 - SQLAlchemy 2.0 방식
     oauth_tokens: Mapped[List["OAuthToken"]] = relationship(back_populates="user", lazy="selectin")
     reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(back_populates="user", lazy="selectin")
-    email_verifications: Mapped[List["EmailVerification"]] = relationship(back_populates="user", lazy="selectin")
     # diaries: Mapped[List["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")

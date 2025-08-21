@@ -2,6 +2,7 @@
 fastapi==0.104.1
 uvicorn==0.24.0
 slowapi==0.1.9
+pydantic==2.11.7
 
 # 데이터베이스
 sqlmodel==0.0.14
@@ -40,6 +41,9 @@ isort==5.13.2
 # HTTP 클라이언트
 httpx==0.25.2
 requests==2.31.0
+
+# 한글 인코딩 지원
+python-multipart==0.0.6
 
 # 파일 저장소
 minio==7.2.0
