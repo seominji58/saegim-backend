@@ -117,7 +117,12 @@ class DiaryService:
 
         for field, value in update_data.items():
             if hasattr(diary, field):
-                setattr(diary, field, value)
+                # keywords 필드는 JSON 문자열로 변환
+                if field == 'keywords' and isinstance(value, list):
+                    import json
+                    setattr(diary, field, json.dumps(value) if value else None)
+                else:
+                    setattr(diary, field, value)
 
         # updated_at 필드 자동 업데이트
         diary.updated_at = datetime.utcnow()
