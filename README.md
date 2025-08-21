@@ -51,6 +51,16 @@ MINIO_BUCKET_NAME=saegim-images
 
 # 기타 설정
 ALLOWED_HOSTS=http://localhost:3000,http://localhost:8080
+
+# 이메일 설정 (SendGrid - 추천)
+SENDGRID_API_KEY=your-sendgrid-api-key-here
+FROM_EMAIL=noreply@yourdomain.com
+
+# 이메일 설정 (Gmail SMTP - 대안)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
 ```
 
 ### 3. 데이터베이스 초기화
@@ -65,13 +75,89 @@ python -m app.db.init_db
 -   샘플 사용자 생성
 -   샘플 다이어리 데이터 생성
 
-### 4. 서버 실행
+### 4. 한글 인코딩 설정 (Windows 환경)
 
+Windows 환경에서 한글 로그와 응답이 깨지는 문제를 해결하기 위해 다음 방법 중 하나를 사용하세요:
+
+#### 방법 1: 배치 파일 사용 (추천)
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Windows에서 실행
+run_server.bat
 ```
 
-### 5. API 문서 확인
+#### 방법 2: Python 스크립트 사용
+```bash
+python run_server.py
+```
+
+#### 방법 3: 직접 환경 변수 설정 후 실행
+```bash
+# Windows CMD에서
+set PYTHONIOENCODING=utf-8
+set PYTHONUTF8=1
+set PYTHONLEGACYWINDOWSSTDIO=utf-8
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### 방법 4: PowerShell에서 실행
+```powershell
+$env:PYTHONIOENCODING="utf-8"
+$env:PYTHONUTF8="1"
+$env:PYTHONLEGACYWINDOWSSTDIO="utf-8"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 5. 이메일 서비스 설정 (선택사항)
+
+#### SendGrid 설정 (추천 - 무료)
+
+1. [SendGrid](https://sendgrid.com) 계정 생성
+2. 무료 플랜 선택 (월 100통 이메일)
+3. API 키 생성: Settings → API Keys → Create API Key
+4. 발신자 이메일 인증: Settings → Sender Authentication
+5. 환경변수 설정:
+   ```bash
+   SENDGRID_API_KEY=your-api-key-here
+   FROM_EMAIL=your-verified-email@yourdomain.com
+   ```
+
+#### Gmail SMTP 설정 (대안)
+
+1. Gmail 계정에서 2단계 인증 활성화
+2. 앱 비밀번호 생성: Google 계정 → 보안 → 앱 비밀번호
+3. 환경변수 설정:
+   ```bash
+   SMTP_SERVER=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=your-email@gmail.com
+   SMTP_PASSWORD=your-app-password
+   FROM_EMAIL=your-email@gmail.com
+   ```
+
+**참고**: 이메일 설정이 없어도 회원가입 기능은 정상 작동하지만, 이메일 인증과 환영 이메일이 발송되지 않습니다.
+
+### 6. 서버 실행
+
+#### Windows 환경 (한글 인코딩 지원)
+```bash
+# 방법 1: 배치 파일 사용 (추천)
+run_server.bat
+
+# 방법 2: Python 스크립트 사용
+python run_server.py
+
+# 방법 3: 직접 실행
+set PYTHONIOENCODING=utf-8
+set PYTHONUTF8=1
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### Linux/Mac 환경
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 7. API 문서 확인
 
 브라우저에서 다음 URL을 열어 API 문서를 확인할 수 있습니다:
 

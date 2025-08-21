@@ -64,8 +64,19 @@ class Settings(BaseSettings):
     google_userinfo_uri: str = os.getenv("GOOGLE_USERINFO_URI", "https://www.googleapis.com/oauth2/v2/userinfo")
     
     # 프론트엔드 URL 설정
-    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000")
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000" if os.getenv("ENVIRONMENT", "development") == "development" else "https://saegim.seongjunlee.dev")
+    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000/auth/callback" if os.getenv("ENVIRONMENT", "development") == "development" else "https://saegim.seongjunlee.dev/auth/callback")
+
+    # 이메일 설정
+    smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("SMTP_USERNAME", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    from_email: str = os.getenv("FROM_EMAIL", "noreply@saegim.com")
+    
+    # SendGrid 설정
+    sendgrid_api_key: str = os.getenv("SENDGRID_API_KEY", "")
+    sendgrid_from_email: str = os.getenv("SENDGRID_FROM_EMAIL", "alswlalalswl58@naver.com")
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod

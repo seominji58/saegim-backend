@@ -41,6 +41,9 @@ isort==5.13.2
 httpx==0.25.2
 requests==2.31.0
 
+# 한글 인코딩 지원
+python-multipart==0.0.6
+
 # 파일 저장소
 minio==7.2.0
 

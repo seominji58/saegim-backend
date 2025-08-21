@@ -19,11 +19,10 @@ from app.core.config import get_settings
 load_env_file()
 from app.api import health, router as api_router
 from app.db.database import create_db_and_tables
+from app.core.logging_config import setup_logging
 
-# 로깅 설정
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# 로깅 설정 초기화
+setup_logging()
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
@@ -35,6 +34,12 @@ app = FastAPI(
     version=settings.version,
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
+    # 한글 인코딩을 위한 설정
+    openapi_tags=[
+        {"name": "auth", "description": "인증 관련 API"},
+        {"name": "diary", "description": "다이어리 관련 API"},
+        {"name": "health", "description": "헬스체크 API"},
+    ]
 )
 
 # 미들웨어 설정
@@ -45,6 +50,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# 한글 인코딩을 위한 커스텀 미들웨어
+@app.middleware("http")
+async def add_charset_header(request: Request, call_next):
+    """응답에 UTF-8 인코딩 헤더 추가"""
+    response = await call_next(request)
+    if "Content-Type" in response.headers and "application/json" in response.headers["Content-Type"]:
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
 
 # 프로덕션 환경에서만 적용되는 미들웨어
 if settings.is_production:
@@ -59,12 +73,27 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global exception handler caught: {exc}", exc_info=True)
+    logger.error(f"Request URL: {request.url}")
+    logger.error(f"Request method: {request.method}")
+    logger.error(f"Request headers: {dict(request.headers)}")
+    
+    # 요청 본문도 로깅 (가능한 경우)
+    try:
+        body = await request.body()
+        logger.error(f"Request body: {body.decode('utf-8')}")
+    except:
+        pass
+    
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "내부 서버 오류가 발생했습니다.",
+            "detail": f"내부 서버 오류가 발생했습니다: {str(exc)}",
             "timestamp": datetime.now().isoformat(),
         },
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-cache"
+        }
     )
 
 

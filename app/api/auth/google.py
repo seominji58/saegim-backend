@@ -81,7 +81,8 @@ async def google_callback(
             httponly=True,
             secure=False,  # 개발환경에서는 False
             samesite="lax",
-            max_age=3600  # 1시간
+            max_age=3600,  # 1시간
+            path="/"  # 모든 경로에서 접근 가능
         )
         
         response.set_cookie(
@@ -90,7 +91,8 @@ async def google_callback(
             httponly=True,
             secure=False,  # 개발환경에서는 False
             samesite="lax",
-            max_age=604800  # 7일
+            max_age=604800,  # 7일
+            path="/"  # 모든 경로에서 접근 가능
         )
         
         print(f"User logged in: {user.email}")
@@ -105,46 +107,3 @@ async def google_callback(
         print(f"Error URL: {error_url}")
         print(f"OAuth Error: {e}")
         return RedirectResponse(url=error_url)
-
-
-
-
-
-@router.get("/me")
-async def get_current_user_info(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
-    db: Session = Depends(get_session),
-) -> Dict[str, Any]:
-    """현재 로그인한 사용자 정보 조회"""
-    try:
-        # 사용자 정보 조회
-        stmt = select(User).where(User.id == current_user_id)
-        result = db.execute(stmt)
-        user = result.scalar_one_or_none()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="사용자를 찾을 수 없습니다."
-            )
-        
-        return {
-            "user": {
-                "id": str(user.id),
-                "email": user.email,
-                "name": user.nickname,
-                "profile_image": user.profile_image_url,
-                "provider": user.provider
-            },
-            "authenticated": True
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get user info: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="사용자 정보 조회 중 오류가 발생했습니다."
-        )
