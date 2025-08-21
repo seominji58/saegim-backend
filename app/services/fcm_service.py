@@ -3,12 +3,11 @@ FCM 서비스
 사용자 디바이스 토큰 관리 및 푸시 알림 전송
 """
 
-from typing import List
+from typing import List, Dict
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
-from firebase_admin import messaging
+from sqlmodel import Session, select, and_, desc
+from app.utils.fcm_push import get_fcm_service
 import logging
 
 from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
@@ -30,8 +29,8 @@ class FCMService:
     """FCM 토큰 및 알림 관리 서비스"""
 
     @staticmethod
-    async def register_token(
-        user_id: str, token_data: FCMTokenRegisterRequest, session: AsyncSession
+    def register_token(
+        user_id: str, token_data: FCMTokenRegisterRequest, session: Session
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
         try:
@@ -42,54 +41,56 @@ class FCMService:
                     FCMToken.device_id == token_data.device_id,
                 )
             )
-            result = await session.execute(stmt)
-            existing_token = result.scalar_one_or_none()
+            existing_token = session.exec(stmt).first()
 
             if existing_token:
                 # 기존 토큰 업데이트
                 existing_token.token = token_data.token
                 existing_token.device_type = token_data.device_type
-                existing_token.device_name = token_data.device_name
                 existing_token.app_version = token_data.app_version
-                existing_token.os_version = token_data.os_version
                 existing_token.is_active = True
                 existing_token.updated_at = datetime.now(timezone.utc)
-
-                await session.commit()
-                await session.refresh(existing_token)
-                fcm_token = existing_token
+                
+                session.add(existing_token)
+                session.commit()
+                session.refresh(existing_token)
+                
+                return FCMTokenResponse(
+                    id=existing_token.id,
+                    device_id=existing_token.device_id,
+                    device_type=existing_token.device_type,
+                    app_version=existing_token.app_version,
+                    is_active=existing_token.is_active,
+                    created_at=existing_token.created_at,
+                    updated_at=existing_token.updated_at,
+                )
             else:
                 # 새 토큰 생성
-                fcm_token = FCMToken(
+                new_token = FCMToken(
                     user_id=user_id,
                     token=token_data.token,
                     device_id=token_data.device_id,
                     device_type=token_data.device_type,
-                    device_name=token_data.device_name,
                     app_version=token_data.app_version,
-                    os_version=token_data.os_version,
                     is_active=True,
                 )
-                session.add(fcm_token)
-                await session.commit()
-                await session.refresh(fcm_token)
-
-            logger.info(
-                f"FCM token registered for user {user_id}, device {token_data.device_id}"
-            )
-
-            return FCMTokenResponse(
-                id=fcm_token.id,
-                device_id=fcm_token.device_id,
-                device_type=fcm_token.device_type,
-                device_name=fcm_token.device_name,
-                is_active=fcm_token.is_active,
-                created_at=fcm_token.created_at,
-                updated_at=fcm_token.updated_at,
-            )
+                
+                session.add(new_token)
+                session.commit()
+                session.refresh(new_token)
+                
+                return FCMTokenResponse(
+                    id=new_token.id,
+                    device_id=new_token.device_id,
+                    device_type=new_token.device_type,
+                    app_version=new_token.app_version,
+                    is_active=new_token.is_active,
+                    created_at=new_token.created_at,
+                    updated_at=new_token.updated_at,
+                )
 
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             logger.error(f"Error registering FCM token: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -97,26 +98,20 @@ class FCMService:
             )
 
     @staticmethod
-    async def get_user_tokens(
-        user_id: str, session: AsyncSession
-    ) -> List[FCMTokenResponse]:
-        """사용자의 모든 FCM 토큰 조회"""
+    def get_user_tokens(user_id: str, session: Session) -> List[FCMTokenResponse]:
+        """사용자의 활성 FCM 토큰 목록 조회"""
         try:
-            stmt = (
-                select(FCMToken)
-                .where(and_(FCMToken.user_id == user_id, FCMToken.is_active))
-                .order_by(desc(FCMToken.updated_at))
+            stmt = select(FCMToken).where(
+                and_(FCMToken.user_id == user_id, FCMToken.is_active == True)
             )
-
-            result = await session.execute(stmt)
-            tokens = result.scalars().all()
+            tokens = session.exec(stmt).all()
 
             return [
                 FCMTokenResponse(
                     id=token.id,
                     device_id=token.device_id,
                     device_type=token.device_type,
-                    device_name=token.device_name,
+                    app_version=token.app_version,
                     is_active=token.is_active,
                     created_at=token.created_at,
                     updated_at=token.updated_at,
@@ -128,54 +123,52 @@ class FCMService:
             logger.error(f"Error getting user tokens: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="토큰 조회에 실패했습니다.",
+                detail="FCM 토큰 목록 조회에 실패했습니다.",
             )
 
     @staticmethod
-    async def delete_token(user_id: str, token_id: str, session: AsyncSession) -> bool:
+    def delete_token(user_id: str, token_id: str, session: Session) -> bool:
         """FCM 토큰 삭제 (비활성화)"""
         try:
             stmt = select(FCMToken).where(
                 and_(FCMToken.id == token_id, FCMToken.user_id == user_id)
             )
-            result = await session.execute(stmt)
-            token = result.scalar_one_or_none()
+            token = session.exec(stmt).first()
 
             if not token:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="토큰을 찾을 수 없습니다.",
+                    detail="FCM 토큰을 찾을 수 없습니다.",
                 )
 
             token.is_active = False
             token.updated_at = datetime.now(timezone.utc)
-
-            await session.commit()
-            logger.info(f"FCM token {token_id} deactivated for user {user_id}")
+            
+            session.add(token)
+            session.commit()
 
             return True
 
         except HTTPException:
             raise
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             logger.error(f"Error deleting FCM token: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="토큰 삭제에 실패했습니다.",
+                detail="FCM 토큰 삭제에 실패했습니다.",
             )
 
     @staticmethod
-    async def get_notification_settings(
-        user_id: str, session: AsyncSession
+    def get_notification_settings(
+        user_id: str, session: Session
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 조회"""
         try:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            result = await session.execute(stmt)
-            settings = result.scalar_one_or_none()
+            settings = session.exec(stmt).first()
 
             if not settings:
                 # 기본 설정 생성
@@ -183,23 +176,20 @@ class FCMService:
                     user_id=user_id,
                     diary_reminder=True,
                     ai_content_ready=True,
-                    weekly_summary=True,
-                    system_notifications=True,
-                    quiet_hours_start="22:00",
-                    quiet_hours_end="08:00",
+                    weekly_report=True,
+                    marketing=False,
                 )
                 session.add(settings)
-                await session.commit()
-                await session.refresh(settings)
+                session.commit()
+                session.refresh(settings)
 
             return NotificationSettingsResponse(
                 diary_reminder=settings.diary_reminder,
                 ai_content_ready=settings.ai_content_ready,
-                weekly_summary=settings.weekly_summary,
-                system_notifications=settings.system_notifications,
+                weekly_report=settings.weekly_report,
+                marketing=settings.marketing,
                 quiet_hours_start=settings.quiet_hours_start,
                 quiet_hours_end=settings.quiet_hours_end,
-                updated_at=settings.updated_at,
             )
 
         except Exception as e:
@@ -210,45 +200,42 @@ class FCMService:
             )
 
     @staticmethod
-    async def update_notification_settings(
-        user_id: str, settings_data: NotificationSettingsUpdate, session: AsyncSession
+    def update_notification_settings(
+        user_id: str, settings_data: NotificationSettingsUpdate, session: Session
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 업데이트"""
         try:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            result = await session.execute(stmt)
-            settings = result.scalar_one_or_none()
+            settings = session.exec(stmt).first()
 
             if not settings:
+                # 새 설정 생성
                 settings = NotificationSettings(user_id=user_id)
                 session.add(settings)
 
-            # 업데이트할 필드만 설정
+            # 설정 업데이트
             update_data = settings_data.model_dump(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(settings, field, value)
+            for key, value in update_data.items():
+                setattr(settings, key, value)
 
             settings.updated_at = datetime.now(timezone.utc)
-
-            await session.commit()
-            await session.refresh(settings)
-
-            logger.info(f"Notification settings updated for user {user_id}")
+            session.add(settings)
+            session.commit()
+            session.refresh(settings)
 
             return NotificationSettingsResponse(
                 diary_reminder=settings.diary_reminder,
                 ai_content_ready=settings.ai_content_ready,
-                weekly_summary=settings.weekly_summary,
-                system_notifications=settings.system_notifications,
+                weekly_report=settings.weekly_report,
+                marketing=settings.marketing,
                 quiet_hours_start=settings.quiet_hours_start,
                 quiet_hours_end=settings.quiet_hours_end,
-                updated_at=settings.updated_at,
             )
 
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             logger.error(f"Error updating notification settings: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -257,127 +244,91 @@ class FCMService:
 
     @staticmethod
     async def send_notification(
-        notification_data: NotificationSendRequest, session: AsyncSession
+        notification_data: NotificationSendRequest, session: Session
     ) -> NotificationSendResponse:
         """푸시 알림 전송"""
         try:
-            # 대상 토큰 조회
-            if notification_data.user_ids:
-                # 특정 사용자들에게 전송
-                stmt = select(FCMToken).where(
-                    and_(
-                        FCMToken.user_id.in_(notification_data.user_ids),
-                        FCMToken.is_active,
-                    )
-                )
-            elif notification_data.tokens:
-                # 특정 토큰들에게 전송
-                stmt = select(FCMToken).where(
-                    and_(
-                        FCMToken.token.in_(notification_data.tokens), FCMToken.is_active
-                    )
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="user_ids 또는 tokens 중 하나는 필수입니다.",
-                )
-
-            result = await session.execute(stmt)
-            tokens = result.scalars().all()
-
-            if not tokens:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="전송할 토큰을 찾을 수 없습니다.",
-                )
-
-            # FCM 메시지 생성
-            messages = []
-            for token in tokens:
-                message = messaging.Message(
-                    notification=messaging.Notification(
-                        title=notification_data.title,
-                        body=notification_data.body,
-                        image=notification_data.image_url,
-                    ),
-                    data=notification_data.data or {},
-                    token=token.token,
-                    android=messaging.AndroidConfig(
-                        notification=messaging.AndroidNotification(
-                            icon="ic_notification",
-                            color="#7C9885",  # 새김 브랜드 컬러
-                        )
-                    ),
-                    apns=messaging.APNSConfig(
-                        payload=messaging.APNSPayload(
-                            aps=messaging.Aps(badge=1, sound="default")
-                        )
-                    ),
-                )
-                messages.append(message)
-
-            # FCM 전송
-            response = messaging.send_all(messages)
-
-            # 전송 결과 기록
+            fcm_service = get_fcm_service()
             successful_tokens = []
             failed_tokens = []
 
-            for i, result in enumerate(response.responses):
-                token = tokens[i]
+            # 대상 사용자들의 활성 토큰 조회
+            all_tokens = []
+            for user_id in notification_data.user_ids:
+                stmt = select(FCMToken).where(
+                    and_(FCMToken.user_id == user_id, FCMToken.is_active == True)
+                )
+                user_tokens = session.exec(stmt).all()
+                all_tokens.extend(user_tokens)
 
-                if result.success:
-                    successful_tokens.append(token.token)
+            if not all_tokens:
+                return NotificationSendResponse(
+                    success_count=0,
+                    failure_count=0,
+                    successful_tokens=[],
+                    failed_tokens=[],
+                    message="전송할 활성 토큰이 없습니다.",
+                )
 
-                    # 성공 기록 저장
+            # 각 토큰에 대해 알림 전송
+            for token_model in all_tokens:
+                try:
+                    # 알림 전송
+                    success = await fcm_service.send_notification(
+                        token=token_model.token,
+                        title=notification_data.title,
+                        body=notification_data.body,
+                        data=notification_data.data,
+                    )
+
+                    if success:
+                        successful_tokens.append(token_model.token)
+                        status_value = "sent"
+                    else:
+                        failed_tokens.append(token_model.token)
+                        status_value = "failed"
+
+                    # 알림 기록 저장
                     history = NotificationHistory(
-                        user_id=token.user_id,
+                        user_id=token_model.user_id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
-                        status="sent",
-                        fcm_response={"message_id": result.message_id},
+                        status=status_value,
+                        fcm_response={
+                            "token": token_model.token[:10] + "...",  # 보안을 위해 일부만 저장
+                            "success": success,
+                        },
                     )
                     session.add(history)
-                else:
-                    failed_tokens.append(
-                        {"token": token.token, "error": str(result.exception)}
-                    )
 
+                except Exception as e:
+                    logger.error(f"Error sending to token {token_model.token[:10]}...: {str(e)}")
+                    failed_tokens.append(token_model.token)
+                    
                     # 실패 기록 저장
                     history = NotificationHistory(
-                        user_id=token.user_id,
+                        user_id=token_model.user_id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status="failed",
-                        fcm_response={"error": str(result.exception)},
+                        fcm_response={"error": str(e)},
                     )
                     session.add(history)
 
-                    # 토큰이 유효하지 않은 경우 비활성화
-                    if "not-registered" in str(result.exception).lower():
-                        token.is_active = False
-                        token.updated_at = datetime.now(timezone.utc)
-
-            await session.commit()
-
-            logger.info(
-                f"Notification sent: {len(successful_tokens)} success, {len(failed_tokens)} failed"
-            )
+            session.commit()
 
             return NotificationSendResponse(
                 success_count=len(successful_tokens),
                 failure_count=len(failed_tokens),
                 successful_tokens=successful_tokens,
                 failed_tokens=failed_tokens,
+                message=f"알림 전송 완료: 성공 {len(successful_tokens)}개, 실패 {len(failed_tokens)}개",
             )
 
-        except HTTPException:
-            raise
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             logger.error(f"Error sending notification: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -385,15 +336,53 @@ class FCMService:
             )
 
     @staticmethod
-    async def send_diary_notification(
-        user_id: str, diary_id: str, session: AsyncSession
-    ) -> NotificationSendResponse:
-        """다이어리 관련 알림 전송"""
+    async def send_diary_reminder(user_id: str, session: Session) -> NotificationSendResponse:
+        """다이어리 작성 알림 전송"""
         try:
-            # 다이어리 정보 조회
-            stmt = select(DiaryEntry).where(DiaryEntry.id == diary_id)
-            result = await session.execute(stmt)
-            diary = result.scalar_one_or_none()
+            # 알림 설정 확인
+            settings_stmt = select(NotificationSettings).where(
+                NotificationSettings.user_id == user_id
+            )
+            settings = session.exec(settings_stmt).first()
+
+            if settings and not settings.diary_reminder:
+                return NotificationSendResponse(
+                    success_count=0,
+                    failure_count=0,
+                    successful_tokens=[],
+                    failed_tokens=[],
+                    message="사용자가 다이어리 알림을 비활성화했습니다.",
+                )
+
+            # 알림 전송
+            notification_request = NotificationSendRequest(
+                title="📝 오늘의 감정을 기록해보세요",
+                body="새김에서 오늘 하루를 돌아보며 마음을 정리해보세요.",
+                notification_type="diary_reminder",
+                user_ids=[user_id],
+                data={"action": "write_diary"},
+            )
+
+            return await FCMService.send_notification(notification_request, session)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error sending diary reminder: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="다이어리 알림 전송에 실패했습니다.",
+            )
+
+    @staticmethod
+    async def send_ai_content_ready(
+        user_id: str, diary_id: str, session: Session
+    ) -> NotificationSendResponse:
+        """AI 콘텐츠 준비 완료 알림 전송"""
+        try:
+            # 다이어리 존재 확인
+            diary_stmt = select(DiaryEntry).where(DiaryEntry.id == diary_id)
+            diary = session.exec(diary_stmt).first()
 
             if not diary:
                 raise HTTPException(
@@ -405,8 +394,7 @@ class FCMService:
             settings_stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            settings_result = await session.execute(settings_stmt)
-            settings = settings_result.scalar_one_or_none()
+            settings = session.exec(settings_stmt).first()
 
             if settings and not settings.ai_content_ready:
                 return NotificationSendResponse(
@@ -431,15 +419,15 @@ class FCMService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error sending diary notification: {str(e)}")
+            logger.error(f"Error sending AI content notification: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="다이어리 알림 전송에 실패했습니다.",
+                detail="AI 콘텐츠 알림 전송에 실패했습니다.",
             )
 
     @staticmethod
-    async def get_notification_history(
-        user_id: str, limit: int, offset: int, session: AsyncSession
+    def get_notification_history(
+        user_id: str, limit: int, offset: int, session: Session
     ) -> List[NotificationHistoryResponse]:
         """사용자 알림 기록 조회"""
         try:
@@ -451,8 +439,7 @@ class FCMService:
                 .offset(offset)
             )
 
-            result = await session.execute(stmt)
-            histories = result.scalars().all()
+            histories = session.exec(stmt).all()
 
             return [
                 NotificationHistoryResponse(

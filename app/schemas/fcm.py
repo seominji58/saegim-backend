@@ -50,6 +50,17 @@ class NotificationFrequency(str, Enum):
 
 
 # Request Schemas
+class FCMTokenRegisterRequest(BaseModel):
+    """FCM 토큰 등록 요청"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    token: str = Field(..., description="FCM 토큰", max_length=255)
+    device_id: str = Field(..., description="디바이스 ID", max_length=255)
+    device_type: DeviceType = Field(..., description="디바이스 타입")
+    app_version: Optional[str] = Field(None, description="앱 버전", max_length=50)
+
+
 class FCMTokenCreate(BaseModel):
     """FCM 토큰 등록 요청"""
 
@@ -58,6 +69,18 @@ class FCMTokenCreate(BaseModel):
     token: str = Field(..., description="FCM 토큰", max_length=255)
     device_type: DeviceType = Field(..., description="디바이스 타입")
     device_info: Optional[Dict[str, Any]] = Field(None, description="디바이스 정보")
+
+
+class NotificationSendRequest(BaseModel):
+    """알림 전송 요청"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str = Field(..., description="알림 제목", max_length=255)
+    body: str = Field(..., description="알림 내용", max_length=1000)
+    notification_type: str = Field(..., description="알림 타입")
+    user_ids: List[str] = Field(..., description="대상 사용자 ID 목록")
+    data: Optional[Dict[str, Any]] = Field(None, description="추가 데이터")
 
 
 class NotificationSettingsUpdate(BaseModel):
@@ -110,13 +133,52 @@ class FCMTokenResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
-    user_id: UUID
-    token: str
+    id: str
+    device_id: str
     device_type: DeviceType
+    app_version: Optional[str]
     is_active: bool
-    last_used_at: Optional[datetime]
     created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class NotificationSettingsResponse(BaseModel):
+    """알림 설정 응답"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    diary_reminder: bool
+    ai_content_ready: bool
+    weekly_report: bool
+    marketing: bool
+    quiet_hours_start: Optional[str]
+    quiet_hours_end: Optional[str]
+
+
+class NotificationSendResponse(BaseModel):
+    """알림 전송 응답"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    success_count: int
+    failure_count: int
+    successful_tokens: List[str]
+    failed_tokens: List[str]
+    message: str
+
+
+class NotificationHistoryResponse(BaseModel):
+    """알림 기록 응답"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    body: str
+    notification_type: str
+    status: str
+    created_at: datetime
+    fcm_response: Optional[Dict[str, Any]]
 
 
 class FCMTokenListResponse(BaseModel):
@@ -126,61 +188,3 @@ class FCMTokenListResponse(BaseModel):
 
     tokens: List[FCMTokenResponse]
     total: int
-
-
-class NotificationSettingsResponse(BaseModel):
-    """알림 설정 응답"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    user_id: UUID
-    enabled: bool
-    diary_reminder: bool
-    ai_content_ready: bool
-    emotion_trend: bool
-    anniversary: bool
-    friend_share: bool
-    quiet_hours_enabled: bool
-    quiet_start_time: Optional[str]
-    quiet_end_time: Optional[str]
-    frequency: NotificationFrequency
-    created_at: datetime
-    updated_at: datetime
-
-
-class NotificationHistoryResponse(BaseModel):
-    """알림 히스토리 응답"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    user_id: UUID
-    notification_type: NotificationType
-    title: str
-    body: str
-    status: NotificationStatus
-    sent_at: Optional[datetime]
-    delivered_at: Optional[datetime]
-    opened_at: Optional[datetime]
-    created_at: datetime
-
-
-class NotificationHistoryListResponse(BaseModel):
-    """알림 히스토리 목록 응답"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    notifications: List[NotificationHistoryResponse]
-    pagination: Dict[str, Any]
-
-
-class NotificationSendResponse(BaseModel):
-    """알림 전송 응답"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    notification_id: Optional[UUID] = None
-    sent_count: int
-    failed_count: int
-    sent_tokens: Optional[List[str]] = None
