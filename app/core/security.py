@@ -6,9 +6,10 @@ JWT 토큰 생성/검증, 의존성 주입
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+from uuid import UUID
 
 import jwt
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import get_settings
@@ -237,7 +238,7 @@ security_service = SecurityService()
 
 def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> int:
+) -> UUID:
     """
     현재 사용자 ID 의존성
 
@@ -267,7 +268,66 @@ def get_current_user_id(
         )
 
     try:
-        return int(user_id)
+        return UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 사용자 ID입니다.",
+        )
+
+
+def get_current_user_id_from_cookie(
+    request: Request,
+) -> UUID:
+    """
+    쿠키에서 현재 사용자 ID 의존성
+
+    Args:
+        request: FastAPI Request 객체
+
+    Returns:
+        사용자 ID
+
+    Raises:
+        HTTPException: 인증 실패 시
+    """
+    # 쿠키에서 access_token 읽기
+    access_token = request.cookies.get("access_token")
+    
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="액세스 토큰이 없습니다.",
+        )
+    
+    try:
+        payload = security_service.jwt_handler.decode_token(access_token)
+        
+        if not security_service.jwt_handler.verify_token_type(payload, "access"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="액세스 토큰이 아닙니다.",
+            )
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않은 토큰입니다.",
+            )
+
+        return UUID(user_id)
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="토큰이 만료되었습니다.",
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 토큰입니다.",
+        )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
