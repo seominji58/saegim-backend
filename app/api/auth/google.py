@@ -1,24 +1,29 @@
 """
 구글 OAuth 라우트
 """
-from typing import Dict
+from typing import Dict, Any
 from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session
 import uuid
 import time
+from uuid import UUID
 
 from app.core.config import get_settings
 from app.db.database import get_session
 from app.services.oauth import GoogleOAuthService
-from app.core.security import create_access_token, create_refresh_token
+from app.core.security import create_access_token, create_refresh_token, get_current_user_id_from_cookie
+from app.models.user import User
+from sqlmodel import select
+import logging
+from fastapi import status
 
-# 임시 토큰 저장소 (실제로는 Redis를 사용하는 것이 좋습니다)
-temp_tokens = {}
+# 로거 설정
 
-router = APIRouter(prefix="/auth/google", tags=["auth"])
+router = APIRouter(prefix="/google", tags=["auth"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/login")
@@ -66,45 +71,80 @@ async def google_callback(
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
 
-        # 임시 토큰 ID 생성
-        temp_token_id = str(uuid.uuid4())
-        temp_tokens[temp_token_id] = {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "created_at": time.time()
-        }
-
-        # 프론트엔드 콜백 페이지로 리다이렉트 (토큰 ID 포함)
-        frontend_callback_url = f"{settings.frontend_callback_url}?token_id={temp_token_id}"
+        # 프론트엔드로 리다이렉트 (쿠키에 토큰 설정)
+        response = RedirectResponse(url=f"{settings.frontend_callback_url}?success=true")
         
-        print(f"Frontend callback URL: {settings.frontend_callback_url}")
-        print(f"Redirecting to: {frontend_callback_url}")
+        # 쿠키에 토큰 설정
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=3600  # 1시간
+        )
+        
+        response.set_cookie(
+            key="refresh_token", 
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=604800  # 7일
+        )
+        
         print(f"User logged in: {user.email}")
-        print(f"Token ID: {temp_token_id}")
+        print(f"Redirecting to: {settings.frontend_callback_url}?success=true")
         
-        return RedirectResponse(url=frontend_callback_url)
+        return response
         
     except Exception as e:
         # 에러 발생 시 프론트엔드 콜백 페이지로 리다이렉트 (에러 파라미터 포함)
-        error_url = f"{settings.frontend_callback_url}?error=login_failed"
+        error_url = f"{settings.frontend_callback_url}?error=login_failed&message={str(e)}"
         print(f"Frontend callback URL (error): {settings.frontend_callback_url}")
         print(f"Error URL: {error_url}")
         print(f"OAuth Error: {e}")
         return RedirectResponse(url=error_url)
 
 
-@router.get("/token/{token_id}")
-async def get_token(token_id: str) -> Dict[str, str]:
-    """임시 토큰 ID로 실제 토큰 반환"""
-    if token_id in temp_tokens:
-        token_data = temp_tokens.pop(token_id)  # 사용 후 삭제
+
+
+
+@router.get("/me")
+async def get_current_user_info(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    db: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """현재 로그인한 사용자 정보 조회"""
+    try:
+        # 사용자 정보 조회
+        stmt = select(User).where(User.id == current_user_id)
+        result = db.execute(stmt)
+        user = result.scalar_one_or_none()
         
-        # 5분 이내에 생성된 토큰만 유효
-        if time.time() - token_data["created_at"] < 300:
-            return {
-                "access_token": token_data["access_token"],
-                "refresh_token": token_data["refresh_token"],
-                "token_type": "bearer",
-            }
-    
-    raise HTTPException(status_code=400, detail="Invalid or expired token")
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="사용자를 찾을 수 없습니다."
+            )
+        
+        return {
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.nickname,
+                "profile_image": user.profile_image_url,
+                "provider": user.provider
+            },
+            "authenticated": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get user info: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="사용자 정보 조회 중 오류가 발생했습니다."
+        )

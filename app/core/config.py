@@ -55,14 +55,14 @@ class Settings(BaseSettings):
     # Google OAuth 설정
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
     google_auth_uri: str = os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/oauth2/auth")
     google_token_uri: str = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
     google_userinfo_uri: str = os.getenv("GOOGLE_USERINFO_URI", "https://www.googleapis.com/oauth2/v2/userinfo")
     
     # 프론트엔드 URL 설정
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000/auth/callback")
+    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000")
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod

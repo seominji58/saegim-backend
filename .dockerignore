@@ -62,7 +62,6 @@ logs/
 *.sqlite3
 
 # 환경설정 파일 (민감 정보 포함)
-.env
 .env.*
 !.env.example
 

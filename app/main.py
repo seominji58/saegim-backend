@@ -18,7 +18,6 @@ from app.core.config import get_settings
 # 환경 변수 먼저 로드
 load_env_file()
 from app.api import health, router as api_router
-from app.api.auth.google import router as google_router
 from app.db.database import create_db_and_tables
 
 # 로깅 설정
@@ -93,6 +92,28 @@ async def root():
     return {"message": "새김 API에 오신 것을 환영합니다!"}
 
 
+# 기존 auth 경로를 새로운 api/auth 경로로 리다이렉트
+@app.get("/auth/google/login", tags=["redirect"])
+async def redirect_google_login():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/auth/google/login", status_code=307)
+
+@app.get("/auth/google/callback", tags=["redirect"])
+async def redirect_google_callback():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/auth/google/callback", status_code=307)
+
+@app.get("/auth/google/token/{token_id}", tags=["redirect"])
+async def redirect_google_token(token_id: str):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/api/auth/google/token/{token_id}", status_code=307)
+
+@app.post("/auth/logout", tags=["redirect"])
+async def redirect_logout():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/auth/logout", status_code=307)
+
+
 # 상태 확인 라우트
 @app.get("/status", tags=["status"])
 async def status():
@@ -106,4 +127,3 @@ async def status():
 
 # API 라우터 등록
 app.include_router(api_router)  # 일반 API 라우터 (prefix 포함)
-# app.include_router(google_router)  # Google OAuth 라우터 (prefix 없음)
