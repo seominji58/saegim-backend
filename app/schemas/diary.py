@@ -39,6 +39,7 @@ class DiaryListResponse(BaseModel):
     """다이어리 목록 응답 스키마 (캘린더용)"""
     id: str
     title: str
+    content: str  # 수정된 본문 내용을 표시하기 위해 content 필드 추가
     ai_generated_text: Optional[str] = None  # ai_generated_text 필드 추가
     user_emotion: Optional[str] = None
     ai_emotion: Optional[str] = None
@@ -53,6 +54,18 @@ class DiaryListResponse(BaseModel):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
+
+    class Config:
+        from_attributes = True
+
+
+class DiaryUpdateRequest(BaseModel):
+    """다이어리 수정 요청 스키마"""
+    title: Optional[str] = None
+    content: Optional[str] = None
+    user_emotion: Optional[str] = None
+    is_public: Optional[bool] = None
+    keywords: Optional[List[str]] = None
 
     class Config:
         from_attributes = True

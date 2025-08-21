@@ -33,10 +33,24 @@ pip install -r requirements.txt
 
 ### 2. 환경 설정
 
-PostgreSQL 데이터베이스 연결 정보가 이미 `app/core/config.py`에 설정되어 있습니다:
+프로젝트 루트에 `.env` 파일을 생성하고 다음 환경변수들을 설정하세요:
 
-```python
-database_url: str = "postgresql://saegim_admin:saegim_pass1234!@seongjunlee.dev:55432/saegim_dev"
+```bash
+# 데이터베이스 설정
+DATABASE_URL=postgresql://username:password@localhost:5432/database_name
+
+# 보안 설정
+SECRET_KEY=your-secret-key-here
+ENCRYPTION_KEY=your-encryption-key-here
+
+# MinIO 설정
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=saegim-images
+
+# 기타 설정
+ALLOWED_HOSTS=http://localhost:3000,http://localhost:8080
 ```
 
 ### 3. 데이터베이스 초기화

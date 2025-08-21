@@ -76,6 +76,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # 애플리케이션 코드 복사
 COPY --chown=saegim:saegim . .
 
+# .env 파일 복사 (환경변수 설정용)
+COPY --chown=saegim:saegim .env* ./
+
 # 로그 디렉터리 생성
 RUN mkdir -p /app/logs && \
     chown -R saegim:saegim /app

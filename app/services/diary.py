@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from sqlmodel import Session, select, func
 from datetime import datetime, date
 from app.models.diary import DiaryEntry
+from app.schemas.diary import DiaryUpdateRequest
 
 
 class DiaryService:
@@ -19,10 +20,12 @@ class DiaryService:
         user_id: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        searchTerm: Optional[str] = None,
         emotion: Optional[str] = None,
         is_public: Optional[bool] = None,
         start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+        end_date: Optional[date] = None,
+        sort_order: str = "desc"
     ) -> Tuple[List[DiaryEntry], int]:
         """다이어리 목록 조회 (페이지네이션 포함)"""
 
@@ -32,6 +35,13 @@ class DiaryService:
         # 사용자별 필터링
         if user_id is not None:
             statement = statement.where(DiaryEntry.user_id == user_id)
+
+        # 통합 검색 (제목 또는 내용)
+        if searchTerm:
+            statement = statement.where(
+            (DiaryEntry.title.ilike(f"%{searchTerm}%")) |
+            (DiaryEntry.content.ilike(f"%{searchTerm}%"))
+            )
 
         # 감정별 필터링
         if emotion:
@@ -47,8 +57,13 @@ class DiaryService:
         if end_date:
             statement = statement.where(func.date(DiaryEntry.created_at) <= end_date)
 
-        # 정렬 (최신순)
-        statement = statement.order_by(DiaryEntry.created_at.desc())
+        # # 정렬 (최신순) old
+        # statement = statement.order_by(DiaryEntry.created_at.desc())
+        # 정렬 적용
+        if sort_order.lower() == "desc":
+            statement = statement.order_by(DiaryEntry.created_at.desc())
+        else:
+            statement = statement.order_by(DiaryEntry.created_at.asc())
 
         # 전체 개수 조회
         total_count = self.session.exec(
@@ -89,3 +104,27 @@ class DiaryService:
         ).order_by(DiaryEntry.created_at.desc())
 
         return self.session.exec(statement).all()
+
+    def update_diary(self, diary_id: str, diary_update: DiaryUpdateRequest) -> Optional[DiaryEntry]:
+        """다이어리 수정"""
+        diary = self.get_diary_by_id(diary_id)
+
+        if not diary:
+            return None
+
+        # 업데이트할 필드들만 수정
+        update_data = diary_update.dict(exclude_unset=True)
+
+        for field, value in update_data.items():
+            if hasattr(diary, field):
+                setattr(diary, field, value)
+
+        # updated_at 필드 자동 업데이트
+        diary.updated_at = datetime.utcnow()
+
+        # 데이터베이스에 저장
+        self.session.add(diary)
+        self.session.commit()
+        self.session.refresh(diary)
+
+        return diary

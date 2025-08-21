@@ -1,28 +1,36 @@
-"""Alembic 환경 설정"""
+"""Alembic Environment Configuration"""
 from logging.config import fileConfig
-from sqlmodel import SQLModel
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from urllib.parse import unquote
 
 from alembic import context
 from app.core.config import get_settings
+from app.models.base import Base
 
-# Alembic Config 객체
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models.user import User
+from app.models.email_verification import EmailVerification
+from app.models.oauth_token import OAuthToken
+from app.models.password_reset_token import PasswordResetToken
+
+# Alembic Config object
 config = context.config
 
-# Python 로깅을 위한 Alembic 설정 파일 해석
+# Interpret the config file for Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 애플리케이션 설정에서 데이터베이스 URL 가져오기
+# Get database URL from application settings and decode it
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+decoded_database_url = unquote(settings.database_url)
+config.set_main_option("sqlalchemy.url", decoded_database_url)
 
-# 모델의 MetaData 객체
-target_metadata = SQLModel.metadata
+# MetaData object for models
+target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
-    """오프라인 모드에서 마이그레이션 실행"""
+    """Run migrations in 'offline' mode"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -36,7 +44,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """온라인 모드에서 마이그레이션 실행"""
+    """Run migrations in 'online' mode"""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
