@@ -34,6 +34,16 @@ black==23.12.1
 flake8==7.0.0
 isort==5.13.2
 
+# HTTP 클라이언트
+httpx==0.25.2
+requests==2.31.0
+
+# 파일 저장소
+minio==7.2.0
+
+# 시스템 모니터링
+psutil==5.9.6
+
 # 모니터링 및 로깅
 prometheus-fastapi-instrumentator==6.1.0
 python-json-logger==2.0.7
