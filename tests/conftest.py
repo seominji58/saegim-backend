@@ -41,7 +41,7 @@ def sample_user():
         provider_id="google-123",
         is_active=True,
         created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -56,7 +56,7 @@ def sample_fcm_token(sample_user):
         device_id="test-device-456",
         is_active=True,
         created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -71,7 +71,7 @@ def sample_notification_settings(sample_user):
         weekly_summary=False,
         is_active=True,
         created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -85,7 +85,7 @@ def sample_notification_history(sample_user):
         body="테스트 메시지",
         notification_type="diary_reminder",
         status="sent",
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
 
@@ -95,7 +95,7 @@ def mock_fcm_service():
     mock = Mock()
     mock.send_notification.return_value = {
         "success": True,
-        "message_id": "test-message-123"
+        "message_id": "test-message-123",
     }
     return mock
 

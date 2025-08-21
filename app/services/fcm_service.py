@@ -49,11 +49,11 @@ class FCMService:
                 existing_token.device_info = token_data.device_info
                 existing_token.is_active = True
                 existing_token.updated_at = datetime.now(timezone.utc)
-                
+
                 session.add(existing_token)
                 session.commit()
                 session.refresh(existing_token)
-                
+
                 return FCMTokenResponse(
                     id=existing_token.id,
                     token=existing_token.token,
@@ -72,11 +72,11 @@ class FCMService:
                     device_info=token_data.device_info,
                     is_active=True,
                 )
-                
+
                 session.add(new_token)
                 session.commit()
                 session.refresh(new_token)
-                
+
                 return FCMTokenResponse(
                     id=new_token.id,
                     token=new_token.token,
@@ -141,7 +141,7 @@ class FCMService:
 
             token.is_active = False
             token.updated_at = datetime.now(timezone.utc)
-            
+
             session.add(token)
             session.commit()
 
@@ -294,16 +294,19 @@ class FCMService:
                         notification_type=notification_data.notification_type,
                         status=status_value,
                         fcm_response={
-                            "token": token_model.token[:10] + "...",  # 보안을 위해 일부만 저장
+                            "token": token_model.token[:10]
+                            + "...",  # 보안을 위해 일부만 저장
                             "success": success,
                         },
                     )
                     session.add(history)
 
                 except Exception as e:
-                    logger.error(f"Error sending to token {token_model.token[:10]}...: {str(e)}")
+                    logger.error(
+                        f"Error sending to token {token_model.token[:10]}...: {str(e)}"
+                    )
                     failed_tokens.append(token_model.token)
-                    
+
                     # 실패 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
@@ -334,7 +337,9 @@ class FCMService:
             )
 
     @staticmethod
-    async def send_diary_reminder(user_id: str, session: Session) -> NotificationSendResponse:
+    async def send_diary_reminder(
+        user_id: str, session: Session
+    ) -> NotificationSendResponse:
         """다이어리 작성 알림 전송"""
         try:
             # 알림 설정 확인

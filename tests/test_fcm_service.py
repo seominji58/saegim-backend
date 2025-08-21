@@ -36,7 +36,7 @@ class TestFCMService:
         return FCMTokenRegisterRequest(
             token="test-fcm-token-12345",
             device_type="web",
-            device_info={"user_agent": "test-browser", "platform": "web"}
+            device_info={"user_agent": "test-browser", "platform": "web"},
         )
 
     @pytest.fixture
@@ -50,7 +50,7 @@ class TestFCMService:
             device_info={"user_agent": "test-browser", "platform": "web"},
             is_active=True,
             created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(timezone.utc),
         )
 
     @pytest.fixture
@@ -70,14 +70,16 @@ class TestFCMService:
             quiet_end_time="08:00",
             frequency="immediate",
             created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(timezone.utc),
         )
 
-    def test_register_token_new_token(self, mock_session, sample_user_id, sample_token_request):
+    def test_register_token_new_token(
+        self, mock_session, sample_user_id, sample_token_request
+    ):
         """새로운 토큰 등록 테스트"""
         # Mock: 기존 토큰이 없는 경우
         mock_session.exec.return_value.first.return_value = None
-        
+
         # Mock: 새 토큰 생성과 refresh 시 속성 설정
         mock_token = Mock()
         mock_token.id = "token-id-123"
@@ -87,37 +89,43 @@ class TestFCMService:
         mock_token.is_active = True
         mock_token.created_at = datetime.now(timezone.utc)
         mock_token.updated_at = datetime.now(timezone.utc)
-        
+
         def mock_refresh(obj):
             # refresh 호출 시 객체에 속성 설정
             obj.id = mock_token.id
             obj.token = mock_token.token
             obj.created_at = mock_token.created_at
             obj.updated_at = mock_token.updated_at
-        
+
         mock_session.add = Mock()
         mock_session.commit = Mock()
         mock_session.refresh = Mock(side_effect=mock_refresh)
 
-        result = FCMService.register_token(sample_user_id, sample_token_request, mock_session)
+        result = FCMService.register_token(
+            sample_user_id, sample_token_request, mock_session
+        )
 
         # 검증
         assert result.token == sample_token_request.token
         assert result.device_type == sample_token_request.device_type
         assert result.device_info == sample_token_request.device_info
         assert result.is_active is True
-        
+
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
 
-    def test_register_token_update_existing(self, mock_session, sample_user_id, sample_token_request, sample_fcm_token):
+    def test_register_token_update_existing(
+        self, mock_session, sample_user_id, sample_token_request, sample_fcm_token
+    ):
         """기존 토큰 업데이트 테스트"""
         # Mock: 기존 토큰이 있는 경우
         mock_session.exec.return_value.first.return_value = sample_fcm_token
         mock_session.commit = Mock()
         mock_session.refresh = Mock()
 
-        result = FCMService.register_token(sample_user_id, sample_token_request, mock_session)
+        result = FCMService.register_token(
+            sample_user_id, sample_token_request, mock_session
+        )
 
         # 검증
         assert result.token == sample_token_request.token
@@ -159,7 +167,9 @@ class TestFCMService:
 
         assert exc_info.value.status_code == 404
 
-    def test_get_notification_settings_existing(self, mock_session, sample_user_id, sample_notification_settings):
+    def test_get_notification_settings_existing(
+        self, mock_session, sample_user_id, sample_notification_settings
+    ):
         """기존 알림 설정 조회 테스트"""
         # Mock: 기존 설정 반환
         mock_session.exec.return_value.first.return_value = sample_notification_settings
@@ -171,7 +181,9 @@ class TestFCMService:
         assert result.ai_content_ready is True
         assert result.emotion_trend is True
 
-    def test_get_notification_settings_create_default(self, mock_session, sample_user_id):
+    def test_get_notification_settings_create_default(
+        self, mock_session, sample_user_id
+    ):
         """기본 알림 설정 생성 테스트"""
         # Mock: 기존 설정이 없는 경우
         mock_session.exec.return_value.first.return_value = None
@@ -188,7 +200,9 @@ class TestFCMService:
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
 
-    def test_update_notification_settings(self, mock_session, sample_user_id, sample_notification_settings):
+    def test_update_notification_settings(
+        self, mock_session, sample_user_id, sample_notification_settings
+    ):
         """알림 설정 업데이트 테스트"""
         # Mock: 기존 설정 반환
         mock_session.exec.return_value.first.return_value = sample_notification_settings
@@ -196,12 +210,12 @@ class TestFCMService:
         mock_session.refresh = Mock()
 
         settings_update = NotificationSettingsUpdate(
-            diary_reminder=False,
-            ai_content_ready=True,
-            emotion_trend=False
+            diary_reminder=False, ai_content_ready=True, emotion_trend=False
         )
 
-        result = FCMService.update_notification_settings(sample_user_id, settings_update, mock_session)
+        result = FCMService.update_notification_settings(
+            sample_user_id, settings_update, mock_session
+        )
 
         # 검증
         assert result.diary_reminder is False
@@ -210,14 +224,16 @@ class TestFCMService:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('app.services.fcm_service.get_fcm_service')
-    async def test_send_notification_success(self, mock_get_fcm_service, mock_session, sample_fcm_token):
+    @patch("app.services.fcm_service.get_fcm_service")
+    async def test_send_notification_success(
+        self, mock_get_fcm_service, mock_session, sample_fcm_token
+    ):
         """알림 전송 성공 테스트"""
         # Mock FCM 서비스
         mock_fcm = AsyncMock()
         mock_fcm.send_notification.return_value = {
             "success": True,
-            "message_id": "test-message-123"
+            "message_id": "test-message-123",
         }
         mock_get_fcm_service.return_value = mock_fcm
 
@@ -230,7 +246,7 @@ class TestFCMService:
             user_ids=["test-user-123"],
             title="테스트 알림",
             body="테스트 메시지",
-            data={"type": "test"}
+            data={"type": "test"},
         )
 
         result = await FCMService.send_notification(notification_request, mock_session)
@@ -243,8 +259,10 @@ class TestFCMService:
         mock_session.add.assert_called_once()  # 히스토리 저장 확인
 
     @pytest.mark.asyncio
-    @patch('app.services.fcm_service.get_fcm_service')
-    async def test_send_notification_failure(self, mock_get_fcm_service, mock_session, sample_fcm_token):
+    @patch("app.services.fcm_service.get_fcm_service")
+    async def test_send_notification_failure(
+        self, mock_get_fcm_service, mock_session, sample_fcm_token
+    ):
         """알림 전송 실패 테스트"""
         # Mock FCM 서비스 - 실패 케이스
         mock_fcm = AsyncMock()
@@ -257,9 +275,7 @@ class TestFCMService:
         mock_session.commit = Mock()
 
         notification_request = NotificationSendRequest(
-            user_ids=["test-user-123"],
-            title="테스트 알림",
-            body="테스트 메시지"
+            user_ids=["test-user-123"], title="테스트 알림", body="테스트 메시지"
         )
 
         result = await FCMService.send_notification(notification_request, mock_session)
@@ -271,8 +287,14 @@ class TestFCMService:
         assert "FCM 전송 실패" in result.results[0]["error"]
 
     @pytest.mark.asyncio
-    @patch('app.services.fcm_service.get_fcm_service')
-    async def test_send_diary_reminder(self, mock_get_fcm_service, mock_session, sample_fcm_token, sample_notification_settings):
+    @patch("app.services.fcm_service.get_fcm_service")
+    async def test_send_diary_reminder(
+        self,
+        mock_get_fcm_service,
+        mock_session,
+        sample_fcm_token,
+        sample_notification_settings,
+    ):
         """다이어리 리마인더 전송 테스트"""
         # Mock FCM 서비스
         mock_fcm = AsyncMock()
@@ -282,7 +304,7 @@ class TestFCMService:
         # Mock 조회
         mock_session.exec.side_effect = [
             Mock(first=Mock(return_value=sample_notification_settings)),  # 설정 조회
-            Mock(all=Mock(return_value=[sample_fcm_token]))  # 토큰 조회
+            Mock(all=Mock(return_value=[sample_fcm_token])),  # 토큰 조회
         ]
         mock_session.add = Mock()
         mock_session.commit = Mock()
@@ -291,10 +313,15 @@ class TestFCMService:
 
         # 검증
         assert result.success_count == 1
-        assert "오늘의 감정을 새김에 기록해보세요" in mock_fcm.send_notification.call_args[1]["body"]
+        assert (
+            "오늘의 감정을 새김에 기록해보세요"
+            in mock_fcm.send_notification.call_args[1]["body"]
+        )
 
     @pytest.mark.asyncio
-    async def test_send_diary_reminder_disabled(self, mock_session, sample_notification_settings):
+    async def test_send_diary_reminder_disabled(
+        self, mock_session, sample_notification_settings
+    ):
         """다이어리 리마인더 비활성화 테스트"""
         # 알림 설정 비활성화
         sample_notification_settings.diary_reminder = False
@@ -317,7 +344,7 @@ class TestFCMService:
                 body="테스트 메시지 1",
                 notification_type="diary_reminder",
                 status="sent",
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc),
             ),
             NotificationHistory(
                 id="history-2",
@@ -326,13 +353,15 @@ class TestFCMService:
                 body="테스트 메시지 2",
                 notification_type="ai_content_ready",
                 status="failed",
-                created_at=datetime.now(timezone.utc)
-            )
+                created_at=datetime.now(timezone.utc),
+            ),
         ]
-        
+
         mock_session.exec.return_value.offset.return_value.limit.return_value.all.return_value = mock_history
 
-        result = FCMService.get_notification_history(sample_user_id, 10, 0, mock_session)
+        result = FCMService.get_notification_history(
+            sample_user_id, 10, 0, mock_session
+        )
 
         # 검증
         assert len(result) == 2
