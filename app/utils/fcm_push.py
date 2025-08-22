@@ -32,9 +32,23 @@ class FCMPushService:
 
         # Service Account 정보 파싱
         try:
-            self.service_account = json.loads(self.service_account_json)
-        except json.JSONDecodeError:
+            # 환경변수에서 이스케이프된 문자들을 처리
+            json_str = self.service_account_json.replace('\\n', '\n').replace('\\"', '"')
+            self.service_account = json.loads(json_str)
+            
+            # 필수 필드 검증
+            required_fields = ['client_email', 'private_key', 'project_id']
+            for field in required_fields:
+                if field not in self.service_account:
+                    raise ValueError(f"FCM Service Account JSON에 필수 필드 '{field}'가 없습니다")
+                    
+        except json.JSONDecodeError as e:
+            logger.error(f"FCM_SERVICE_ACCOUNT_JSON 파싱 오류: {e}")
+            logger.error(f"JSON 내용 (처음 100자): {self.service_account_json[:100]}...")
             raise ValueError("FCM_SERVICE_ACCOUNT_JSON이 유효한 JSON 형식이 아닙니다")
+        except Exception as e:
+            logger.error(f"FCM Service Account 초기화 오류: {e}")
+            raise ValueError(f"FCM Service Account 설정 오류: {str(e)}")
 
         # FCM API URL
         self.fcm_url = (
@@ -181,7 +195,12 @@ def get_fcm_service() -> FCMPushService:
     """FCM 서비스 인스턴스 반환 (싱글톤)"""
     global _fcm_instance
     if _fcm_instance is None:
-        _fcm_instance = FCMPushService()
+        try:
+            _fcm_instance = FCMPushService()
+        except Exception as e:
+            logger.error(f"FCM 서비스 초기화 실패: {e}")
+            # FCM 서비스가 초기화되지 않았음을 나타내는 None 반환
+            return None
     return _fcm_instance
 
 

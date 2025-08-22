@@ -133,7 +133,7 @@ class FCMTokenResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: UUID
     token: str
     device_type: DeviceType
     device_info: Optional[Dict[str, Any]]
