@@ -74,8 +74,6 @@ class LoginResponse(BaseModel):
     email: str
     nickname: str
     message: str
-    access_token: str
-    refresh_token: str
 
 
 class EmailVerificationRequest(BaseModel):
@@ -318,14 +316,12 @@ async def login(
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
         
-        # 6. 응답 생성 (JWT 토큰 포함 + 쿠키 설정)
+        # 6. 응답 생성 (쿠키만 설정, 응답에는 토큰 제외)
         response_data = LoginResponse(
             user_id=str(user.id),
             email=user.email,
             nickname=user.nickname,
-            message="로그인이 완료되었습니다.",
-            access_token=access_token,
-            refresh_token=refresh_token
+            message="로그인이 완료되었습니다."
         )
         
         logger.info(f"사용자 로그인: {user.email}")

@@ -111,9 +111,9 @@ async def send_password_reset_email(
             db.commit()
             db.refresh(reset_token)
             
-            # 비밀번호 재설정 이메일 발송
+            # 비밀번호 재설정 이메일 발송 (URL 링크 방식)
             email_service = EmailService()
-            reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token_value}"
+            reset_url = f"{settings.frontend_url}/reset-password?token={token_value}"
             
             email_sent = await email_service.send_password_reset_email(
                 to_email=user.email,

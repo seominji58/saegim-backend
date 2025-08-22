@@ -265,7 +265,7 @@ class EmailService:
 
     async def send_password_reset_email(self, to_email: str, nickname: str, reset_url: str) -> bool:
         """
-        비밀번호 재설정 이메일 발송
+        비밀번호 재설정 이메일 발송 (URL 링크 방식)
         
         Args:
             to_email: 수신자 이메일

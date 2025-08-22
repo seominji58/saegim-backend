@@ -30,15 +30,13 @@ async def refresh_token(
     - Access Token이 만료되었을 때 자동으로 호출
     """
     try:
-        # 1. Authorization 헤더에서 Refresh Token 추출
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
+        # 1. 쿠키에서 Refresh Token 추출
+        refresh_token = request.cookies.get("refresh_token")
+        if not refresh_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token이 필요합니다."
             )
-        
-        refresh_token = auth_header.split(" ")[1]
         
         # 2. Refresh Token 검증
         try:
@@ -86,18 +84,44 @@ async def refresh_token(
         
         logger.info(f"토큰 갱신 성공: {user.email}")
         
-        return BaseResponse(
-            data={
-                "access_token": access_token,
-                "refresh_token": new_refresh_token,
-                "token_type": "bearer",
-                "expires_in": settings.access_token_expire_minutes * 60,
-                "user_id": str(user.id),
-                "email": user.email,
-                "nickname": user.nickname
-            },
-            message="토큰이 성공적으로 갱신되었습니다."
+        # 5. 쿠키에 새로운 토큰 설정
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            content={
+                "success": True,
+                "message": "토큰이 성공적으로 갱신되었습니다.",
+                "data": {
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "nickname": user.nickname
+                }
+            }
         )
+        
+        # 쿠키에 새로운 토큰 설정
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=3600,  # 1시간
+            path="/",
+            domain="localhost"
+        )
+        
+        response.set_cookie(
+            key="refresh_token", 
+            value=new_refresh_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=604800,  # 7일
+            path="/",
+            domain="localhost"
+        )
+        
+        return response
         
     except HTTPException:
         raise
