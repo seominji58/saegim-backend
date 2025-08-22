@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import Optional
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import UniqueConstraint, Index, String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from app.models.base import Base
 
@@ -17,7 +17,7 @@ class PasswordResetToken(Base):
         Index("idx_user_reset", "user_id", "is_used", "expires_at"),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 

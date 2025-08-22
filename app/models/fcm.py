@@ -4,7 +4,7 @@ FCM (Firebase Cloud Messaging) 관련 모델
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Dict, Any
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import (
@@ -14,10 +14,10 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     CheckConstraint,
-    JSON,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class FCMToken(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -56,7 +56,7 @@ class FCMToken(Base):
         String(20), nullable=False, default="web"
     )  # web, android, ios
     device_info: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=True
+        JSONB, nullable=True
     )  # user_agent, platform 등
 
     # Status
@@ -96,7 +96,7 @@ class NotificationSettings(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -110,7 +110,7 @@ class NotificationSettings(Base):
         String(5), nullable=True, default="21:00"
     )  # HH:MM 형식
     diary_reminder_days: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=True, default=lambda: []
+        JSONB, nullable=True, default=lambda: []
     )  # 리마인드 요일 배열 ['mon','tue',...]
     report_notification_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     ai_processing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -154,7 +154,7 @@ class NotificationHistory(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -173,7 +173,7 @@ class NotificationHistory(Base):
 
     # Additional Data
     data_payload: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=True
+        JSONB, nullable=True
     )  # FCM data payload
 
     # Status and Tracking

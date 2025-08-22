@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import Index, CheckConstraint, text, String, DateTime, ForeignKey
@@ -21,7 +21,7 @@ class EmailVerification(Base):
         CheckConstraint("verification_type IN ('signup','change')", name="ck_verification_type"),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     verification_code: Mapped[str] = mapped_column(String(6), nullable=False)
     verification_type: Mapped[str] = mapped_column(String(10), nullable=False, default="signup")

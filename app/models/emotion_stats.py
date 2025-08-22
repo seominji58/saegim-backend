@@ -3,7 +3,7 @@
 """
 
 from typing import TYPE_CHECKING
-from uuid import uuid4, UUID
+from uuid import UUID
 from sqlalchemy import (
     String,
     Integer,
@@ -13,6 +13,7 @@ from sqlalchemy import (
     CheckConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import text
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -39,7 +40,7 @@ class EmotionStats(Base):
         CheckConstraint("count >= 0", name="ck_emotion_stats_count"),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )

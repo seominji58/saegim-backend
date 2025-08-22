@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, List
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import (
@@ -52,7 +52,7 @@ class User(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     account_type: Mapped[str] = mapped_column(

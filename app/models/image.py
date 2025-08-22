@@ -3,11 +3,11 @@
 """
 
 from typing import Optional
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from app.models.base import Base
 
@@ -18,7 +18,7 @@ class Image(Base):
     __tablename__ = "images"
     __table_args__ = (Index("idx_diary_images", "diary_id"),)
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     diary_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("diaries.id"), nullable=True, index=True
     )

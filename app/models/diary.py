@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List, Dict, Any
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 from sqlalchemy import (
     String,
@@ -13,10 +13,10 @@ from sqlalchemy import (
     ForeignKey,
     CheckConstraint,
     Index,
-    JSON,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.base import Base
 
@@ -26,7 +26,7 @@ class DiaryEntry(Base):
 
     __tablename__ = "diaries"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     title: Mapped[str] = mapped_column(String(255), index=True)
     content: Mapped[str] = mapped_column()
     user_emotion: Mapped[Optional[str]] = mapped_column(String(20), index=True)
@@ -36,8 +36,8 @@ class DiaryEntry(Base):
     ai_generated_text: Mapped[Optional[str]] = mapped_column()
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     keywords: Mapped[Optional[List[str]]] = mapped_column(
-        JSON, nullable=True
-    )  # JSON 타입으로 변경
+        JSONB, nullable=True
+    )  # JSONB 타입으로 변경
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Dict, Any
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import (
@@ -13,11 +13,11 @@ from sqlalchemy import (
     Boolean,
     Index,
     CheckConstraint,
-    JSON,
     Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class Notification(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -56,8 +56,8 @@ class Notification(Base):
 
     # Additional Data
     data: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=True
-    )  # 알림 관련 세부 데이터 (JSON)
+        JSONB, nullable=True
+    )  # 알림 관련 세부 데이터 (JSONB)
 
     # Status
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
