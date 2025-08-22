@@ -121,7 +121,7 @@ async def signup(
         stmt = select(EmailVerification).where(
             EmailVerification.email == request.email,
             EmailVerification.verification_type == "signup",  # 회원가입용만
-            EmailVerification.is_verified == True
+            EmailVerification.is_used == True
         )
         result = db.execute(stmt)
         email_verification = result.scalar_one_or_none()
@@ -318,7 +318,7 @@ async def login(
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
         
-        # 6. 응답 생성 (JWT 토큰 포함)
+        # 6. 응답 생성 (JWT 토큰 포함 + 쿠키 설정)
         response_data = LoginResponse(
             user_id=str(user.id),
             email=user.email,
@@ -330,10 +330,40 @@ async def login(
         
         logger.info(f"사용자 로그인: {user.email}")
         
-        return BaseResponse(
-            data=response_data,
-            message="로그인이 성공적으로 완료되었습니다."
+        # 쿠키 설정을 위한 응답 생성
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            content={
+                "success": True,
+                "message": "로그인이 성공적으로 완료되었습니다.",
+                "data": response_data.dict()
+            }
         )
+        
+        # 쿠키에 토큰 설정 (소셜 로그인과 동일한 방식)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=3600,  # 1시간
+            path="/",
+            domain="localhost"
+        )
+        
+        response.set_cookie(
+            key="refresh_token", 
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # 개발환경에서는 False
+            samesite="lax",
+            max_age=604800,  # 7일
+            path="/",
+            domain="localhost"
+        )
+        
+        return response
         
     except HTTPException:
         raise
@@ -452,7 +482,7 @@ async def verify_email(
             EmailVerification.verification_code == request.verification_code,
             EmailVerification.verification_type == "signup",  # 회원가입용만
             EmailVerification.expires_at > datetime.now(),
-            EmailVerification.is_verified == False
+            EmailVerification.is_used == False
         )
         result = db.execute(stmt)
         verification = result.scalar_one_or_none()
@@ -464,8 +494,7 @@ async def verify_email(
             )
         
         # 2. 인증 완료 처리
-        verification.is_verified = True
-        verification.verified_at = datetime.now()
+        verification.is_used = True
         db.commit()
         
         logger.info(f"이메일 인증 완료: {request.email}")

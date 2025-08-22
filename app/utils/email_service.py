@@ -27,13 +27,14 @@ class EmailService:
         self.smtp_username = settings.smtp_username
         self.smtp_password = settings.smtp_password
 
-    async def send_verification_email(self, to_email: str, verification_code: str) -> bool:
+    async def send_verification_email(self, to_email: str, verification_code: str, email_type: str = "signup") -> bool:
         """
         이메일 인증 코드 발송
         
         Args:
             to_email: 수신자 이메일
             verification_code: 인증 코드
+            email_type: 이메일 타입 (signup, email_change)
             
         Returns:
             발송 성공 여부
@@ -41,16 +42,40 @@ class EmailService:
         try:
             # SendGrid API 키가 있으면 SendGrid 사용
             if self.sendgrid_api_key:
-                return await self._send_with_sendgrid(to_email, verification_code)
+                return await self._send_with_sendgrid(to_email, verification_code, email_type)
             else:
                 # 기존 SMTP 방식 사용 (fallback)
-                return await self._send_with_smtp(to_email, verification_code)
+                return await self._send_with_smtp(to_email, verification_code, email_type)
                 
         except Exception as e:
             logger.error(f"Verification email sending failed: {to_email} - {e}")
             return False
 
-    async def _send_with_sendgrid(self, to_email: str, verification_code: str) -> bool:
+    async def send_email_change_verification(self, to_email: str, verification_url: str, current_email: str) -> bool:
+        """
+        이메일 변경 인증 URL 발송
+        
+        Args:
+            to_email: 새로운 이메일 주소
+            verification_url: 인증 URL
+            current_email: 현재 이메일 주소
+            
+        Returns:
+            발송 성공 여부
+        """
+        try:
+            # SendGrid API 키가 있으면 SendGrid 사용
+            if self.sendgrid_api_key:
+                return await self._send_email_change_with_sendgrid(to_email, verification_url, current_email)
+            else:
+                # 기존 SMTP 방식 사용 (fallback)
+                return await self._send_email_change_with_smtp(to_email, verification_url, current_email)
+                
+        except Exception as e:
+            logger.error(f"Email change verification sending failed: {to_email} - {e}")
+            return False
+
+    async def _send_with_sendgrid(self, to_email: str, verification_code: str, email_type: str = "signup") -> bool:
         """SendGrid를 사용한 이메일 발송"""
         try:
             import httpx
@@ -62,34 +87,61 @@ class EmailService:
             # SendGrid API 엔드포인트
             url = "https://api.sendgrid.com/v3/mail/send"
             
-            # 이메일 제목과 내용 (임시 영어 버전)
-            subject = "[Saegim] Email Verification Code"
-            
-            html_content = f"""
-            <html>
-            <body>
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #5C8D89;">Saegim Email Verification</h2>
-                    <p>Hello! Thank you for signing up for Saegim service.</p>
-                    <p>Please enter the verification code below to complete your email verification.</p>
-                    
-                    <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
-                        <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
+            # 이메일 타입에 따른 제목과 내용
+            if email_type == "email_change":
+                subject = "[Saegim] 이메일 변경 인증"
+                html_content = f"""
+                <html>
+                <body>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #5C8D89;">Saegim 이메일 변경 인증</h2>
+                        <p>안녕하세요! Saegim 서비스의 이메일 변경 요청이 있었습니다.</p>
+                        <p>아래 인증 코드를 입력하여 이메일 변경을 완료해주세요.</p>
+                        
+                        <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
+                            <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
+                        </div>
+                        
+                        <p><strong>이 인증 코드는 10분 후에 만료됩니다.</strong></p>
+                        
+                        <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                        
+                        <hr style="margin: 30px 0;">
+                        <p style="color: #666; font-size: 12px;">
+                            이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                            문의사항이 있으시면 고객센터에 연락해주세요.
+                        </p>
                     </div>
-                    
-                    <p><strong>This verification code will expire in 10 minutes.</strong></p>
-                    
-                    <p>If you did not request this, please ignore this email.</p>
-                    
-                    <hr style="margin: 30px 0;">
-                    <p style="color: #666; font-size: 12px;">
-                        This email was sent from Saegim service.<br>
-                        If you have any questions, please contact our customer service.
-                    </p>
-                </div>
-            </body>
-            </html>
-            """
+                </body>
+                </html>
+                """
+            else:
+                subject = "[Saegim] Email Verification Code"
+                html_content = f"""
+                <html>
+                <body>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #5C8D89;">Saegim Email Verification</h2>
+                        <p>Hello! Thank you for signing up for Saegim service.</p>
+                        <p>Please enter the verification code below to complete your email verification.</p>
+                        
+                        <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
+                            <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
+                        </div>
+                        
+                        <p><strong>This verification code will expire in 10 minutes.</strong></p>
+                        
+                        <p>If you did not request this, please ignore this email.</p>
+                        
+                        <hr style="margin: 30px 0;">
+                        <p style="color: #666; font-size: 12px;">
+                            This email was sent from Saegim service.<br>
+                            If you have any questions, please contact our customer service.
+                        </p>
+                    </div>
+                </body>
+                </html>
+                """
             
             # SendGrid API 요청 데이터
             data = {
@@ -357,4 +409,139 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"SMTP 환영 이메일 발송 실패: {to_email} - {e}")
+            return False
+
+    async def _send_email_change_with_sendgrid(self, to_email: str, verification_url: str, current_email: str) -> bool:
+        """SendGrid를 사용한 이메일 변경 인증 URL 발송"""
+        try:
+            import httpx
+            
+            # SendGrid API 엔드포인트
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            # 이메일 제목과 내용
+            subject = "[Saegim] 이메일 변경 인증"
+            
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 이메일 변경 인증</h2>
+                    <p>안녕하세요! Saegim 서비스의 이메일 변경 요청이 있었습니다.</p>
+                    <p><strong>현재 이메일:</strong> {current_email}</p>
+                    <p><strong>변경할 이메일:</strong> {to_email}</p>
+                    <p>아래 버튼을 클릭하여 이메일 변경을 완료해주세요.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{verification_url}" 
+                           style="background-color: #5C8D89; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                            이메일 변경 인증하기
+                        </a>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px;">
+                        위 버튼이 작동하지 않는 경우, 아래 링크를 복사하여 브라우저에 붙여넣기 해주세요:<br>
+                        <a href="{verification_url}" style="color: #5C8D89; word-break: break-all;">{verification_url}</a>
+                    </p>
+                    
+                    <p><strong>이 인증 링크는 30분 후에 만료됩니다.</strong></p>
+                    
+                    <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                    
+                    <hr style="margin: 30px 0;">
+                    <p style="color: #666; font-size: 12px;">
+                        이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                        문의사항이 있으시면 고객센터에 연락해주세요.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # SendGrid API 요청 데이터
+            data = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}]
+                    }
+                ],
+                "from": {"email": self.sendgrid_from_email},
+                "subject": subject,
+                "content": [
+                    {
+                        "type": "text/html",
+                        "value": html_content
+                    }
+                ]
+            }
+            
+            # SendGrid API 호출
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {self.sendgrid_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                if response.status_code == 202:
+                    logger.info(f"Email change verification sent successfully to {to_email}")
+                    return True
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"SendGrid email change verification sending failed: {e}")
+            return False
+
+    async def _send_email_change_with_smtp(self, to_email: str, verification_url: str, current_email: str) -> bool:
+        """SMTP를 사용한 이메일 변경 인증 URL 발송 (fallback)"""
+        try:
+            # 이메일 제목과 내용
+            subject = "[Saegim] 이메일 변경 인증"
+            
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 이메일 변경 인증</h2>
+                    <p>안녕하세요! Saegim 서비스의 이메일 변경 요청이 있었습니다.</p>
+                    <p><strong>현재 이메일:</strong> {current_email}</p>
+                    <p><strong>변경할 이메일:</strong> {to_email}</p>
+                    <p>아래 링크를 클릭하여 이메일 변경을 완료해주세요.</p>
+                    
+                    <p><a href="{verification_url}" style="color: #5C8D89;">{verification_url}</a></p>
+                    
+                    <p><strong>이 인증 링크는 30분 후에 만료됩니다.</strong></p>
+                    
+                    <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # MIME 메시지 생성
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = self.smtp_username
+            msg['To'] = to_email
+            
+            # HTML 내용 추가
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+            
+            # SMTP 서버 연결 및 이메일 발송
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+            
+            logger.info(f"Email change verification sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"SMTP email change verification sending failed: {e}")
             return False

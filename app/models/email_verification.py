@@ -24,11 +24,10 @@ class EmailVerification(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     verification_code: Mapped[str] = mapped_column(String(6), nullable=False)
-    verification_type: Mapped[str] = mapped_column(String(10), nullable=False, default="signup")
+    verification_type: Mapped[str] = mapped_column(String(20), nullable=False, default="signup")
 
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    is_verified: Mapped[bool] = mapped_column(default=False, nullable=False)
-    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_used: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

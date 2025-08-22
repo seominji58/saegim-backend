@@ -29,6 +29,19 @@ config.set_main_option("sqlalchemy.url", decoded_database_url)
 # MetaData object for models
 target_metadata = Base.metadata
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    마이그레이션 대상 테이블을 제한하는 함수
+    email_verifications 테이블만 마이그레이션 대상으로 포함
+    """
+    if type_ == "table":
+        # email_verifications 테이블만 허용
+        if name == "email_verifications":
+            return True
+        # 다른 모든 테이블은 마이그레이션에서 제외
+        return False
+    return True
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode"""
     url = config.get_main_option("sqlalchemy.url")
@@ -37,6 +50,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object
     )
 
     with context.begin_transaction():
@@ -53,7 +67,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, 
+            target_metadata=target_metadata,
+            include_object=include_object
         )
 
         with context.begin_transaction():
