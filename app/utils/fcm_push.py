@@ -32,8 +32,23 @@ class FCMPushService:
 
         # Service Account 정보 파싱
         try:
-            # 환경변수에서 이스케이프된 문자들을 처리
-            json_str = self.service_account_json.replace('\\n', '\n').replace('\\"', '"')
+            # 환경변수에서 따옴표 제거 (필요한 경우)
+            json_str = self.service_account_json.strip()
+            if json_str.startswith("'") and json_str.endswith("'"):
+                json_str = json_str[1:-1]
+            elif json_str.startswith('"') and json_str.endswith('"'):
+                json_str = json_str[1:-1]
+            
+            # 이스케이프된 문자들을 실제 문자로 변환
+            # 중요: \' -> ' 변환도 포함하고, 이중 이스케이프 처리
+            json_str = (json_str
+                       .replace('\\\\n', '\\n')  # 이중 이스케이프된 \n 처리
+                       .replace('\\\\', '\\')     # 이중 이스케이프된 \ 처리
+                       .replace('\\n', '\n')     # 일반 \n 처리
+                       .replace('\\"', '"')      # 이스케이프된 " 처리
+                       .replace("\\'", "'"))     # 이스케이프된 ' 처리
+            
+            # JSON 파싱
             self.service_account = json.loads(json_str)
             
             # 필수 필드 검증
@@ -44,7 +59,19 @@ class FCMPushService:
                     
         except json.JSONDecodeError as e:
             logger.error(f"FCM_SERVICE_ACCOUNT_JSON 파싱 오류: {e}")
-            logger.error(f"JSON 내용 (처음 100자): {self.service_account_json[:100]}...")
+            logger.error(f"원본 JSON 내용 (처음 200자): {self.service_account_json[:200]}...")
+            logger.error(f"처리된 JSON 내용 (처음 200자): {json_str[:200] if 'json_str' in locals() else 'N/A'}...")
+            
+            # 디버깅을 위해 JSON 내용의 문제가 되는 부분 찾기
+            try:
+                # 문제가 되는 문자 찾기
+                for i, char in enumerate(json_str[:500]):
+                    if ord(char) < 32 and char not in ['\n', '\r', '\t']:
+                        logger.error(f"Invalid control character at position {i}: {repr(char)}")
+                        break
+            except Exception:
+                pass
+                
             raise ValueError("FCM_SERVICE_ACCOUNT_JSON이 유효한 JSON 형식이 아닙니다")
         except Exception as e:
             logger.error(f"FCM Service Account 초기화 오류: {e}")
