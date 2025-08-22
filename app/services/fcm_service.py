@@ -6,7 +6,8 @@ FCM 서비스
 from typing import List, Dict
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
-from sqlmodel import Session, select, and_, desc
+from sqlalchemy.orm import Session
+from sqlalchemy import select, and_, desc
 from app.utils.fcm_push import get_fcm_service
 import logging
 
@@ -41,7 +42,7 @@ class FCMService:
                     FCMToken.token == token_data.token,
                 )
             )
-            existing_token = session.exec(stmt).first()
+            existing_token = session.execute(stmt).scalar_one_or_none()
 
             if existing_token:
                 # 기존 토큰 업데이트
@@ -54,15 +55,7 @@ class FCMService:
                 session.commit()
                 session.refresh(existing_token)
 
-                return FCMTokenResponse(
-                    id=existing_token.id,
-                    token=existing_token.token,
-                    device_type=existing_token.device_type,
-                    device_info=existing_token.device_info,
-                    is_active=existing_token.is_active,
-                    created_at=existing_token.created_at,
-                    updated_at=existing_token.updated_at,
-                )
+                return FCMTokenResponse.model_validate(existing_token)
             else:
                 # 새 토큰 생성
                 new_token = FCMToken(
@@ -77,15 +70,7 @@ class FCMService:
                 session.commit()
                 session.refresh(new_token)
 
-                return FCMTokenResponse(
-                    id=new_token.id,
-                    token=new_token.token,
-                    device_type=new_token.device_type,
-                    device_info=new_token.device_info,
-                    is_active=new_token.is_active,
-                    created_at=new_token.created_at,
-                    updated_at=new_token.updated_at,
-                )
+                return FCMTokenResponse.model_validate(new_token)
 
         except Exception as e:
             session.rollback()
@@ -102,20 +87,9 @@ class FCMService:
             stmt = select(FCMToken).where(
                 and_(FCMToken.user_id == user_id, FCMToken.is_active)
             )
-            tokens = session.exec(stmt).all()
+            tokens = session.execute(stmt).scalars().all()
 
-            return [
-                FCMTokenResponse(
-                    id=token.id,
-                    token=token.token,
-                    device_type=token.device_type,
-                    device_info=token.device_info,
-                    is_active=token.is_active,
-                    created_at=token.created_at,
-                    updated_at=token.updated_at,
-                )
-                for token in tokens
-            ]
+            return [FCMTokenResponse.model_validate(token) for token in tokens]
 
         except Exception as e:
             logger.error(f"Error getting user tokens: {str(e)}")
@@ -131,7 +105,7 @@ class FCMService:
             stmt = select(FCMToken).where(
                 and_(FCMToken.id == token_id, FCMToken.user_id == user_id)
             )
-            token = session.exec(stmt).first()
+            token = session.execute(stmt).scalar_one_or_none()
 
             if not token:
                 raise HTTPException(
@@ -166,28 +140,28 @@ class FCMService:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            settings = session.exec(stmt).first()
+            settings = session.execute(stmt).scalar_one_or_none()
 
             if not settings:
                 # 기본 설정 생성
                 settings = NotificationSettings(
                     user_id=user_id,
-                    diary_reminder=True,
-                    ai_content_ready=True,
-                    weekly_report=True,
-                    marketing=False,
+                    diary_reminder_enabled=True,
+                    ai_processing_enabled=True,
+                    report_notification_enabled=True,
+                    browser_push_enabled=False,
                 )
                 session.add(settings)
                 session.commit()
                 session.refresh(settings)
 
             return NotificationSettingsResponse(
-                diary_reminder=settings.diary_reminder,
-                ai_content_ready=settings.ai_content_ready,
-                weekly_report=settings.weekly_report,
-                marketing=settings.marketing,
-                quiet_hours_start=settings.quiet_hours_start,
-                quiet_hours_end=settings.quiet_hours_end,
+                diary_reminder=settings.diary_reminder_enabled,
+                ai_content_ready=settings.ai_processing_enabled,
+                weekly_report=settings.report_notification_enabled,
+                marketing=settings.browser_push_enabled,
+                quiet_hours_start=settings.diary_reminder_time,
+                quiet_hours_end=settings.diary_reminder_time,
             )
 
         except Exception as e:
@@ -206,17 +180,33 @@ class FCMService:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            settings = session.exec(stmt).first()
+            settings = session.execute(stmt).scalar_one_or_none()
 
             if not settings:
                 # 새 설정 생성
                 settings = NotificationSettings(user_id=user_id)
                 session.add(settings)
 
-            # 설정 업데이트
+            # 스키마 필드를 모델 필드로 매핑하여 설정 업데이트
             update_data = settings_data.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(settings, key, value)
+
+            # 필드명 매핑 처리
+            field_mapping = {
+                "enabled": "push_enabled",
+                "diary_reminder": "diary_reminder_enabled",
+                "ai_content_ready": "ai_processing_enabled",
+                "emotion_trend": "report_notification_enabled",  # 임시 매핑
+                "anniversary": "report_notification_enabled",  # 임시 매핑
+                "friend_share": "report_notification_enabled",  # 임시 매핑
+                "quiet_hours_enabled": "browser_push_enabled",  # 임시 매핑
+                "quiet_start_time": "diary_reminder_time",  # 임시 매핑
+                "quiet_end_time": "diary_reminder_time",  # 임시 매핑
+            }
+
+            for schema_field, value in update_data.items():
+                model_field = field_mapping.get(schema_field)
+                if model_field and hasattr(settings, model_field):
+                    setattr(settings, model_field, value)
 
             settings.updated_at = datetime.now(timezone.utc)
             session.add(settings)
@@ -224,12 +214,12 @@ class FCMService:
             session.refresh(settings)
 
             return NotificationSettingsResponse(
-                diary_reminder=settings.diary_reminder,
-                ai_content_ready=settings.ai_content_ready,
-                weekly_report=settings.weekly_report,
-                marketing=settings.marketing,
-                quiet_hours_start=settings.quiet_hours_start,
-                quiet_hours_end=settings.quiet_hours_end,
+                diary_reminder=settings.diary_reminder_enabled,
+                ai_content_ready=settings.ai_processing_enabled,
+                weekly_report=settings.report_notification_enabled,
+                marketing=settings.browser_push_enabled,
+                quiet_hours_start=settings.diary_reminder_time,
+                quiet_hours_end=settings.diary_reminder_time,
             )
 
         except Exception as e:
@@ -247,6 +237,16 @@ class FCMService:
         """푸시 알림 전송"""
         try:
             fcm_service = get_fcm_service()
+            if fcm_service is None:
+                logger.error("FCM 서비스가 초기화되지 않았습니다")
+                return NotificationSendResponse(
+                    success_count=0,
+                    failure_count=0,
+                    successful_tokens=[],
+                    failed_tokens=[],
+                    message="FCM 서비스 초기화 오류로 알림을 전송할 수 없습니다.",
+                )
+
             successful_tokens = []
             failed_tokens = []
 
@@ -256,7 +256,7 @@ class FCMService:
                 stmt = select(FCMToken).where(
                     and_(FCMToken.user_id == user_id, FCMToken.is_active)
                 )
-                user_tokens = session.exec(stmt).all()
+                user_tokens = session.execute(stmt).scalars().all()
                 all_tokens.extend(user_tokens)
 
             if not all_tokens:
@@ -346,9 +346,9 @@ class FCMService:
             settings_stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            settings = session.exec(settings_stmt).first()
+            settings = session.execute(settings_stmt).scalar_one_or_none()
 
-            if settings and not settings.diary_reminder:
+            if settings and not settings.diary_reminder_enabled:
                 return NotificationSendResponse(
                     success_count=0,
                     failure_count=0,
@@ -385,7 +385,7 @@ class FCMService:
         try:
             # 다이어리 존재 확인
             diary_stmt = select(DiaryEntry).where(DiaryEntry.id == diary_id)
-            diary = session.exec(diary_stmt).first()
+            diary = session.execute(diary_stmt).scalar_one_or_none()
 
             if not diary:
                 raise HTTPException(
@@ -397,9 +397,9 @@ class FCMService:
             settings_stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
-            settings = session.exec(settings_stmt).first()
+            settings = session.execute(settings_stmt).scalar_one_or_none()
 
-            if settings and not settings.ai_content_ready:
+            if settings and not settings.ai_processing_enabled:
                 return NotificationSendResponse(
                     success_count=0,
                     failure_count=0,
@@ -442,7 +442,7 @@ class FCMService:
                 .offset(offset)
             )
 
-            histories = session.exec(stmt).all()
+            histories = session.execute(stmt).scalars().all()
 
             return [
                 NotificationHistoryResponse(

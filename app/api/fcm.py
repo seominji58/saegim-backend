@@ -147,37 +147,37 @@ async def send_push_notification(
 
 
 @router.post(
-    "/send-diary-reminder/{user_id}",
+    "/send-diary-reminder",
     response_model=BaseResponse[NotificationSendResponse],
     summary="다이어리 작성 알림 전송",
-    description="지정된 사용자에게 다이어리 작성 알림을 전송합니다.",
+    description="현재 인증된 사용자에게 다이어리 작성 알림을 전송합니다.",
 )
 async def send_diary_reminder_notification(
-    user_id: str,
     current_user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """다이어리 작성 알림 전송"""
-    result = await FCMService.send_diary_reminder(user_id, session)
+    result = await FCMService.send_diary_reminder(str(current_user_id), session)
     return BaseResponse(
         success=True, message="다이어리 알림이 성공적으로 전송되었습니다.", data=result
     )
 
 
 @router.post(
-    "/send-ai-content-ready/{user_id}/{diary_id}",
+    "/send-ai-content-ready/{diary_id}",
     response_model=BaseResponse[NotificationSendResponse],
     summary="AI 콘텐츠 준비 완료 알림 전송",
-    description="AI 콘텐츠가 준비되었을 때 사용자에게 알림을 전송합니다.",
+    description="AI 콘텐츠가 준비되었을 때 현재 인증된 사용자에게 알림을 전송합니다.",
 )
 async def send_ai_content_ready_notification(
-    user_id: str,
     diary_id: str,
     current_user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """AI 콘텐츠 준비 완료 알림 전송"""
-    result = await FCMService.send_ai_content_ready(user_id, diary_id, session)
+    result = await FCMService.send_ai_content_ready(
+        str(current_user_id), diary_id, session
+    )
     return BaseResponse(
         success=True, message="AI 콘텐츠 알림이 성공적으로 전송되었습니다.", data=result
     )
