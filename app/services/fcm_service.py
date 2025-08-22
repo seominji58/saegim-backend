@@ -246,7 +246,7 @@ class FCMService:
                     failed_tokens=[],
                     message="FCM 서비스 초기화 오류로 알림을 전송할 수 없습니다.",
                 )
-                
+
             successful_tokens = []
             failed_tokens = []
 
