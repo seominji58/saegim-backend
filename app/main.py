@@ -153,6 +153,12 @@ async def status():
         "environment": settings.environment,
     }
 
+# 다이어리 생성 라우트
+@app.post("/api/create/{sessionId}", tags=["diary"])
+async def create_diary(sessionId: str, diary: DiaryCreate):
+    # sessionId를 기반으로 세션별 다이어리 생성 로직
+    return await diary_service.create_diary(sessionId, diary)
+
 
 # API 라우터 등록
 app.include_router(api_router)  # 일반 API 라우터 (prefix 포함)
