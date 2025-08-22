@@ -3,6 +3,7 @@ fastapi==0.104.1
 uvicorn==0.24.0
 slowapi==0.1.9
 pydantic==2.11.7
+pydantic[email]
 
 # 데이터베이스
 sqlmodel==0.0.14

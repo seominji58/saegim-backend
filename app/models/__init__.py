@@ -16,14 +16,30 @@ __all__ = ["BaseModel", "DiaryEntry", "User"]
 from .user import User
 
 # 2. User 모델에 의존성이 있는 모델들
+from .diary import DiaryEntry
 from .oauth_token import OAuthToken
 from .email_verification import EmailVerification
 from .password_reset_token import PasswordResetToken
+from .fcm import FCMToken, NotificationSettings, NotificationHistory
+
+# 3. 새로 추가된 모델들
+from .image import Image
+from .emotion_stats import EmotionStats
+from .ai_usage_log import AIUsageLog
+from .notification import Notification
 
 # 명시적으로 모든 모델을 노출
 __all__ = [
     "User",
-    "OAuthToken", 
+    "DiaryEntry",
+    "OAuthToken",
     "EmailVerification",
     "PasswordResetToken",
+    "FCMToken",
+    "NotificationSettings",
+    "NotificationHistory",
+    "Image",
+    "EmotionStats",
+    "AIUsageLog",
+    "Notification",
 ]
