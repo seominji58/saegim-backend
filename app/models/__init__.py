@@ -26,6 +26,7 @@ from .fcm import FCMToken, NotificationSettings, NotificationHistory
 from .image import Image
 from .emotion_stats import EmotionStats
 from .ai_usage_log import AIUsageLog
+from .notification import Notification
 
 # 명시적으로 모든 모델을 노출
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "Image",
     "EmotionStats",
     "AIUsageLog",
+    "Notification",
 ]

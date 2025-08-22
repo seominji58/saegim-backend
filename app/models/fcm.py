@@ -103,33 +103,18 @@ class NotificationSettings(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
-    # 알림 설정
-    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    diary_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    ai_content_ready: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True
-    )
-    emotion_trend: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    anniversary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    friend_share: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )  # 향후 기능
-
-    # 조용한 시간 설정
-    quiet_hours_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
-    quiet_start_time: Mapped[Optional[str]] = mapped_column(
-        String(5), nullable=True, default="22:00"
-    )  # HH:MM
-    quiet_end_time: Mapped[Optional[str]] = mapped_column(
-        String(5), nullable=True, default="08:00"
-    )  # HH:MM
-
-    # 알림 빈도 설정
-    frequency: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="immediate"
-    )  # immediate, hourly, daily
+    # ERD 기준 알림 설정 필드
+    push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    diary_reminder_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    diary_reminder_time: Mapped[Optional[str]] = mapped_column(
+        String(5), nullable=True, default="21:00"
+    )  # HH:MM 형식
+    diary_reminder_days: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON, nullable=True, default=lambda: []
+    )  # 리마인드 요일 배열 ['mon','tue',...]
+    report_notification_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    ai_processing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    browser_push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -146,7 +131,7 @@ class NotificationSettings(Base):
     user: Mapped["User"] = relationship("User", back_populates="notification_settings")
 
     def __repr__(self) -> str:
-        return f"<NotificationSettings(id={self.id}, user_id={self.user_id}, enabled={self.enabled})>"
+        return f"<NotificationSettings(id={self.id}, user_id={self.user_id}, push_enabled={self.push_enabled})>"
 
 
 class NotificationHistory(Base):

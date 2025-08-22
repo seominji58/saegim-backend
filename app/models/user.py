@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
     from app.models.emotion_stats import EmotionStats
     from app.models.ai_usage_log import AIUsageLog
+    from app.models.notification import Notification
 
 from app.models.base import Base
 
@@ -106,5 +107,8 @@ class User(Base):
         back_populates="user", lazy="selectin", cascade="all, delete-orphan"
     )
     ai_usage_logs: Mapped[List["AIUsageLog"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
+    notifications: Mapped[List["Notification"]] = relationship(
         back_populates="user", lazy="selectin", cascade="all, delete-orphan"
     )
