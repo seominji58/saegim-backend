@@ -1,0 +1,109 @@
+"""
+JWT 토큰 갱신 API 라우터
+"""
+import logging
+from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlmodel import Session, select
+from datetime import datetime, timedelta
+
+from app.core.config import get_settings
+from app.core.security import decode_refresh_token, create_access_token, create_refresh_token
+from app.db.database import get_session
+from app.models.user import User
+from app.schemas.base import BaseResponse
+
+router = APIRouter(tags=["auth"])
+settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+@router.post("/refresh", response_model=BaseResponse[Dict[str, Any]])
+async def refresh_token(
+    request: Request,
+    db: Session = Depends(get_session),
+) -> BaseResponse[Dict[str, Any]]:
+    """
+    JWT 토큰 갱신 API
+    
+    - Refresh Token을 사용하여 새로운 Access Token 발급
+    - Access Token이 만료되었을 때 자동으로 호출
+    """
+    try:
+        # 1. Authorization 헤더에서 Refresh Token 추출
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token이 필요합니다."
+            )
+        
+        refresh_token = auth_header.split(" ")[1]
+        
+        # 2. Refresh Token 검증
+        try:
+            payload = decode_refresh_token(refresh_token)
+            user_id = int(payload.get("sub"))
+            token_type = payload.get("type")
+            
+            if token_type != "refresh":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="유효하지 않은 토큰 타입입니다."
+                )
+                
+        except Exception as e:
+            logger.warning(f"Refresh token 검증 실패: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않은 refresh token입니다."
+            )
+        
+        # 3. 사용자 정보 조회
+        stmt = select(User).where(User.id == user_id)
+        result = db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="사용자를 찾을 수 없습니다."
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="비활성화된 계정입니다."
+            )
+        
+        # 4. 새로운 토큰 발급
+        access_token = create_access_token(
+            data={"sub": str(user.id), "email": user.email}
+        )
+        new_refresh_token = create_refresh_token(
+            data={"sub": str(user.id)}
+        )
+        
+        logger.info(f"토큰 갱신 성공: {user.email}")
+        
+        return BaseResponse(
+            data={
+                "access_token": access_token,
+                "refresh_token": new_refresh_token,
+                "token_type": "bearer",
+                "expires_in": settings.access_token_expire_minutes * 60,
+                "user_id": str(user.id),
+                "email": user.email,
+                "nickname": user.nickname
+            },
+            message="토큰이 성공적으로 갱신되었습니다."
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"토큰 갱신 중 오류 발생: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="토큰 갱신 중 오류가 발생했습니다."
+        )

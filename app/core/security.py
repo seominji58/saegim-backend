@@ -372,3 +372,20 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         토큰 페이로드
     """
     return security_service.jwt_handler.decode_token(token)
+
+
+def decode_refresh_token(token: str) -> Dict[str, Any]:
+    """
+    리프레시 토큰 디코딩 (전역 함수)
+
+    Args:
+        token: JWT 리프레시 토큰
+
+    Returns:
+        토큰 페이로드
+    """
+    return security_service.jwt_handler.decode_token(token)
+
+
+# 전역 보안 서비스 인스턴스 (모든 클래스 정의 후에 생성)
+security_service = SecurityService()
