@@ -118,3 +118,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """설정 싱글톤 인스턴스 반환"""
     return Settings()
+
+
+# 전역 settings 객체 생성
+settings = get_settings()

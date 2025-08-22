@@ -263,6 +263,55 @@ class EmailService:
             logger.error(f"Welcome email sending failed: {to_email} - {e}")
             return False
 
+    async def send_password_reset_email(self, to_email: str, nickname: str, reset_url: str) -> bool:
+        """
+        비밀번호 재설정 이메일 발송
+        
+        Args:
+            to_email: 수신자 이메일
+            nickname: 사용자 닉네임
+            reset_url: 비밀번호 재설정 URL
+            
+        Returns:
+            발송 성공 여부
+        """
+        try:
+            # SendGrid API 키가 있으면 SendGrid 사용
+            if self.sendgrid_api_key:
+                return await self._send_password_reset_with_sendgrid(to_email, nickname, reset_url)
+            else:
+                # 기존 SMTP 방식 사용 (fallback)
+                return await self._send_password_reset_with_smtp(to_email, nickname, reset_url)
+                
+        except Exception as e:
+            logger.error(f"Password reset email sending failed: {to_email} - {e}")
+            return False
+
+    async def send_social_account_password_reset_error(self, to_email: str, nickname: str, provider: str, error_url: str) -> bool:
+        """
+        소셜 계정 사용자 비밀번호 재설정 에러 이메일 발송
+        
+        Args:
+            to_email: 수신자 이메일
+            nickname: 사용자 닉네임
+            provider: 소셜 제공자 (google, kakao, naver 등)
+            error_url: 에러 페이지 URL
+            
+        Returns:
+            발송 성공 여부
+        """
+        try:
+            # SendGrid API 키가 있으면 SendGrid 사용
+            if self.sendgrid_api_key:
+                return await self._send_social_error_with_sendgrid(to_email, nickname, provider, error_url)
+            else:
+                # 기존 SMTP 방식 사용 (fallback)
+                return await self._send_social_error_with_smtp(to_email, nickname, provider, error_url)
+                
+        except Exception as e:
+            logger.error(f"Social account error email sending failed: {to_email} - {e}")
+            return False
+
     async def _send_welcome_with_sendgrid(self, to_email: str, nickname: str) -> bool:
         """SendGrid를 사용한 환영 이메일 발송"""
         try:
@@ -544,4 +593,262 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"SMTP email change verification sending failed: {e}")
+            return False
+
+    async def _send_password_reset_with_sendgrid(self, to_email: str, nickname: str, reset_url: str) -> bool:
+        """SendGrid를 사용한 비밀번호 재설정 이메일 발송"""
+        try:
+            import httpx
+            
+            # SendGrid API 엔드포인트
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            subject = "[Saegim] 비밀번호 재설정"
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 비밀번호 재설정</h2>
+                    <p>안녕하세요, <strong>{nickname}</strong>님!</p>
+                    <p>Saegim 서비스에서 비밀번호 재설정 요청이 있었습니다.</p>
+                    <p>아래 링크를 클릭하여 새로운 비밀번호를 설정해주세요.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{reset_url}" style="background-color: #5C8D89; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                            비밀번호 재설정하기
+                        </a>
+                    </div>
+                    
+                    <p><strong>이 링크는 1시간 후에 만료됩니다.</strong></p>
+                    <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                    
+                    <hr style="margin: 30px 0;">
+                    <p style="color: #666; font-size: 12px;">
+                        이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                        문의사항이 있으시면 고객센터에 연락해주세요.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # SendGrid API 요청 데이터
+            data = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}]
+                    }
+                ],
+                "from": {"email": self.sendgrid_from_email},
+                "subject": subject,
+                "content": [
+                    {
+                        "type": "text/html",
+                        "value": html_content
+                    }
+                ]
+            }
+            
+            # SendGrid API 호출
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {self.sendgrid_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                if response.status_code == 202:
+                    logger.info(f"Password reset email sent successfully to {to_email}")
+                    return True
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"SendGrid password reset email sending failed: {e}")
+            return False
+
+    async def _send_password_reset_with_smtp(self, to_email: str, nickname: str, reset_url: str) -> bool:
+        """SMTP를 사용한 비밀번호 재설정 이메일 발송 (fallback)"""
+        try:
+            subject = "[Saegim] 비밀번호 재설정"
+            
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 비밀번호 재설정</h2>
+                    <p>안녕하세요, <strong>{nickname}</strong>님!</p>
+                    <p>Saegim 서비스에서 비밀번호 재설정 요청이 있었습니다.</p>
+                    <p>아래 링크를 클릭하여 새로운 비밀번호를 설정해주세요.</p>
+                    
+                    <p><a href="{reset_url}" style="color: #5C8D89;">{reset_url}</a></p>
+                    
+                    <p><strong>이 링크는 1시간 후에 만료됩니다.</strong></p>
+                    <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # MIME 메시지 생성
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = self.smtp_username
+            msg['To'] = to_email
+            
+            # HTML 내용 추가
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+            
+            # SMTP 서버 연결 및 이메일 발송
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+            
+            logger.info(f"Password reset email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"SMTP password reset email sending failed: {e}")
+            return False
+
+    async def _send_social_error_with_sendgrid(self, to_email: str, nickname: str, provider: str, error_url: str) -> bool:
+        """SendGrid를 사용한 소셜 계정 에러 이메일 발송"""
+        try:
+            import httpx
+            
+            # SendGrid API 엔드포인트
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            subject = "[Saegim] 비밀번호 재설정 안내"
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 비밀번호 재설정 안내</h2>
+                    <p>안녕하세요, <strong>{nickname}</strong>님!</p>
+                    <p>Saegim 서비스에서 비밀번호 재설정 요청이 있었습니다.</p>
+                    <p><strong>현재 {provider} 소셜 계정으로 가입되어 계십니다.</strong></p>
+                    
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <h3 style="color: #856404; margin-top: 0;">⚠️ 소셜 계정 사용자 안내</h3>
+                        <p style="color: #856404; margin-bottom: 0;">
+                            소셜 계정으로 가입하신 경우, 비밀번호는 해당 서비스에서 직접 관리해주세요.<br>
+                            Saegim에서는 비밀번호 재설정이 불가능합니다.
+                        </p>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{error_url}" style="background-color: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                            자세한 안내 보기
+                        </a>
+                    </div>
+                    
+                    <p>궁금한 점이 있으시면 고객센터에 문의해주세요.</p>
+                    
+                    <hr style="margin: 30px 0;">
+                    <p style="color: #666; font-size: 12px;">
+                        이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                        문의사항이 있으시면 고객센터에 연락해주세요.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # SendGrid API 요청 데이터
+            data = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}]
+                    }
+                ],
+                "from": {"email": self.sendgrid_from_email},
+                "subject": subject,
+                "content": [
+                    {
+                        "type": "text/html",
+                        "value": html_content
+                    }
+                ]
+            }
+            
+            # SendGrid API 호출
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {self.sendgrid_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                if response.status_code == 202:
+                    logger.info(f"Social account error email sent successfully to {to_email}")
+                    return True
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"SendGrid social error email sending failed: {e}")
+            return False
+
+    async def _send_social_error_with_smtp(self, to_email: str, nickname: str, provider: str, error_url: str) -> bool:
+        """SMTP를 사용한 소셜 계정 에러 이메일 발송 (fallback)"""
+        try:
+            subject = "[Saegim] 비밀번호 재설정 안내"
+            
+            html_content = f"""
+            <html>
+            <body>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #5C8D89;">Saegim 비밀번호 재설정 안내</h2>
+                    <p>안녕하세요, <strong>{nickname}</strong>님!</p>
+                    <p>Saegim 서비스에서 비밀번호 재설정 요청이 있었습니다.</p>
+                    <p><strong>현재 {provider} 소셜 계정으로 가입되어 계십니다.</strong></p>
+                    
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <h3 style="color: #856404; margin-top: 0;">⚠️ 소셜 계정 사용자 안내</h3>
+                        <p style="color: #856404; margin-bottom: 0;">
+                            소셜 계정으로 가입하신 경우, 비밀번호는 해당 서비스에서 직접 관리해주세요.<br>
+                            Saegim에서는 비밀번호 재설정이 불가능합니다.
+                        </p>
+                    </div>
+                    
+                    <p><a href="{error_url}" style="color: #5C8D89;">자세한 안내 보기</a></p>
+                    
+                    <p>궁금한 점이 있으시면 고객센터에 문의해주세요.</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # MIME 메시지 생성
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = self.smtp_username
+            msg['To'] = to_email
+            
+            # HTML 내용 추가
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+            
+            # SMTP 서버 연결 및 이메일 발송
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+            
+            logger.info(f"Social account error email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"SMTP social error email sending failed: {e}")
             return False
