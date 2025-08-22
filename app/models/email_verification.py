@@ -27,7 +27,7 @@ class EmailVerification(Base):
     verification_type: Mapped[str] = mapped_column(String(10), nullable=False, default="signup")
 
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    is_verified: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_used: Mapped[bool] = mapped_column(default=False, nullable=False)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

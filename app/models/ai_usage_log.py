@@ -28,28 +28,6 @@ class AIUsageLog(Base):
     """AI 사용 로그 테이블 모델"""
 
     __tablename__ = "ai_usage_logs"
-
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
-    )
-    api_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    session_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
-    regeneration_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    tokens_used: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    request_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    response_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
     __table_args__ = (
         Index("idx_ai_usage_user_created", "user_id", desc("created_at")),
         Index("idx_ai_usage_session_regen", "session_id", "regeneration_count"),
@@ -68,6 +46,7 @@ class AIUsageLog(Base):
         CheckConstraint("tokens_used >= 0", name="ck_ai_usage_tokens_positive"),
     )
 
+    # 기본 필드
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
@@ -79,8 +58,15 @@ class AIUsageLog(Base):
     request_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     response_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
+    # 타임스탬프 필드
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     # 관계 설정
