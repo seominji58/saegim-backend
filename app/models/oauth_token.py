@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy import Index, UniqueConstraint, CheckConstraint, text, String, DateTime, ForeignKey
@@ -21,7 +21,7 @@ class OAuthToken(Base):
         Index("idx_oauth_expires", "expires_at", postgresql_where=text("expires_at IS NOT NULL")),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 

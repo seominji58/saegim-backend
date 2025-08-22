@@ -1,4 +1,5 @@
 """Alembic Environment Configuration"""
+
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -13,6 +14,7 @@ from app.models.user import User
 from app.models.email_verification import EmailVerification
 from app.models.oauth_token import OAuthToken
 from app.models.password_reset_token import PasswordResetToken
+from app.models.fcm import FCMToken, NotificationSettings
 
 # Alembic Config object
 config = context.config
@@ -29,18 +31,6 @@ config.set_main_option("sqlalchemy.url", decoded_database_url)
 # MetaData object for models
 target_metadata = Base.metadata
 
-def include_object(object, name, type_, reflected, compare_to):
-    """
-    마이그레이션 대상 테이블을 제한하는 함수
-    email_verifications 테이블만 마이그레이션 대상으로 포함
-    """
-    if type_ == "table":
-        # email_verifications 테이블만 허용
-        if name == "email_verifications":
-            return True
-        # 다른 모든 테이블은 마이그레이션에서 제외
-        return False
-    return True
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode"""
@@ -66,11 +56,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata,
-            include_object=include_object
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
