@@ -33,8 +33,8 @@ class ProfileUpdateRequest(BaseModel):
     
     @validator('nickname')
     def validate_nickname(cls, v):
-        if len(v) < 2 or len(v) > 20:
-            raise ValueError('닉네임은 2-20자 사이여야 합니다')
+        if len(v) < 2 or len(v) > 10:
+            raise ValueError('닉네임은 2-10자 사이여야 합니다')
         
         # 한글과 영문만 허용
         if not re.match(r'^[가-힣a-zA-Z]+$', v):
