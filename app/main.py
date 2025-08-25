@@ -8,6 +8,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 
 import logging
 from datetime import datetime
@@ -17,7 +18,7 @@ from app.core.config import get_settings
 
 # 환경 변수 먼저 로드
 load_env_file()
-from app.api import health, router as api_router
+from app.api import router as api_router
 from app.db.database import create_db_and_tables
 
 # 로깅 설정
@@ -36,6 +37,53 @@ app = FastAPI(
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
 )
+
+
+def custom_openapi():
+    """
+    Swagger UI에 JWT Bearer Token 인증 버튼을 추가하기 위한 OpenAPI 스키마 커스터마이징
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # JWT Bearer Token Security Scheme 추가
+    openapi_schema["components"]["securitySchemes"] = {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer {token}'",
+        }
+    }
+
+    # 모든 보호된 엔드포인트에 기본 보안 적용
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            # 인증이 필요없는 엔드포인트 제외 (로그인, 회원가입, health 등)
+            if (
+                path.startswith("/api/auth/")
+                or path in ["/", "/status", "/docs", "/redoc", "/openapi.json"]
+                or path.startswith("/health")
+            ):
+                continue
+
+            # 기타 모든 엔드포인트에 Bearer 토큰 보안 적용
+            if "security" not in openapi_schema["paths"][path][method]:
+                openapi_schema["paths"][path][method]["security"] = [{"bearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+# 커스텀 OpenAPI 스키마 적용
+app.openapi = custom_openapi
 
 # 미들웨어 설정
 app.add_middleware(
