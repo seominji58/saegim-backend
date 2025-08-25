@@ -272,32 +272,42 @@ class FCMService:
             for token_model in all_tokens:
                 try:
                     # 알림 전송
-                    success = await fcm_service.send_notification(
+                    result = await fcm_service.send_notification(
                         token=token_model.token,
                         title=notification_data.title,
                         body=notification_data.body,
                         data=notification_data.data,
                     )
 
-                    if success:
+                    if result["success"]:
                         successful_tokens.append(token_model.token)
                         status_value = "sent"
                     else:
                         failed_tokens.append(token_model.token)
                         status_value = "failed"
+                        
+                        # UNREGISTERED 토큰인 경우 비활성화
+                        if result.get("error_type") == "UNREGISTERED":
+                            logger.warning(f"토큰 {token_model.token[:10]}...이 UNREGISTERED 상태입니다. 비활성화합니다.")
+                            token_model.is_active = False
+                            token_model.updated_at = datetime.now(timezone.utc)
 
                     # 알림 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        fcm_token_id=token_model.id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status=status_value,
-                        fcm_response={
-                            "token": token_model.token[:10]
-                            + "...",  # 보안을 위해 일부만 저장
-                            "success": success,
+                        data_payload={
+                            "token": token_model.token[:10] + "...",  # 보안을 위해 일부만 저장
+                            "success": result["success"],
+                            "error_type": result.get("error_type"),
+                            "fcm_response": result.get("response"),
                         },
+                        sent_at=datetime.now(timezone.utc) if result["success"] else None,
+                        error_message=result.get("response", {}).get("error", {}).get("message") if not result["success"] else None,
                     )
                     session.add(history)
 
@@ -310,11 +320,13 @@ class FCMService:
                     # 실패 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        fcm_token_id=token_model.id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status="failed",
-                        fcm_response={"error": str(e)},
+                        error_message=str(e),
+                        data_payload={"token": token_model.token[:10] + "..."},
                     )
                     session.add(history)
 
@@ -452,7 +464,7 @@ class FCMService:
                     notification_type=history.notification_type,
                     status=history.status,
                     created_at=history.created_at,
-                    fcm_response=history.fcm_response,
+                    fcm_response=history.data_payload or {},
                 )
                 for history in histories
             ]
@@ -463,3 +475,62 @@ class FCMService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 기록 조회에 실패했습니다.",
             )
+
+    @staticmethod
+    async def cleanup_invalid_tokens(session: Session) -> int:
+        """무효한 FCM 토큰들을 정리합니다"""
+        try:
+            fcm_service = get_fcm_service()
+            if fcm_service is None:
+                logger.warning("FCM 서비스를 사용할 수 없어 토큰 정리를 건너뜁니다.")
+                return 0
+
+            # 모든 활성 토큰 조회
+            stmt = select(FCMToken).where(FCMToken.is_active)
+            active_tokens = session.execute(stmt).scalars().all()
+
+            cleanup_count = 0
+            
+            # 각 토큰을 테스트하여 유효성 확인 (주의: 실제 알림은 전송하지 않음)
+            for token_model in active_tokens:
+                try:
+                    # 더미 알림으로 토큰 유효성 테스트 (dry run)
+                    result = await fcm_service.send_notification(
+                        token=token_model.token,
+                        title="토큰 검증",
+                        body="이 알림은 토큰 유효성 검증용입니다.",
+                        data={"type": "validation", "test": "true"}
+                    )
+                    
+                    # UNREGISTERED 토큰인 경우 비활성화
+                    if not result["success"] and result.get("error_type") == "UNREGISTERED":
+                        logger.info(f"무효한 토큰 비활성화: {token_model.token[:10]}...")
+                        token_model.is_active = False
+                        token_model.updated_at = datetime.now(timezone.utc)
+                        cleanup_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}")
+                    continue
+
+            session.commit()
+            logger.info(f"FCM 토큰 정리 완료: {cleanup_count}개 토큰 비활성화")
+            return cleanup_count
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"FCM 토큰 정리 중 오류: {str(e)}")
+            return 0
+
+    @staticmethod
+    def get_active_token_count(user_id: str, session: Session) -> int:
+        """사용자의 활성 토큰 개수를 반환합니다"""
+        try:
+            stmt = select(FCMToken).where(
+                and_(FCMToken.user_id == user_id, FCMToken.is_active)
+            )
+            count = len(session.execute(stmt).scalars().all())
+            return count
+        except Exception as e:
+            logger.error(f"활성 토큰 개수 조회 실패: {str(e)}")
+            return 0

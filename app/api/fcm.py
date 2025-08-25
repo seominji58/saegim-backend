@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlmodel import Session
 
 from app.db.database import get_session
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id_from_cookie
 from app.services.fcm_service import FCMService
 from app.schemas.base import BaseResponse
 from app.schemas.fcm import (
@@ -46,7 +46,7 @@ async def fcm_health_check():
 )
 def register_fcm_token(
     token_data: FCMTokenRegisterRequest,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """FCM 토큰 등록 또는 업데이트"""
@@ -63,7 +63,7 @@ def register_fcm_token(
     description="현재 사용자의 활성 FCM 토큰 목록을 조회합니다.",
 )
 def get_fcm_tokens(
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """사용자 FCM 토큰 목록 조회"""
@@ -81,7 +81,7 @@ def get_fcm_tokens(
 )
 def delete_fcm_token(
     token_id: str,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """FCM 토큰 삭제"""
@@ -98,7 +98,7 @@ def delete_fcm_token(
     description="현재 사용자의 알림 설정을 조회합니다.",
 )
 def get_notification_settings(
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """알림 설정 조회"""
@@ -116,7 +116,7 @@ def get_notification_settings(
 )
 def update_notification_settings(
     settings_data: NotificationSettingsUpdate,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """알림 설정 업데이트"""
@@ -136,7 +136,7 @@ def update_notification_settings(
 )
 async def send_push_notification(
     notification_data: NotificationSendRequest,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """푸시 알림 전송"""
@@ -153,7 +153,7 @@ async def send_push_notification(
     description="현재 인증된 사용자에게 다이어리 작성 알림을 전송합니다.",
 )
 async def send_diary_reminder_notification(
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """다이어리 작성 알림 전송"""
@@ -171,7 +171,7 @@ async def send_diary_reminder_notification(
 )
 async def send_ai_content_ready_notification(
     diary_id: str,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """AI 콘텐츠 준비 완료 알림 전송"""
@@ -192,7 +192,7 @@ async def send_ai_content_ready_notification(
 def get_notification_history(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """알림 기록 조회"""
@@ -201,4 +201,63 @@ def get_notification_history(
     )
     return BaseResponse(
         success=True, message="알림 기록을 성공적으로 조회했습니다.", data=history
+    )
+
+
+@router.post(
+    "/cleanup-tokens",
+    response_model=BaseResponse[dict],
+    summary="무효한 토큰 정리",
+    description="무효한 FCM 토큰들을 자동으로 감지하고 비활성화합니다.",
+)
+async def cleanup_invalid_tokens(
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
+    session: Session = Depends(get_session),
+):
+    """무효한 FCM 토큰 정리"""
+    cleanup_count = await FCMService.cleanup_invalid_tokens(session)
+    active_count = FCMService.get_active_token_count(current_user_id, session)
+    
+    return BaseResponse(
+        success=True,
+        message=f"무효한 토큰 정리가 완료되었습니다. {cleanup_count}개 토큰이 비활성화되었습니다.",
+        data={
+            "cleanup_count": cleanup_count,
+            "active_token_count": active_count,
+        }
+    )
+
+
+@router.get(
+    "/token-status", 
+    response_model=BaseResponse[dict],
+    summary="토큰 상태 조회",
+    description="현재 사용자의 FCM 토큰 상태를 조회합니다.",
+)
+def get_token_status(
+    current_user_id: str = Depends(get_current_user_id_from_cookie),
+    session: Session = Depends(get_session),
+):
+    """FCM 토큰 상태 조회"""
+    active_count = FCMService.get_active_token_count(current_user_id, session)
+    tokens = FCMService.get_user_tokens(current_user_id, session)
+    
+    return BaseResponse(
+        success=True,
+        message="FCM 토큰 상태를 성공적으로 조회했습니다.",
+        data={
+            "active_token_count": active_count,
+            "total_token_count": len(tokens),
+            "tokens": [
+                {
+                    "id": str(token.id),
+                    "device_type": token.device_type,
+                    "is_active": token.is_active,
+                    "created_at": token.created_at.isoformat(),
+                    "updated_at": token.updated_at.isoformat(),
+                    "token_preview": token.token[:20] + "..." if token.token else None,
+                }
+                for token in tokens
+            ],
+        }
     )
