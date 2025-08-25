@@ -1,6 +1,6 @@
 """
-FCM 서비스
-사용자 디바이스 토큰 관리 및 푸시 알림 전송
+알림 서비스
+FCM 디바이스 토큰 관리, 푸시 알림 전송 및 인앱 알림 통합 관리
 """
 
 from typing import List, Dict
@@ -13,7 +13,7 @@ import logging
 
 from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
 from app.models.diary import DiaryEntry
-from app.schemas.fcm import (
+from app.schemas.notification import (
     FCMTokenRegisterRequest,
     FCMTokenResponse,
     NotificationSettingsUpdate,
@@ -26,8 +26,8 @@ from app.schemas.fcm import (
 logger = logging.getLogger(__name__)
 
 
-class FCMService:
-    """FCM 토큰 및 알림 관리 서비스"""
+class NotificationService:
+    """알림 토큰 및 푸시 알림 관리 서비스"""
 
     @staticmethod
     def register_token(
@@ -419,7 +419,9 @@ class FCMService:
                 data={"action": "write_diary"},
             )
 
-            return await FCMService.send_notification(notification_request, session)
+            return await NotificationService.send_notification(
+                notification_request, session
+            )
 
         except HTTPException:
             raise
@@ -470,7 +472,9 @@ class FCMService:
                 data={"diary_id": diary_id, "action": "view_ai_content"},
             )
 
-            return await FCMService.send_notification(notification_request, session)
+            return await NotificationService.send_notification(
+                notification_request, session
+            )
 
         except HTTPException:
             raise
@@ -485,29 +489,56 @@ class FCMService:
     def get_notification_history(
         user_id: str, limit: int, offset: int, session: Session
     ) -> List[NotificationHistoryResponse]:
-        """사용자 알림 기록 조회"""
+        """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
         try:
+            from app.models.notification import Notification
+
+            # notification_history와 notification을 LEFT JOIN
             stmt = (
-                select(NotificationHistory)
+                select(
+                    NotificationHistory.id,
+                    NotificationHistory.notification_id,
+                    NotificationHistory.notification_type,
+                    NotificationHistory.status,
+                    NotificationHistory.sent_at,
+                    NotificationHistory.delivered_at,
+                    NotificationHistory.opened_at,
+                    NotificationHistory.created_at,
+                    NotificationHistory.error_message,
+                    Notification.title,
+                    Notification.message,
+                    Notification.is_read,
+                )
+                .select_from(NotificationHistory)
+                .outerjoin(
+                    Notification, NotificationHistory.notification_id == Notification.id
+                )
                 .where(NotificationHistory.user_id == user_id)
                 .order_by(desc(NotificationHistory.created_at))
                 .limit(limit)
                 .offset(offset)
             )
 
-            histories = session.execute(stmt).scalars().all()
+            results = session.execute(stmt).all()
 
             return [
                 NotificationHistoryResponse(
-                    id=history.id,
-                    title=history.title,
-                    body=history.body,
-                    notification_type=history.notification_type,
-                    status=history.status,
-                    created_at=history.created_at,
-                    fcm_response=history.data_payload or {},
+                    id=str(result.id),
+                    notification_id=str(result.notification_id)
+                    if result.notification_id
+                    else None,
+                    notification_type=result.notification_type,
+                    status=result.status,
+                    sent_at=result.sent_at,
+                    delivered_at=result.delivered_at,
+                    opened_at=result.opened_at,
+                    created_at=result.created_at,
+                    error_message=result.error_message,
+                    title=result.title,
+                    message=result.message,
+                    is_read=result.is_read,
                 )
-                for history in histories
+                for result in results
             ]
 
         except Exception as e:
