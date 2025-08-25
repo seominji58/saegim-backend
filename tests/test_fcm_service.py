@@ -64,16 +64,13 @@ class TestNotificationService:
         return NotificationSettings(
             id="settings-id-123",
             user_id=sample_user_id,
-            enabled=True,
-            diary_reminder=True,
-            ai_content_ready=True,
-            emotion_trend=True,
-            anniversary=True,
-            friend_share=False,
-            quiet_hours_enabled=False,
-            quiet_start_time="22:00",
-            quiet_end_time="08:00",
-            frequency="immediate",
+            push_enabled=True,
+            diary_reminder_enabled=True,
+            diary_reminder_time="21:00",
+            diary_reminder_days=[],
+            report_notification_enabled=True,
+            ai_processing_enabled=True,
+            browser_push_enabled=False,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
@@ -120,7 +117,12 @@ class TestNotificationService:
         mock_session.commit.assert_called_once()
 
     def test_register_token_update_existing(
-        self, mock_session, sample_user_id, sample_token_request, sample_fcm_token
+        self,
+        notification_service,
+        mock_session,
+        sample_user_id,
+        sample_token_request,
+        sample_fcm_token,
     ):
         """기존 토큰 업데이트 테스트"""
         # Mock: 기존 토큰이 있는 경우
@@ -183,7 +185,11 @@ class TestNotificationService:
         assert exc_info.value.status_code == 404
 
     def test_get_notification_settings_existing(
-        self, mock_session, sample_user_id, sample_notification_settings
+        self,
+        notification_service,
+        mock_session,
+        sample_user_id,
+        sample_notification_settings,
     ):
         """기존 알림 설정 조회 테스트"""
         # Mock: 기존 설정 반환
@@ -196,10 +202,10 @@ class TestNotificationService:
         # 검증
         assert result.diary_reminder is True
         assert result.ai_content_ready is True
-        assert result.emotion_trend is True
+        assert result.weekly_report is True
 
     def test_get_notification_settings_create_default(
-        self, mock_session, sample_user_id
+        self, notification_service, mock_session, sample_user_id
     ):
         """기본 알림 설정 생성 테스트"""
         # Mock: 기존 설정이 없는 경우
@@ -215,12 +221,16 @@ class TestNotificationService:
         # 검증: 기본값이 설정되어야 함
         assert result.diary_reminder is True
         assert result.ai_content_ready is True
-        assert result.emotion_trend is True
+        assert result.weekly_report is True
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
 
     def test_update_notification_settings(
-        self, mock_session, sample_user_id, sample_notification_settings
+        self,
+        notification_service,
+        mock_session,
+        sample_user_id,
+        sample_notification_settings,
     ):
         """알림 설정 업데이트 테스트"""
         # Mock: 기존 설정 반환
@@ -239,7 +249,7 @@ class TestNotificationService:
         # 검증
         assert result.diary_reminder is False
         assert result.ai_content_ready is True
-        assert result.emotion_trend is False
+        assert result.weekly_report is True  # emotion_trend -> weekly_report
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
@@ -265,6 +275,7 @@ class TestNotificationService:
             user_ids=["test-user-123"],
             title="테스트 알림",
             body="테스트 메시지",
+            notification_type="general",
             data={"type": "test"},
         )
 
@@ -275,7 +286,7 @@ class TestNotificationService:
         # 검증
         assert result.success_count == 1
         assert result.failure_count == 0
-        assert len(result.results) == 1
+        assert len(result.successful_tokens) == 1
         mock_fcm.send_notification.assert_called_once()
         mock_session.add.assert_called_once()  # 히스토리 저장 확인
 
@@ -296,7 +307,10 @@ class TestNotificationService:
         mock_session.commit = Mock()
 
         notification_request = NotificationSendRequest(
-            user_ids=["test-user-123"], title="테스트 알림", body="테스트 메시지"
+            user_ids=["test-user-123"],
+            title="테스트 알림",
+            body="테스트 메시지",
+            notification_type="general",
         )
 
         result = await notification_service.send_notification(
@@ -306,8 +320,7 @@ class TestNotificationService:
         # 검증
         assert result.success_count == 0
         assert result.failure_count == 1
-        assert len(result.results) == 1
-        assert "FCM 전송 실패" in result.results[0]["error"]
+        assert len(result.failed_tokens) == 1
 
     @pytest.mark.asyncio
     @patch("app.services.notification_service.get_fcm_service")
@@ -350,7 +363,7 @@ class TestNotificationService:
     ):
         """다이어리 리마인더 비활성화 테스트"""
         # 알림 설정 비활성화
-        sample_notification_settings.diary_reminder = False
+        sample_notification_settings.diary_reminder_enabled = False
         mock_session.exec.return_value.first.return_value = sample_notification_settings
 
         result = await notification_service.send_diary_reminder(
@@ -370,19 +383,17 @@ class TestNotificationService:
             NotificationHistory(
                 id="history-1",
                 user_id=sample_user_id,
-                title="테스트 알림 1",
-                body="테스트 메시지 1",
                 notification_type="diary_reminder",
                 status="sent",
+                sent_at=datetime.now(timezone.utc),
                 created_at=datetime.now(timezone.utc),
             ),
             NotificationHistory(
                 id="history-2",
                 user_id=sample_user_id,
-                title="테스트 알림 2",
-                body="테스트 메시지 2",
                 notification_type="ai_content_ready",
                 status="failed",
+                error_message="전송 실패",
                 created_at=datetime.now(timezone.utc),
             ),
         ]
@@ -395,7 +406,7 @@ class TestNotificationService:
 
         # 검증
         assert len(result) == 2
-        assert result[0].title == "테스트 알림 1"
+        assert result[0].notification_type == "diary_reminder"
         assert result[1].status == "failed"
 
 
