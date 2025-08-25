@@ -34,51 +34,83 @@ class FCMService:
         user_id: str, token_data: FCMTokenRegisterRequest, session: Session
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
+        from sqlalchemy.dialects.postgresql import insert
+        from psycopg2.errors import UniqueViolation
+        
         try:
-            # 기존 토큰이 있는지 확인 (같은 토큰으로 검색)
-            stmt = select(FCMToken).where(
-                and_(
-                    FCMToken.user_id == user_id,
-                    FCMToken.token == token_data.token,
-                )
+            # PostgreSQL UPSERT를 사용하여 동시성 이슈 해결
+            stmt = insert(FCMToken).values(
+                user_id=user_id,
+                token=token_data.token,
+                device_type=token_data.device_type,
+                device_info=token_data.device_info,
+                is_active=True,
             )
-            existing_token = session.execute(stmt).scalar_one_or_none()
-
-            if existing_token:
-                # 기존 토큰 업데이트
-                existing_token.device_type = token_data.device_type
-                existing_token.device_info = token_data.device_info
-                existing_token.is_active = True
-                existing_token.updated_at = datetime.now(timezone.utc)
-
-                session.add(existing_token)
-                session.commit()
-                session.refresh(existing_token)
-
-                return FCMTokenResponse.model_validate(existing_token)
-            else:
-                # 새 토큰 생성
-                new_token = FCMToken(
-                    user_id=user_id,
-                    token=token_data.token,
-                    device_type=token_data.device_type,
-                    device_info=token_data.device_info,
-                    is_active=True,
+            
+            # ON CONFLICT DO UPDATE - 중복 시 업데이트
+            stmt = stmt.on_conflict_do_update(
+                constraint='uq_fcm_tokens_user_token',  # unique constraint 이름
+                set_=dict(
+                    device_type=stmt.excluded.device_type,
+                    device_info=stmt.excluded.device_info,
+                    is_active=stmt.excluded.is_active,
+                    updated_at=datetime.now(timezone.utc),
                 )
-
-                session.add(new_token)
-                session.commit()
-                session.refresh(new_token)
-
-                return FCMTokenResponse.model_validate(new_token)
-
+            ).returning(FCMToken)
+            
+            result = session.execute(stmt).scalar_one()
+            session.commit()
+            
+            return FCMTokenResponse.model_validate(result)
+            
         except Exception as e:
             session.rollback()
-            logger.error(f"Error registering FCM token: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="FCM 토큰 등록에 실패했습니다.",
-            )
+            
+            # UniqueViolation이 발생한 경우 기존 방식으로 재시도
+            if isinstance(e.__cause__, UniqueViolation):
+                try:
+                    logger.warning(f"UPSERT 실패, 기존 토큰 조회로 재시도: {str(e)}")
+                    
+                    # 기존 토큰 조회
+                    stmt = select(FCMToken).where(
+                        and_(
+                            FCMToken.user_id == user_id,
+                            FCMToken.token == token_data.token,
+                        )
+                    )
+                    existing_token = session.execute(stmt).scalar_one_or_none()
+                    
+                    if existing_token:
+                        # 기존 토큰 업데이트
+                        existing_token.device_type = token_data.device_type
+                        existing_token.device_info = token_data.device_info
+                        existing_token.is_active = True
+                        existing_token.updated_at = datetime.now(timezone.utc)
+                        
+                        session.add(existing_token)
+                        session.commit()
+                        session.refresh(existing_token)
+                        
+                        return FCMTokenResponse.model_validate(existing_token)
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="토큰이 존재하지만 조회할 수 없습니다.",
+                        )
+                        
+                except Exception as retry_error:
+                    session.rollback()
+                    logger.error(f"FCM 토큰 등록 재시도 실패: {str(retry_error)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="FCM 토큰 등록에 실패했습니다.",
+                    )
+            else:
+                logger.error(f"Error registering FCM token: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="FCM 토큰 등록에 실패했습니다.",
+                )
 
     @staticmethod
     def get_user_tokens(user_id: str, session: Session) -> List[FCMTokenResponse]:
