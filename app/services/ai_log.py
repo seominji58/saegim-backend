@@ -23,19 +23,7 @@ class AIService:
         user_id: str,
         data: CreateDiaryRequest,
     ) -> Dict[str, Any]:
-        """
-        Mock AI 모델을 사용하여 텍스트 생성
-        
-        Args:
-            prompt: 사용자 입력 프롬프트
-            style: 문체 (시, 단편글)
-            length: 길이 (단문, 중문, 장문)
-            emotion: 감정 (선택사항)
-            regeneration_count: 재생성 횟수
-            
-        Returns:
-            생성된 AI 텍스트와 메타데이터
-        """
+    
         try:
             logger.info(f"Mock AI 텍스트 생성 시작: {data.prompt[:50]}...")
             
@@ -57,7 +45,10 @@ class AIService:
                 user_id=user_id,
                 api_type='generate',
                 session_id=session_id,
-                request_data=data,
+                request_data=data.dict(),
+                response_data=ai_response,
+                tokens_used=ai_response.get("tokens_used", 0),
+
             )
             session_log = self.db.execute(statement).scalars().all()
             if session_log:
@@ -66,9 +57,10 @@ class AIService:
                 ai_usage_log.regeneration_count = 1
 
             # 저장(request_data)
-            # self.db.add(ai_usage_log)
-            # self.db.commit()
-            logger.info( ai_usage_log)
+
+            self.db.add(ai_usage_log)
+            self.db.commit()
+            logger.info(f"AI 사용 로그 저장 완료: {ai_usage_log}")
 
             
             # 요청 후 응답 받음
@@ -78,6 +70,7 @@ class AIService:
             }
             logger.info(f"Mock AI 텍스트 생성 완료: {len(openai_response['ai_generated_text'])}자")
             # 응답 저장(response_data)
+            
 
             # 데이터베이스에 저장(session_id, request_data, response_data)
 
