@@ -1,13 +1,10 @@
-"""
-애플리케이션 설정 관리
-"""
-
+"""애플리케이션 설정"""
+from typing import List, Union, Optional
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from functools import lru_cache
 import secrets
 import os
-from typing import List, Union
 
 
 class Settings(BaseSettings):
