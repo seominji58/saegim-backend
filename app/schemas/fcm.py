@@ -8,7 +8,7 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class DeviceType(str, Enum):
@@ -179,6 +179,14 @@ class NotificationHistoryResponse(BaseModel):
     status: str
     created_at: datetime
     fcm_response: Optional[Dict[str, Any]]
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def validate_uuid(cls, v):
+        """UUID를 문자열로 변환"""
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 
 class FCMTokenListResponse(BaseModel):
