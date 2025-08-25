@@ -39,18 +39,31 @@ class FCMPushService:
             elif json_str.startswith('"') and json_str.endswith('"'):
                 json_str = json_str[1:-1]
 
-            # 이스케이프된 문자들을 실제 문자로 변환
-            # 중요: \' -> ' 변환도 포함하고, 이중 이스케이프 처리
-            json_str = (
-                json_str.replace("\\\\n", "\\n")  # 이중 이스케이프된 \n 처리
-                .replace("\\\\", "\\")  # 이중 이스케이프된 \ 처리
-                .replace("\\n", "\n")  # 일반 \n 처리
-                .replace('\\"', '"')  # 이스케이프된 " 처리
-                .replace("\\'", "'")
-            )  # 이스케이프된 ' 처리
-
-            # JSON 파싱
-            self.service_account = json.loads(json_str)
+            # JSON 파싱 먼저 시도 (private key의 \n을 실제 개행으로 변환하기 전에)
+            try:
+                # 먼저 기본적인 이스케이프 처리만
+                json_str = (
+                    json_str.replace("\\\\", "\\")  # 이중 이스케이프된 \ 처리
+                    .replace('\\"', '"')  # 이스케이프된 " 처리
+                    .replace("\\'", "'")  # 이스케이프된 ' 처리
+                    .replace("-----BEGINPRIVATEKEY-----", "-----BEGIN PRIVATE KEY-----")  # Private key 시작 태그 수정
+                    .replace("-----ENDPRIVATEKEY-----", "-----END PRIVATE KEY-----")  # Private key 종료 태그 수정
+                )
+                
+                # JSON 파싱 시도
+                self.service_account = json.loads(json_str)
+                
+                # 파싱 성공 후 private_key의 \n을 실제 개행으로 변환
+                if "private_key" in self.service_account:
+                    self.service_account["private_key"] = self.service_account["private_key"].replace("\\n", "\n")
+                    
+            except json.JSONDecodeError:
+                # 기본 파싱이 실패하면 기존 방식으로 시도
+                json_str = (
+                    json_str.replace("\\\\n", "\\n")  # 이중 이스케이프된 \n 처리
+                    .replace("\\n", "\n")  # 일반 \n 처리
+                )
+                self.service_account = json.loads(json_str)
 
             # 필수 필드 검증
             required_fields = ["client_email", "private_key", "project_id"]
@@ -150,7 +163,7 @@ class FCMPushService:
 
     async def send_notification(
         self, token: str, title: str, body: str, data: Optional[Dict[str, str]] = None
-    ) -> bool:
+    ) -> Dict[str, any]:
         """
         FCM 푸시 알림 전송
 
@@ -161,7 +174,7 @@ class FCMPushService:
             data: 추가 데이터 (선택사항)
 
         Returns:
-            bool: 전송 성공 여부
+            Dict: {'success': bool, 'error_type': str|None, 'response': dict|None}
         """
         try:
             # Access Token 획득
@@ -193,18 +206,48 @@ class FCMPushService:
 
                 if response.status_code == 200:
                     logger.info(f"FCM 알림 전송 성공: {title}")
-                    return True
+                    return {"success": True, "error_type": None, "response": response.json()}
                 else:
+                    response_data = response.json() if response.content else {}
+                    error_type = self._get_error_type(response.status_code, response_data)
+                    
                     logger.error(
                         f"FCM 알림 전송 실패: {response.status_code} - {response.text}"
                     )
-                    return False
+                    
+                    return {
+                        "success": False, 
+                        "error_type": error_type,
+                        "response": response_data
+                    }
 
         except Exception as e:
             logger.error(f"FCM 알림 전송 중 오류: {e}")
-            return False
+            return {"success": False, "error_type": "EXCEPTION", "response": None}
 
-    async def send_diary_reminder(self, token: str, user_name: str) -> bool:
+    def _get_error_type(self, status_code: int, response_data: dict) -> str:
+        """FCM 응답에서 오류 타입을 추출"""
+        if status_code == 404:
+            # FCM 특정 오류 코드 확인
+            error_details = response_data.get("error", {}).get("details", [])
+            for detail in error_details:
+                if detail.get("@type") == "type.googleapis.com/google.firebase.fcm.v1.FcmError":
+                    return detail.get("errorCode", "NOT_FOUND")
+            return "NOT_FOUND"
+        elif status_code == 400:
+            return "INVALID_ARGUMENT"
+        elif status_code == 401:
+            return "UNAUTHENTICATED"
+        elif status_code == 403:
+            return "PERMISSION_DENIED"
+        elif status_code == 429:
+            return "QUOTA_EXCEEDED"
+        elif status_code >= 500:
+            return "INTERNAL_ERROR"
+        else:
+            return "UNKNOWN_ERROR"
+
+    async def send_diary_reminder(self, token: str, user_name: str) -> Dict[str, any]:
         """다이어리 작성 알림 전송"""
         return await self.send_notification(
             token=token,
@@ -213,7 +256,7 @@ class FCMPushService:
             data={"type": "diary_reminder"},
         )
 
-    async def send_ai_analysis_complete(self, token: str, diary_id: str) -> bool:
+    async def send_ai_analysis_complete(self, token: str, diary_id: str) -> Dict[str, any]:
         """AI 감정 분석 완료 알림 전송"""
         return await self.send_notification(
             token=token,
@@ -243,19 +286,25 @@ def get_fcm_service() -> FCMPushService:
 # 편의 함수들
 async def send_push_notification(
     token: str, title: str, body: str, data: Optional[Dict[str, str]] = None
-) -> bool:
+) -> Dict[str, any]:
     """푸시 알림 전송 함수"""
     fcm_service = get_fcm_service()
+    if fcm_service is None:
+        return {"success": False, "error_type": "SERVICE_UNAVAILABLE", "response": None}
     return await fcm_service.send_notification(token, title, body, data)
 
 
-async def send_diary_reminder(token: str, user_name: str) -> bool:
+async def send_diary_reminder(token: str, user_name: str) -> Dict[str, any]:
     """다이어리 작성 알림 전송 함수"""
     fcm_service = get_fcm_service()
+    if fcm_service is None:
+        return {"success": False, "error_type": "SERVICE_UNAVAILABLE", "response": None}
     return await fcm_service.send_diary_reminder(token, user_name)
 
 
-async def send_ai_analysis_complete(token: str, diary_id: str) -> bool:
+async def send_ai_analysis_complete(token: str, diary_id: str) -> Dict[str, any]:
     """AI 분석 완료 알림 전송 함수"""
     fcm_service = get_fcm_service()
+    if fcm_service is None:
+        return {"success": False, "error_type": "SERVICE_UNAVAILABLE", "response": None}
     return await fcm_service.send_ai_analysis_complete(token, diary_id)

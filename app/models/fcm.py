@@ -22,6 +22,7 @@ from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.notification import Notification
 
 from app.models.base import Base
 
@@ -41,7 +42,9 @@ class FCMToken(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -96,7 +99,9 @@ class NotificationSettings(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -105,16 +110,24 @@ class NotificationSettings(Base):
 
     # ERD 기준 알림 설정 필드
     push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    diary_reminder_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    diary_reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
     diary_reminder_time: Mapped[Optional[str]] = mapped_column(
         String(5), nullable=True, default="21:00"
     )  # HH:MM 형식
     diary_reminder_days: Mapped[Optional[Dict[str, Any]]] = mapped_column(
         JSONB, nullable=True, default=lambda: []
     )  # 리마인드 요일 배열 ['mon','tue',...]
-    report_notification_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    ai_processing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    browser_push_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    report_notification_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    ai_processing_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    browser_push_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -143,6 +156,9 @@ class NotificationHistory(Base):
         Index("idx_notification_history_type", "notification_type"),
         Index("idx_notification_history_sent_at", "sent_at"),
         Index("idx_notification_history_status", "status"),
+        Index(
+            "idx_notification_history_notification_id", "notification_id"
+        ),  # 새 인덱스 추가
         CheckConstraint(
             "notification_type IN ('diary_reminder','ai_content_ready','emotion_trend','anniversary','friend_share','general')",
             name="ck_notification_type",
@@ -154,11 +170,18 @@ class NotificationHistory(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Foreign Key to Notification (새로 추가)
+    notification_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("notifications.id", ondelete="SET NULL"), nullable=True
     )
 
     # FCM Token used for sending (optional, token might be deleted)
@@ -166,10 +189,9 @@ class NotificationHistory(Base):
         ForeignKey("fcm_tokens.id", ondelete="SET NULL"), nullable=True
     )
 
-    # Notification Content
+    # Notification Content (제거 예정 - notification_id로 참조)
     notification_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    body: Mapped[str] = mapped_column(String(1000), nullable=False)
+    # title, body 필드는 마이그레이션에서 제거됨
 
     # Additional Data
     data_payload: Mapped[Optional[Dict[str, Any]]] = mapped_column(
@@ -196,6 +218,9 @@ class NotificationHistory(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="notification_history")
+    notification: Mapped[Optional["Notification"]] = relationship(
+        "Notification", back_populates="notification_history"
+    )  # 새 관계 추가
     fcm_token: Mapped[Optional["FCMToken"]] = relationship(
         "FCMToken", back_populates="notification_history"
     )

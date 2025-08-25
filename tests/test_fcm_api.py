@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from app.main import app
 from app.core.security import get_current_user_id
 from app.db.database import get_session
-from app.services.fcm_service import FCMService
-from app.schemas.fcm import (
+from app.services.notification_service import NotificationService
+from app.schemas.notification import (
     FCMTokenResponse,
     NotificationSettingsResponse,
     NotificationSendResponse,
@@ -56,7 +56,7 @@ class TestFCMAPI:
         assert data["message"] == "FCM 서비스가 정상 작동 중입니다."
         assert data["data"] == "healthy"
 
-    @patch.object(FCMService, "register_token")
+    @patch.object(NotificationService, "register_token")
     def test_register_fcm_token_success(self, mock_register, client):
         """FCM 토큰 등록 성공 테스트"""
         # Mock 서비스 응답
@@ -88,7 +88,7 @@ class TestFCMAPI:
         assert data["data"]["token"] == "test-fcm-token-12345"
         mock_register.assert_called_once()
 
-    @patch.object(FCMService, "register_token")
+    @patch.object(NotificationService, "register_token")
     def test_register_fcm_token_validation_error(self, mock_register, client):
         """FCM 토큰 등록 유효성 검사 실패 테스트"""
         # 잘못된 요청 데이터 (토큰 누락)
@@ -99,7 +99,7 @@ class TestFCMAPI:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         mock_register.assert_not_called()
 
-    @patch.object(FCMService, "get_user_tokens")
+    @patch.object(NotificationService, "get_user_tokens")
     def test_get_fcm_tokens(self, mock_get_tokens, client):
         """FCM 토큰 목록 조회 테스트"""
         # Mock 서비스 응답
@@ -136,7 +136,7 @@ class TestFCMAPI:
         assert data["data"][0]["device_type"] == "web"
         assert data["data"][1]["device_type"] == "mobile"
 
-    @patch.object(FCMService, "delete_token")
+    @patch.object(NotificationService, "delete_token")
     def test_delete_fcm_token_success(self, mock_delete, client):
         """FCM 토큰 삭제 성공 테스트"""
         mock_delete.return_value = True
@@ -151,7 +151,7 @@ class TestFCMAPI:
             "test-user-123", "token-id-123", mock_delete.call_args[0][2]
         )
 
-    @patch.object(FCMService, "delete_token")
+    @patch.object(NotificationService, "delete_token")
     def test_delete_fcm_token_not_found(self, mock_delete, client):
         """FCM 토큰 삭제 실패 - 토큰 없음 테스트"""
         from fastapi import HTTPException
@@ -164,7 +164,7 @@ class TestFCMAPI:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch.object(FCMService, "get_notification_settings")
+    @patch.object(NotificationService, "get_notification_settings")
     def test_get_notification_settings(self, mock_get_settings, client):
         """알림 설정 조회 테스트"""
         mock_settings = NotificationSettingsResponse(
@@ -187,7 +187,7 @@ class TestFCMAPI:
         assert data["data"]["diary_reminder"] is True
         assert data["data"]["weekly_summary"] is False
 
-    @patch.object(FCMService, "update_notification_settings")
+    @patch.object(NotificationService, "update_notification_settings")
     def test_update_notification_settings(self, mock_update_settings, client):
         """알림 설정 업데이트 테스트"""
         mock_settings = NotificationSettingsResponse(
@@ -216,7 +216,7 @@ class TestFCMAPI:
         assert data["data"]["diary_reminder"] is False
         assert data["data"]["weekly_summary"] is True
 
-    @patch.object(FCMService, "send_notification")
+    @patch.object(NotificationService, "send_notification")
     @pytest.mark.asyncio
     async def test_send_push_notification_success(self, mock_send, client):
         """푸시 알림 전송 성공 테스트"""
@@ -245,7 +245,7 @@ class TestFCMAPI:
         assert data["data"]["success_count"] == 2
         assert data["data"]["failure_count"] == 0
 
-    @patch.object(FCMService, "send_diary_reminder")
+    @patch.object(NotificationService, "send_diary_reminder")
     @pytest.mark.asyncio
     async def test_send_diary_reminder_notification(self, mock_send_reminder, client):
         """다이어리 작성 알림 전송 테스트"""
@@ -265,7 +265,7 @@ class TestFCMAPI:
         assert data["success"] is True
         assert data["data"]["success_count"] == 1
 
-    @patch.object(FCMService, "send_ai_content_ready")
+    @patch.object(NotificationService, "send_ai_content_ready")
     @pytest.mark.asyncio
     async def test_send_ai_content_ready_notification(self, mock_send_ai, client):
         """AI 콘텐츠 준비 완료 알림 전송 테스트"""
@@ -285,7 +285,7 @@ class TestFCMAPI:
         assert data["success"] is True
         assert data["data"]["success_count"] == 1
 
-    @patch.object(FCMService, "get_notification_history")
+    @patch.object(NotificationService, "get_notification_history")
     def test_get_notification_history(self, mock_get_history, client):
         """알림 기록 조회 테스트"""
         mock_history = [
