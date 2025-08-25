@@ -8,6 +8,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+import os
 
 import logging
 from datetime import datetime
@@ -36,6 +38,14 @@ app = FastAPI(
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
 )
+
+# 정적 파일 서빙 설정
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+if os.path.exists(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    logger.info(f"정적 파일 서빙 활성화: {uploads_dir}")
+else:
+    logger.warning(f"uploads 디렉토리를 찾을 수 없습니다: {uploads_dir}")
 
 # 미들웨어 설정
 app.add_middleware(
