@@ -3,8 +3,8 @@
 """
 
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, UploadFile, File, Form
+from sqlmodel import Session, select
 from datetime import date
 import uuid
 from app.db.database import get_session
@@ -13,6 +13,9 @@ from app.models.user import User
 from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryUpdateRequest
 from app.schemas.base import BaseResponse
 from app.services.diary import DiaryService
+from app.utils.minio_upload import upload_image_to_minio
+from app.models.image import Image
+from app.models.diary import DiaryEntry
 
 router = APIRouter()
 
@@ -98,28 +101,248 @@ async def get_diary(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="올바른 UUID 형식이 아닙니다",
+            detail="잘못된 다이어리 ID 형식입니다.",
         )
 
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(diary_id)
+    diary = diary_service.get_diary_by_id(
+        diary_id=diary_id, user_id=current_user.id
+    )
 
     if not diary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="다이어리를 찾을 수 없습니다"
+            detail="해당 다이어리를 찾을 수 없습니다.",
         )
 
-    # 본인의 다이어리만 조회 가능하도록 검증
-    if diary.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="해당 다이어리에 접근할 권한이 없습니다"
-        )
+    # 응답 데이터 변환
+    diary_response = DiaryResponse.from_orm(diary)
 
     return BaseResponse(
-        data=DiaryResponse.from_orm(diary),
-        message="다이어리 조회 성공"
+        data=diary_response,
+        message="다이어리 조회 성공",
+    )
+
+
+@router.post("/{diary_id}/upload-image", response_model=BaseResponse[dict])
+async def upload_diary_image(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    diary_id: str = Path(..., description="다이어리 ID (UUID)"),
+    image: UploadFile = File(..., description="업로드할 이미지 파일"),
+) -> BaseResponse[dict]:
+    """다이어리에 이미지 업로드"""
+
+    # UUID 형식 검증
+    try:
+        uuid.UUID(diary_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="잘못된 다이어리 ID 형식입니다.",
+        )
+
+    # 다이어리 존재 여부 및 권한 확인
+    diary_service = DiaryService(session)
+    diary = diary_service.get_diary_by_id(
+        diary_id=diary_id, user_id=current_user.id
+    )
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 다이어리를 찾을 수 없습니다.",
+        )
+
+    # 이미지 파일 검증
+    if not image.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미지 파일만 업로드할 수 있습니다.",
+        )
+
+    if image.size > 10 * 1024 * 1024:  # 10MB 제한
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="파일 크기는 10MB 이하여야 합니다.",
+        )
+
+    try:
+        # 로컬 파일 시스템에 이미지 저장
+        import os
+        from pathlib import Path
+
+        # 업로드 디렉토리 생성
+        upload_dir = Path("uploads/images")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        # 고유 파일명 생성
+        file_extension = Path(image.filename).suffix if image.filename else ".jpg"
+        file_id = str(uuid.uuid4())
+        filename = f"{file_id}{file_extension}"
+
+        # 파일 저장
+        file_path = upload_dir / filename
+        with open(file_path, "wb") as buffer:
+            content = await image.read()
+            buffer.write(content)
+
+        # 파일 경로 설정 (웹에서 접근 가능한 경로)
+        web_file_path = f"/uploads/images/{filename}"
+        web_thumbnail_path = f"/uploads/images/{filename}"  # 썸네일은 나중에 별도로 생성
+
+        # 데이터베이스에 이미지 정보 저장
+        new_image = Image(
+            diary_id=diary_id,
+            file_path=web_file_path,
+            thumbnail_path=web_thumbnail_path,
+            mime_type=image.content_type,
+            file_size=image.size,
+            exif_removed=True
+        )
+
+        session.add(new_image)
+        session.commit()
+        session.refresh(new_image)
+
+        return BaseResponse(
+            data={
+                "id": str(new_image.id),
+                "file_path": new_image.file_path,
+                "thumbnail_path": new_image.thumbnail_path,
+                "mime_type": new_image.mime_type,
+                "file_size": new_image.file_size
+            },
+            message="이미지 업로드 성공"
+        )
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"이미지 업로드 실패: {str(e)}"
+        )
+
+
+@router.delete("/{diary_id}/images/{image_id}")
+async def delete_diary_image(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    diary_id: str = Path(..., description="다이어리 ID (UUID)"),
+    image_id: str = Path(..., description="이미지 ID (UUID)"),
+) -> BaseResponse[dict]:
+    """다이어리 이미지 삭제"""
+
+    # UUID 형식 검증
+    try:
+        uuid.UUID(diary_id)
+        uuid.UUID(image_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="잘못된 ID 형식입니다.",
+        )
+
+    # 다이어리 존재 여부 및 권한 확인
+    diary_service = DiaryService(session)
+    diary = diary_service.get_diary_by_id(
+        diary_id=diary_id, user_id=current_user.id
+    )
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 다이어리를 찾을 수 없습니다.",
+        )
+
+    # 이미지 존재 여부 및 권한 확인
+    image = session.exec(
+        select(Image).where(
+            Image.id == image_id,
+            Image.diary_id == diary_id
+        )
+    ).first()
+
+    if not image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 이미지를 찾을 수 없습니다.",
+        )
+
+    try:
+        # 데이터베이스에서 이미지 정보 삭제
+        session.delete(image)
+        session.commit()
+
+        return BaseResponse(
+            data={"message": "이미지 삭제 성공"},
+            message="이미지가 성공적으로 삭제되었습니다."
+        )
+
+    except Exception as e:
+        session.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"이미지 삭제 실패 - diary_id: {diary_id}, image_id: {image_id}, error: {str(e)}")
+        logger.exception("상세 오류 정보:")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"이미지 삭제 실패: {str(e)}"
+        )
+
+
+@router.get("/{diary_id}/images", response_model=BaseResponse[List[dict]])
+async def get_diary_images(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    diary_id: str = Path(..., description="다이어리 ID (UUID)"),
+) -> BaseResponse[List[dict]]:
+    """다이어리의 기존 이미지들 조회"""
+
+    # UUID 형식 검증
+    try:
+        uuid.UUID(diary_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="잘못된 다이어리 ID 형식입니다.",
+        )
+
+    # 다이어리 존재 여부 및 권한 확인
+    diary_service = DiaryService(session)
+    diary = diary_service.get_diary_by_id(
+        diary_id=diary_id, user_id=current_user.id
+    )
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 다이어리를 찾을 수 없습니다.",
+        )
+
+    # 해당 다이어리의 이미지들 조회
+    images = session.exec(
+        select(Image).where(Image.diary_id == diary_id)
+    ).all()
+
+    # 이미지 정보 반환
+    image_list = []
+    for img in images:
+        image_list.append({
+            "id": str(img.id),
+            "file_path": img.file_path,
+            "thumbnail_path": img.thumbnail_path,
+            "mime_type": img.mime_type,
+            "file_size": img.file_size,
+            "created_at": img.created_at.isoformat() if img.created_at else None
+        })
+
+    return BaseResponse(
+        data=image_list,
+        message=f"다이어리 이미지 조회 성공 (총 {len(image_list)}개)"
     )
 
 
