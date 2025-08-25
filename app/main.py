@@ -49,7 +49,7 @@ app = FastAPI(
 # 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8080"],  # 프론트엔드 origins 명시적 허용
+    allow_origins=settings.cors_origins,  # .env에서 설정된 origins 사용
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -105,21 +105,28 @@ async def root():
 @app.get("/auth/google/login", tags=["redirect"])
 async def redirect_google_login():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/api/auth/google/login", status_code=307)
+
 
 @app.get("/auth/google/callback", tags=["redirect"])
 async def redirect_google_callback():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/api/auth/google/callback", status_code=307)
+
 
 @app.get("/auth/google/token/{token_id}", tags=["redirect"])
 async def redirect_google_token(token_id: str):
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url=f"/api/auth/google/token/{token_id}", status_code=307)
+
 
 @app.post("/auth/logout", tags=["redirect"])
 async def redirect_logout():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/api/auth/logout", status_code=307)
 
 
