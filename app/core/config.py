@@ -35,8 +35,12 @@ class Settings(BaseSettings):
 
     # JWT 설정
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    jwt_access_token_expire_minutes: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
-    jwt_refresh_token_expire_days: int = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    jwt_access_token_expire_minutes: int = int(
+        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+    )
+    jwt_refresh_token_expire_days: int = int(
+        os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7")
+    )
 
     # MinIO 설정
     minio_endpoint: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -46,7 +50,9 @@ class Settings(BaseSettings):
     minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim-images")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
-    allowed_hosts: Union[List[str], str] = os.getenv("ALLOWED_HOSTS", "http://localhost:3000,http://localhost:8080")
+    allowed_hosts: Union[List[str], str] = os.getenv(
+        "ALLOWED_HOSTS", "http://localhost:3000,http://localhost:8080"
+    )
 
     # FCM 설정
     fcm_project_id: str = os.getenv("FCM_PROJECT_ID", "")
@@ -55,14 +61,32 @@ class Settings(BaseSettings):
     # Google OAuth 설정
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
-    google_auth_uri: str = os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/oauth2/auth")
-    google_token_uri: str = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
-    google_userinfo_uri: str = os.getenv("GOOGLE_USERINFO_URI", "https://www.googleapis.com/oauth2/v2/userinfo")
-    
+    google_redirect_uri: str = os.getenv(
+        "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback"
+    )
+    google_auth_uri: str = os.getenv(
+        "GOOGLE_AUTH_URI", "https://accounts.google.com/oauth2/auth"
+    )
+    google_token_uri: str = os.getenv(
+        "GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token"
+    )
+    google_userinfo_uri: str = os.getenv(
+        "GOOGLE_USERINFO_URI", "https://www.googleapis.com/oauth2/v2/userinfo"
+    )
+
     # 프론트엔드 URL 설정
-    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000" if os.getenv("ENVIRONMENT", "development") == "development" else "https://saegim.seongjunlee.dev")
-    frontend_callback_url: str = os.getenv("FRONTEND_CALLBACK_URL", "http://localhost:3000/auth/callback" if os.getenv("ENVIRONMENT", "development") == "development" else "https://saegim.seongjunlee.dev/auth/callback")
+    frontend_url: str = os.getenv(
+        "FRONTEND_URL",
+        "http://localhost:3000"
+        if os.getenv("ENVIRONMENT", "development") == "development"
+        else "https://saegim.seongjunlee.dev",
+    )
+    frontend_callback_url: str = os.getenv(
+        "FRONTEND_CALLBACK_URL",
+        "http://localhost:3000/auth/callback"
+        if os.getenv("ENVIRONMENT", "development") == "development"
+        else "https://saegim.seongjunlee.dev/auth/callback",
+    )
 
     # 이메일 설정
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -70,10 +94,18 @@ class Settings(BaseSettings):
     smtp_username: str = os.getenv("SMTP_USERNAME", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     from_email: str = os.getenv("FROM_EMAIL", "noreply@saegim.com")
-    
+
     # SendGrid 설정
     sendgrid_api_key: str = os.getenv("SENDGRID_API_KEY", "")
-    sendgrid_from_email: str = os.getenv("SENDGRID_FROM_EMAIL", "alswlalalswl58@naver.com")
+    sendgrid_from_email: str = os.getenv(
+        "SENDGRID_FROM_EMAIL", "alswlalalswl58@naver.com"
+    )
+
+    # 쿠키 설정
+    cookie_domain: str = os.getenv("COOKIE_DOMAIN", "localhost")
+    cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    cookie_samesite: str = os.getenv("COOKIE_SAMESITE", "lax")
+    cookie_httponly: bool = os.getenv("COOKIE_HTTPONLY", "true").lower() == "true"
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod
