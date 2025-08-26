@@ -9,6 +9,25 @@ import uuid
 import json
 
 
+class ImageResponse(BaseModel):
+    """이미지 응답 스키마"""
+    id: str
+    file_path: str
+    thumbnail_path: Optional[str] = None
+    mime_type: Optional[str] = None
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def validate_uuid(cls, v):
+        """UUID를 문자열로 변환"""
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+    class Config:
+        from_attributes = True
+
+
 class DiaryResponse(BaseModel):
     """다이어리 응답 스키마"""
     id: str
@@ -23,6 +42,7 @@ class DiaryResponse(BaseModel):
     keywords: Optional[List[str]] = None  # keywords를 리스트 타입으로 수정
     created_at: datetime
     updated_at: Optional[datetime] = None
+    images: Optional[List[ImageResponse]] = None  # 이미지 정보 추가
 
     @field_validator('id', 'user_id', mode='before')
     @classmethod
@@ -60,6 +80,7 @@ class DiaryListResponse(BaseModel):
     keywords: Optional[List[str]] = None  # keywords를 리스트 타입으로 수정
     created_at: datetime
     is_public: bool
+    images: Optional[List[ImageResponse]] = None  # 이미지 정보 추가
 
     @field_validator('id', mode='before')
     @classmethod

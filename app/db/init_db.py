@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 from app.db.database import engine, create_db_and_tables
 from app.models.user import User
 from app.models.diary import DiaryEntry
+from app.models.image import Image
 from datetime import datetime, timedelta
 import json
 
@@ -19,7 +20,10 @@ def init_db():
         user = create_sample_user(session)
 
         # 샘플 다이어리 생성
-        create_sample_diaries(session, user.id)
+        diaries = create_sample_diaries(session, user.id)
+
+        # 샘플 이미지 생성
+        create_sample_images(session, diaries)
 
         print("데이터베이스 초기화 완료!")
 
@@ -57,7 +61,7 @@ def create_sample_diaries(session: Session, user_id: int):
 
     if existing_diaries:
         print(f"기존 다이어리 {len(existing_diaries)}개 발견")
-        return
+        return existing_diaries
 
     # 샘플 다이어리 데이터
     sample_diaries = [
@@ -98,23 +102,54 @@ def create_sample_diaries(session: Session, user_id: int):
         }
     ]
 
-    # 다이어리 생성 (과거 날짜로 분산)
-    for i, diary_data in enumerate(sample_diaries):
-        # 과거 날짜로 분산 (최근 30일 내)
-        days_ago = i * 3  # 3일씩 간격
-        created_at = datetime.now() - timedelta(days=days_ago)
-
+    # 다이어리 생성
+    created_diaries = []
+    for diary_data in sample_diaries:
         diary = DiaryEntry(
-            **diary_data,
             user_id=user_id,
-            created_at=created_at,
-            updated_at=created_at
+            **diary_data
         )
-
         session.add(diary)
+        created_diaries.append(diary)
 
     session.commit()
-    print(f"샘플 다이어리 {len(sample_diaries)}개 생성 완료")
+    
+    # 생성된 다이어리들을 새로고침하여 ID 가져오기
+    for diary in created_diaries:
+        session.refresh(diary)
+
+    print(f"샘플 다이어리 {len(created_diaries)}개 생성")
+    return created_diaries
+
+
+def create_sample_images(session: Session, diaries: list):
+    """샘플 이미지 생성"""
+    # 기존 이미지 확인
+    existing_images = session.exec(select(Image)).all()
+    
+    if existing_images:
+        print(f"기존 이미지 {len(existing_images)}개 발견")
+        return
+
+    # 첫 번째 다이어리에 이미지 추가
+    if diaries:
+        first_diary = diaries[0]
+        
+        # 샘플 이미지 데이터
+        sample_image = Image(
+            diary_id=first_diary.id,
+            file_path="/uploads/images/happy1.jpg",
+            thumbnail_path="/uploads/thumbnails/happy1_thumb.jpg",
+            mime_type="image/jpeg",
+            file_size=1024000,
+            exif_removed=True
+        )
+        
+        session.add(sample_image)
+        session.commit()
+        session.refresh(sample_image)
+        
+        print(f"샘플 이미지 생성: {sample_image.thumbnail_path}")
 
 
 if __name__ == "__main__":

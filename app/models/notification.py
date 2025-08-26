@@ -22,6 +22,7 @@ from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.fcm import NotificationHistory
 
 from app.models.base import Base
 
@@ -33,8 +34,13 @@ class Notification(Base):
     __table_args__ = (
         Index("idx_user_notifications", "user_id", "created_at"),
         Index("idx_notification_type", "type", "scheduled_at"),
-        Index("idx_unread_notifications", "user_id", "is_read", "created_at",
-              postgresql_where="is_read = false"),
+        Index(
+            "idx_unread_notifications",
+            "user_id",
+            "is_read",
+            "created_at",
+            postgresql_where="is_read = false",
+        ),
         CheckConstraint(
             "type IN ('diary_reminder','report_ready','ai_complete')",
             name="ck_notification_type",
@@ -42,7 +48,9 @@ class Notification(Base):
     )
 
     # Primary Key
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
 
     # Foreign Key to User
     user_id: Mapped[UUID] = mapped_column(
@@ -83,6 +91,11 @@ class Notification(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="notifications")
+    notification_history: Mapped[list["NotificationHistory"]] = relationship(
+        "NotificationHistory",
+        back_populates="notification",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Notification(id={self.id}, user_id={self.user_id}, type={self.type}, is_read={self.is_read})>"

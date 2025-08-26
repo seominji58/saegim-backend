@@ -1,6 +1,6 @@
 """
-FCM 서비스
-사용자 디바이스 토큰 관리 및 푸시 알림 전송
+알림 서비스
+FCM 디바이스 토큰 관리, 푸시 알림 전송 및 인앱 알림 통합 관리
 """
 
 from typing import List, Dict
@@ -13,7 +13,7 @@ import logging
 
 from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
 from app.models.diary import DiaryEntry
-from app.schemas.fcm import (
+from app.schemas.notification import (
     FCMTokenRegisterRequest,
     FCMTokenResponse,
     NotificationSettingsUpdate,
@@ -26,59 +26,91 @@ from app.schemas.fcm import (
 logger = logging.getLogger(__name__)
 
 
-class FCMService:
-    """FCM 토큰 및 알림 관리 서비스"""
+class NotificationService:
+    """알림 토큰 및 푸시 알림 관리 서비스"""
 
     @staticmethod
     def register_token(
         user_id: str, token_data: FCMTokenRegisterRequest, session: Session
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
+        from sqlalchemy.dialects.postgresql import insert
+        from psycopg2.errors import UniqueViolation
+
         try:
-            # 기존 토큰이 있는지 확인 (같은 토큰으로 검색)
-            stmt = select(FCMToken).where(
-                and_(
-                    FCMToken.user_id == user_id,
-                    FCMToken.token == token_data.token,
-                )
+            # PostgreSQL UPSERT를 사용하여 동시성 이슈 해결
+            stmt = insert(FCMToken).values(
+                user_id=user_id,
+                token=token_data.token,
+                device_type=token_data.device_type,
+                device_info=token_data.device_info,
+                is_active=True,
             )
-            existing_token = session.execute(stmt).scalar_one_or_none()
 
-            if existing_token:
-                # 기존 토큰 업데이트
-                existing_token.device_type = token_data.device_type
-                existing_token.device_info = token_data.device_info
-                existing_token.is_active = True
-                existing_token.updated_at = datetime.now(timezone.utc)
+            # ON CONFLICT DO UPDATE - 중복 시 업데이트
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_fcm_tokens_user_token",  # unique constraint 이름
+                set_=dict(
+                    device_type=stmt.excluded.device_type,
+                    device_info=stmt.excluded.device_info,
+                    is_active=stmt.excluded.is_active,
+                    updated_at=datetime.now(timezone.utc),
+                ),
+            ).returning(FCMToken)
 
-                session.add(existing_token)
-                session.commit()
-                session.refresh(existing_token)
+            result = session.execute(stmt).scalar_one()
+            session.commit()
 
-                return FCMTokenResponse.model_validate(existing_token)
-            else:
-                # 새 토큰 생성
-                new_token = FCMToken(
-                    user_id=user_id,
-                    token=token_data.token,
-                    device_type=token_data.device_type,
-                    device_info=token_data.device_info,
-                    is_active=True,
-                )
-
-                session.add(new_token)
-                session.commit()
-                session.refresh(new_token)
-
-                return FCMTokenResponse.model_validate(new_token)
+            return FCMTokenResponse.model_validate(result)
 
         except Exception as e:
             session.rollback()
-            logger.error(f"Error registering FCM token: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="FCM 토큰 등록에 실패했습니다.",
-            )
+
+            # UniqueViolation이 발생한 경우 기존 방식으로 재시도
+            if isinstance(e.__cause__, UniqueViolation):
+                try:
+                    logger.warning(f"UPSERT 실패, 기존 토큰 조회로 재시도: {str(e)}")
+
+                    # 기존 토큰 조회
+                    stmt = select(FCMToken).where(
+                        and_(
+                            FCMToken.user_id == user_id,
+                            FCMToken.token == token_data.token,
+                        )
+                    )
+                    existing_token = session.execute(stmt).scalar_one_or_none()
+
+                    if existing_token:
+                        # 기존 토큰 업데이트
+                        existing_token.device_type = token_data.device_type
+                        existing_token.device_info = token_data.device_info
+                        existing_token.is_active = True
+                        existing_token.updated_at = datetime.now(timezone.utc)
+
+                        session.add(existing_token)
+                        session.commit()
+                        session.refresh(existing_token)
+
+                        return FCMTokenResponse.model_validate(existing_token)
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="토큰이 존재하지만 조회할 수 없습니다.",
+                        )
+
+                except Exception as retry_error:
+                    session.rollback()
+                    logger.error(f"FCM 토큰 등록 재시도 실패: {str(retry_error)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="FCM 토큰 등록에 실패했습니다.",
+                    )
+            else:
+                logger.error(f"Error registering FCM token: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="FCM 토큰 등록에 실패했습니다.",
+                )
 
     @staticmethod
     def get_user_tokens(user_id: str, session: Session) -> List[FCMTokenResponse]:
@@ -272,32 +304,51 @@ class FCMService:
             for token_model in all_tokens:
                 try:
                     # 알림 전송
-                    success = await fcm_service.send_notification(
+                    result = await fcm_service.send_notification(
                         token=token_model.token,
                         title=notification_data.title,
                         body=notification_data.body,
                         data=notification_data.data,
                     )
 
-                    if success:
+                    if result["success"]:
                         successful_tokens.append(token_model.token)
                         status_value = "sent"
                     else:
                         failed_tokens.append(token_model.token)
                         status_value = "failed"
 
+                        # UNREGISTERED 토큰인 경우 비활성화
+                        if result.get("error_type") == "UNREGISTERED":
+                            logger.warning(
+                                f"토큰 {token_model.token[:10]}...이 UNREGISTERED 상태입니다. 비활성화합니다."
+                            )
+                            token_model.is_active = False
+                            token_model.updated_at = datetime.now(timezone.utc)
+
                     # 알림 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        fcm_token_id=token_model.id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status=status_value,
-                        fcm_response={
+                        data_payload={
                             "token": token_model.token[:10]
                             + "...",  # 보안을 위해 일부만 저장
-                            "success": success,
+                            "success": result["success"],
+                            "error_type": result.get("error_type"),
+                            "fcm_response": result.get("response"),
                         },
+                        sent_at=datetime.now(timezone.utc)
+                        if result["success"]
+                        else None,
+                        error_message=result.get("response", {})
+                        .get("error", {})
+                        .get("message")
+                        if not result["success"]
+                        else None,
                     )
                     session.add(history)
 
@@ -310,11 +361,13 @@ class FCMService:
                     # 실패 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        fcm_token_id=token_model.id,
                         title=notification_data.title,
                         body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status="failed",
-                        fcm_response={"error": str(e)},
+                        error_message=str(e),
+                        data_payload={"token": token_model.token[:10] + "..."},
                     )
                     session.add(history)
 
@@ -366,7 +419,9 @@ class FCMService:
                 data={"action": "write_diary"},
             )
 
-            return await FCMService.send_notification(notification_request, session)
+            return await NotificationService.send_notification(
+                notification_request, session
+            )
 
         except HTTPException:
             raise
@@ -417,7 +472,9 @@ class FCMService:
                 data={"diary_id": diary_id, "action": "view_ai_content"},
             )
 
-            return await FCMService.send_notification(notification_request, session)
+            return await NotificationService.send_notification(
+                notification_request, session
+            )
 
         except HTTPException:
             raise
@@ -432,29 +489,56 @@ class FCMService:
     def get_notification_history(
         user_id: str, limit: int, offset: int, session: Session
     ) -> List[NotificationHistoryResponse]:
-        """사용자 알림 기록 조회"""
+        """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
         try:
+            from app.models.notification import Notification
+
+            # notification_history와 notification을 LEFT JOIN
             stmt = (
-                select(NotificationHistory)
+                select(
+                    NotificationHistory.id,
+                    NotificationHistory.notification_id,
+                    NotificationHistory.notification_type,
+                    NotificationHistory.status,
+                    NotificationHistory.sent_at,
+                    NotificationHistory.delivered_at,
+                    NotificationHistory.opened_at,
+                    NotificationHistory.created_at,
+                    NotificationHistory.error_message,
+                    Notification.title,
+                    Notification.message,
+                    Notification.is_read,
+                )
+                .select_from(NotificationHistory)
+                .outerjoin(
+                    Notification, NotificationHistory.notification_id == Notification.id
+                )
                 .where(NotificationHistory.user_id == user_id)
                 .order_by(desc(NotificationHistory.created_at))
                 .limit(limit)
                 .offset(offset)
             )
 
-            histories = session.execute(stmt).scalars().all()
+            results = session.execute(stmt).all()
 
             return [
                 NotificationHistoryResponse(
-                    id=history.id,
-                    title=history.title,
-                    body=history.body,
-                    notification_type=history.notification_type,
-                    status=history.status,
-                    created_at=history.created_at,
-                    fcm_response=history.fcm_response,
+                    id=str(result.id),
+                    notification_id=str(result.notification_id)
+                    if result.notification_id
+                    else None,
+                    notification_type=result.notification_type,
+                    status=result.status,
+                    sent_at=result.sent_at,
+                    delivered_at=result.delivered_at,
+                    opened_at=result.opened_at,
+                    created_at=result.created_at,
+                    error_message=result.error_message,
+                    title=result.title,
+                    message=result.message,
+                    is_read=result.is_read,
                 )
-                for history in histories
+                for result in results
             ]
 
         except Exception as e:
@@ -463,3 +547,69 @@ class FCMService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 기록 조회에 실패했습니다.",
             )
+
+    @staticmethod
+    async def cleanup_invalid_tokens(session: Session) -> int:
+        """무효한 FCM 토큰들을 정리합니다"""
+        try:
+            fcm_service = get_fcm_service()
+            if fcm_service is None:
+                logger.warning("FCM 서비스를 사용할 수 없어 토큰 정리를 건너뜁니다.")
+                return 0
+
+            # 모든 활성 토큰 조회
+            stmt = select(FCMToken).where(FCMToken.is_active)
+            active_tokens = session.execute(stmt).scalars().all()
+
+            cleanup_count = 0
+
+            # 각 토큰을 테스트하여 유효성 확인 (주의: 실제 알림은 전송하지 않음)
+            for token_model in active_tokens:
+                try:
+                    # 더미 알림으로 토큰 유효성 테스트 (dry run)
+                    result = await fcm_service.send_notification(
+                        token=token_model.token,
+                        title="토큰 검증",
+                        body="이 알림은 토큰 유효성 검증용입니다.",
+                        data={"type": "validation", "test": "true"},
+                    )
+
+                    # UNREGISTERED 토큰인 경우 비활성화
+                    if (
+                        not result["success"]
+                        and result.get("error_type") == "UNREGISTERED"
+                    ):
+                        logger.info(
+                            f"무효한 토큰 비활성화: {token_model.token[:10]}..."
+                        )
+                        token_model.is_active = False
+                        token_model.updated_at = datetime.now(timezone.utc)
+                        cleanup_count += 1
+
+                except Exception as e:
+                    logger.error(
+                        f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}"
+                    )
+                    continue
+
+            session.commit()
+            logger.info(f"FCM 토큰 정리 완료: {cleanup_count}개 토큰 비활성화")
+            return cleanup_count
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"FCM 토큰 정리 중 오류: {str(e)}")
+            return 0
+
+    @staticmethod
+    def get_active_token_count(user_id: str, session: Session) -> int:
+        """사용자의 활성 토큰 개수를 반환합니다"""
+        try:
+            stmt = select(FCMToken).where(
+                and_(FCMToken.user_id == user_id, FCMToken.is_active)
+            )
+            count = len(session.execute(stmt).scalars().all())
+            return count
+        except Exception as e:
+            logger.error(f"활성 토큰 개수 조회 실패: {str(e)}")
+            return 0

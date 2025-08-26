@@ -16,13 +16,15 @@ from app.api.auth.withdraw import router as withdraw_router
 from app.api.auth.restore import router as restore_router
 from app.api.admin.cleanup import router as cleanup_router
 from app.api.diary import router as diary_router
-from app.api.fcm import router as fcm_router
+from app.api.notification import router as notification_router
 
 router = APIRouter()
 
 router.include_router(health_router)
 router.include_router(diary_router, prefix="/api/diary")
-router.include_router(fcm_router, prefix="/api/fcm")
+router.include_router(
+    notification_router, prefix="/api/notifications"
+)  # 통합된 알림 API
 
 # Auth 라우터들을 /api/auth prefix로 통일
 router.include_router(google_router, prefix="/api/auth")

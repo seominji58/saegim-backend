@@ -1,5 +1,6 @@
 """
-FCM (Firebase Cloud Messaging) 관련 스키마
+알림 시스템 관련 스키마
+FCM (Firebase Cloud Messaging) 및 인앱 알림 통합 스키마
 """
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class DeviceType(str, Enum):
@@ -168,17 +169,32 @@ class NotificationSendResponse(BaseModel):
 
 
 class NotificationHistoryResponse(BaseModel):
-    """알림 기록 응답"""
+    """알림 기록 응답 - notification과 FK 관계를 통한 데이터 조회"""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    title: str
-    body: str
+    notification_id: Optional[str] = Field(None, description="연결된 알림 ID")
     notification_type: str
     status: str
+    sent_at: Optional[datetime] = Field(None, description="전송 시간")
+    delivered_at: Optional[datetime] = Field(None, description="전달 시간")
+    opened_at: Optional[datetime] = Field(None, description="열람 시간")
     created_at: datetime
-    fcm_response: Optional[Dict[str, Any]]
+    error_message: Optional[str] = Field(None, description="에러 메시지")
+
+    # notification 테이블에서 가져올 데이터
+    title: Optional[str] = Field(None, description="알림 제목 (from notification)")
+    message: Optional[str] = Field(None, description="알림 내용 (from notification)")
+    is_read: Optional[bool] = Field(None, description="읽음 상태 (from notification)")
+
+    @field_validator("id", "notification_id", mode="before")
+    @classmethod
+    def validate_uuid(cls, v):
+        """UUID를 문자열로 변환"""
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 
 class FCMTokenListResponse(BaseModel):

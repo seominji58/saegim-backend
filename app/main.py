@@ -2,23 +2,36 @@
 새김 백엔드 FastAPI 애플리케이션
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+import os
+from fastapi.openapi.utils import get_openapi
+
 
 import logging
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 from app.core.env_config import load_env_file
 from app.core.config import get_settings
+from app.core.deps import get_db, get_current_user
+from app.db.database import get_session
+from app.models.user import User
 
 # 환경 변수 먼저 로드
 load_env_file()
-from app.api import health, router as api_router
+from app.api import router as api_router
 from app.db.database import create_db_and_tables
+from app.schemas.create_diary import CreateDiaryRequest
+from app.schemas.base import BaseResponse
+
+# AI 사용 로그 생성 서비스
+from app.services.create_diary import diary_service
 
 # 로깅 설정
 logging.basicConfig(
@@ -36,6 +49,60 @@ app = FastAPI(
     docs_url="/docs" if settings.is_development else None,
     redoc_url="/redoc" if settings.is_development else None,
 )
+
+# 정적 파일 서빙 설정
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+if os.path.exists(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    logger.info(f"정적 파일 서빙 활성화: {uploads_dir}")
+else:
+    logger.warning(f"uploads 디렉토리를 찾을 수 없습니다: {uploads_dir}")
+
+def custom_openapi():
+    """
+    Swagger UI에 JWT Bearer Token 인증 버튼을 추가하기 위한 OpenAPI 스키마 커스터마이징
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # JWT Bearer Token Security Scheme 추가
+    openapi_schema["components"]["securitySchemes"] = {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer {token}'",
+        }
+    }
+
+    # 모든 보호된 엔드포인트에 기본 보안 적용
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            # 인증이 필요없는 엔드포인트 제외 (로그인, 회원가입, health 등)
+            if (
+                path.startswith("/api/auth/")
+                or path in ["/", "/status", "/docs", "/redoc", "/openapi.json"]
+                or path.startswith("/health")
+            ):
+                continue
+
+            # 기타 모든 엔드포인트에 Bearer 토큰 보안 적용
+            if "security" not in openapi_schema["paths"][path][method]:
+                openapi_schema["paths"][path][method]["security"] = [{"bearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+# 커스텀 OpenAPI 스키마 적용
+app.openapi = custom_openapi
 
 # 미들웨어 설정
 app.add_middleware(
@@ -131,6 +198,39 @@ async def status():
         "environment": settings.environment,
     }
 
+# ai_log 생성 라우트
+@app.post("/api/ai-usage-log", tags=["ai"])
+async def create_ai_usage_log(
+    user_id: str,
+    api_type: str,
+    session_id: str,
+    regeneration_count: int = 1,
+    tokens_used: int = 0,
+    request_data: dict = None,
+    response_data: dict = None,
+    db=Depends(get_session)
+):
+    # AI 사용 로그 생성 로직
+    service = diary_service(db)
+    return await service.create_ai_usage_log(
+        user_id, api_type, session_id, regeneration_count,
+        tokens_used, request_data, response_data
+    )
+
+# saegim-backend/app/main.py
+from app.services.ai_log import AIService
+
+# AI 텍스트 생성 API
+@app.post("/api/ai-generate", tags=["ai"])
+async def generate_ai_text(
+    data: CreateDiaryRequest,
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_session)
+):
+    ai_service = AIService(db)
+    result = await ai_service.generate_ai_text(current_user.id, data)
+    print('result', result)
+    return BaseResponse(data=result)
 
 # API 라우터 등록
 app.include_router(api_router)  # 일반 API 라우터 (prefix 포함)

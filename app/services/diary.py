@@ -105,8 +105,14 @@ class DiaryService:
         start_date: date,
         end_date: date
     ) -> List[DiaryEntry]:
-        """특정 날짜 범위의 다이어리 조회 (캘린더용, Soft Delete 제외)"""
-        statement = select(DiaryEntry).where(
+        """특정 날짜 범위의 다이어리 조회 (캘린더용) - 이미지 정보 포함"""
+        # 이미지 관계를 함께 로드하기 위해 selectinload 사용
+        from sqlmodel import select, func
+        from sqlalchemy.orm import selectinload
+        
+        statement = select(DiaryEntry).options(
+            selectinload(DiaryEntry.images)
+        ).where(
             DiaryEntry.user_id == user_id,
             DiaryEntry.deleted_at.is_(None),
             func.date(DiaryEntry.created_at) >= start_date,
