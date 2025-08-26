@@ -3,7 +3,7 @@
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import update, delete
 from datetime import datetime, timedelta
@@ -43,6 +43,7 @@ class WithdrawResponse(BaseModel):
 @router.post("/withdraw", response_model=BaseResponse[WithdrawResponse])
 async def withdraw_account(
     request: WithdrawRequest,
+    response: Response,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_session),
 ) -> BaseResponse[WithdrawResponse]:
@@ -204,7 +205,13 @@ async def withdraw_account(
         db.commit()
         logger.info("데이터베이스 커밋 완료")
         
-        # 8. 응답 생성
+        # 8. 쿠키 무효화 (토큰 삭제)
+        logger.info("쿠키 무효화 시작")
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        logger.info("쿠키 무효화 완료")
+        
+        # 9. 응답 생성
         account_type_message = "이메일 계정" if user.account_type == "email" else "소셜 계정"
         response_data = WithdrawResponse(
             message=f"{account_type_message} 탈퇴가 완료되었습니다. 30일 이내에 계정을 복구할 수 있습니다.",

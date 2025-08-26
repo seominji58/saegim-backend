@@ -205,16 +205,20 @@ async def send_restore_email(
         import random
         verification_code = str(random.randint(100000, 999999))
         
-        # 4. 기존 인증 코드가 있다면 삭제
+        # 4. 기존 인증 코드가 있다면 만료 처리 (삭제하지 않고 만료만 표시)
         stmt = select(EmailVerification).where(
             EmailVerification.email == request.email,
-            EmailVerification.verification_type == "restore"
+            EmailVerification.verification_type == "restore",
+            EmailVerification.expires_at > datetime.now()  # 아직 유효한 코드만
         )
         result = db.execute(stmt)
         existing_verification = result.scalar_one_or_none()
         
         if existing_verification:
-            db.delete(existing_verification)
+            # 기존 코드를 만료 처리 (삭제하지 않음)
+            existing_verification.expires_at = datetime.now() - timedelta(seconds=1)
+            existing_verification.is_used = True
+            db.commit()
         
         # 5. 새로운 인증 코드 저장
         new_verification = EmailVerification(
@@ -240,7 +244,7 @@ async def send_restore_email(
                 detail="복구 이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
             )
         
-        logger.info(f"복구 이메일 발송 성공: {request.email}")
+        logger.info(f"복구 이메일 발송 성공: {request.email} (인증코드: {verification_code})")
         
         return BaseResponse(
             success=True,
