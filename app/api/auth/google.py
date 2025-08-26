@@ -102,8 +102,26 @@ async def google_callback(
         
         return response
         
+    except HTTPException as http_ex:
+        # HTTPException 처리 (탈퇴된 계정 등)
+        error_detail = http_ex.detail
+        if isinstance(error_detail, dict):
+            # 탈퇴된 계정 에러 처리
+            if error_detail.get("error") == "ACCOUNT_DELETED":
+                error_url = f"{settings.frontend_callback_url}?error=account_deleted&message={error_detail.get('message', '탈퇴된 계정입니다.')}&restore_available=true&days_remaining={error_detail.get('days_remaining', 0)}"
+            elif error_detail.get("error") == "ACCOUNT_PERMANENTLY_DELETED":
+                error_url = f"{settings.frontend_callback_url}?error=account_permanently_deleted&message={error_detail.get('message', '탈퇴 후 30일이 경과되어 복구할 수 없습니다.')}&restore_available=false"
+            else:
+                error_url = f"{settings.frontend_callback_url}?error=login_failed&message={error_detail.get('message', str(http_ex))}"
+        else:
+            error_url = f"{settings.frontend_callback_url}?error=login_failed&message={str(error_detail)}"
+        
+        print(f"HTTPException - Error URL: {error_url}")
+        print(f"HTTPException - Detail: {error_detail}")
+        return RedirectResponse(url=error_url)
+        
     except Exception as e:
-        # 에러 발생 시 프론트엔드 콜백 페이지로 리다이렉트 (에러 파라미터 포함)
+        # 기타 에러 발생 시 프론트엔드 콜백 페이지로 리다이렉트 (에러 파라미터 포함)
         error_url = f"{settings.frontend_callback_url}?error=login_failed&message={str(e)}"
         print(f"Frontend callback URL (error): {settings.frontend_callback_url}")
         print(f"Error URL: {error_url}")

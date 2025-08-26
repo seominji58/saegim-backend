@@ -1,7 +1,7 @@
 """
 회원가입 API 라우터
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
 from pydantic import BaseModel, EmailStr, validator
@@ -9,6 +9,7 @@ import re
 import logging
 import jwt
 from jose.exceptions import JWTError
+from datetime import datetime, timedelta
 
 from app.core.config import get_settings
 from app.db.database import get_session
@@ -17,7 +18,7 @@ from app.models.email_verification import EmailVerification
 from app.utils.encryption import password_hasher
 from app.schemas.base import BaseResponse
 from app.core.security import create_access_token, create_refresh_token
-from app.utils.email_service import EmailService
+from app.models.utils.email_service import EmailService
 from app.core.deps import get_current_user
 
 router = APIRouter(tags=["auth"])
@@ -280,7 +281,7 @@ async def login(
         로그인 성공 응답 (쿠키에 토큰 설정)
     """
     try:
-        # 1. 사용자 조회
+        # 1. 사용자 조회 (Soft Delete 포함)
         stmt = select(User).where(User.email == request.email)
         result = db.execute(stmt)
         user = result.scalar_one_or_none()
@@ -291,32 +292,62 @@ async def login(
                 detail="이메일 또는 비밀번호가 올바르지 않습니다."
             )
         
-        # 2. 이메일 회원가입 사용자인지 확인
+        # 2. Soft Delete된 계정인지 확인
+        if user.deleted_at is not None:
+            # timezone을 일치시켜서 비교
+            current_time = datetime.now(user.deleted_at.tzinfo) if user.deleted_at.tzinfo else datetime.now()
+            deleted_time = user.deleted_at.replace(tzinfo=None) if user.deleted_at.tzinfo else user.deleted_at
+            current_time_naive = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
+            
+            # 30일 이내인지 확인
+            if deleted_time >= current_time_naive - timedelta(days=30):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "ACCOUNT_DELETED",
+                        "message": "탈퇴된 계정입니다. 30일 이내에 복구할 수 있습니다.",
+                        "deleted_at": user.deleted_at.isoformat(),
+                        "restore_available": True,
+                        "days_remaining": 30 - (current_time_naive - deleted_time).days
+                    }
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "ACCOUNT_PERMANENTLY_DELETED",
+                        "message": "탈퇴 후 30일이 경과되어 복구할 수 없습니다.",
+                        "deleted_at": user.deleted_at.isoformat(),
+                        "restore_available": False
+                    }
+                )
+        
+        # 3. 이메일 회원가입 사용자인지 확인
         if user.account_type != "email":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="소셜 로그인으로 가입된 계정입니다."
             )
         
-        # 3. 비밀번호 검증
+        # 4. 비밀번호 검증
         if not password_hasher.verify_password(request.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="이메일 또는 비밀번호가 올바르지 않습니다."
             )
         
-        # 4. 계정 활성화 상태 확인
+        # 5. 계정 활성화 상태 확인
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="비활성화된 계정입니다."
             )
         
-        # 5. JWT 토큰 생성
+        # 6. JWT 토큰 생성
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
         
-        # 6. 응답 생성 (쿠키만 설정, 응답에는 토큰 제외)
+        # 7. 응답 생성 (쿠키만 설정, 응답에는 토큰 제외)
         response_data = LoginResponse(
             user_id=str(user.id),
             email=user.email,
@@ -412,7 +443,6 @@ async def send_verification_email(
             db.delete(existing_verification)
         
         # 4. 새로운 인증 코드 저장
-        from datetime import datetime, timedelta
         new_verification = EmailVerification(
             email=request.email,
             verification_code=verification_code,
@@ -472,7 +502,6 @@ async def verify_email(
     """
     try:
         # 1. 인증 코드 조회
-        from datetime import datetime
         stmt = select(EmailVerification).where(
             EmailVerification.email == request.email,
             EmailVerification.verification_code == request.verification_code,

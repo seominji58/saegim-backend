@@ -41,7 +41,7 @@ async def refresh_token(
         # 2. Refresh Token 검증
         try:
             payload = decode_refresh_token(refresh_token)
-            user_id = int(payload.get("sub"))
+            user_id = payload.get("sub")  # UUID는 문자열로 유지
             token_type = payload.get("type")
             
             if token_type != "refresh":
