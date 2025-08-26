@@ -54,7 +54,11 @@ ALLOWED_HOSTS=http://localhost:3000,http://localhost:8080
 
 # 이메일 설정 (SendGrid - 추천)
 SENDGRID_API_KEY=your-sendgrid-api-key-here
+SENDGRID_FROM_EMAIL=your-verified-email@yourdomain.com
 FROM_EMAIL=noreply@yourdomain.com
+
+# 테스트 설정
+TEST_EMAIL=test@example.com
 
 # 이메일 설정 (Gmail SMTP - 대안)
 SMTP_SERVER=smtp.gmail.com
