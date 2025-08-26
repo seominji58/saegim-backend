@@ -66,34 +66,39 @@ class DiaryAIService:
             )
             logger.info("글귀 생성 완료")
             
-            return {
-                "emotion": emotion,
-                "keywords": keywords,
-                "quote": quote,
-                "writing_style": writing_style,
-                "content_length": content_length
-            }
+            return self._build_result(emotion, keywords, quote, writing_style, content_length)
             
         except Exception as e:
             logger.error(f"다이어리 AI 분석 오류: {str(e)}")
             raise
 
-    def _analyze_emotion(
-        self, 
-        text_input: str, 
-        image_description: Optional[str] = None
-    ) -> str:
-        """감정 분석"""
-        
-        # 기본 입력 구성
+    def _build_content(self, text_input: str, image_description: Optional[str] = None) -> str:
+        """입력 콘텐츠 구성"""
         content = f"사용자 입력: {text_input}"
         if image_description:
             content += f"\n이미지 설명: {image_description}"
-        
-        messages = [
-            {
-                "role": "system",
-                "content": """당신은 전문 심리 상담사입니다. 주어진 텍스트와 이미지 설명을 바탕으로 감정을 분석해주세요.
+        return content
+
+    def _build_result(
+        self, 
+        emotion: str, 
+        keywords: List[str], 
+        quote: str, 
+        writing_style: WritingStyle, 
+        content_length: ContentLength
+    ) -> Dict[str, Any]:
+        """결과 객체 구성"""
+        return {
+            "emotion": emotion,
+            "keywords": keywords,
+            "quote": quote,
+            "writing_style": writing_style,
+            "content_length": content_length
+        }
+
+    def _get_emotion_system_message(self) -> str:
+        """감정 분석 시스템 메시지"""
+        return """당신은 전문 심리 상담사입니다. 주어진 텍스트와 이미지 설명을 바탕으로 감정을 분석해주세요.
 
 감정은 다음 중 하나로 분류해주세요:
 - 행복 (happiness)
@@ -103,37 +108,10 @@ class DiaryAIService:
 - 불안 (unrest)
 
 응답은 감정 단어 하나만 한국어로 답해주세요."""
-            },
-            {
-                "role": "user", 
-                "content": content
-            }
-        ]
-        
-        response = self.client.chat_completion(
-            messages=messages,
-            temperature=0.3,
-            max_tokens=50
-        )
-        
-        return response["content"].strip()
 
-    def _extract_keywords(
-        self, 
-        text_input: str, 
-        image_description: Optional[str] = None,
-        emotion: str = ""
-    ) -> List[str]:
-        """키워드 추출 (감정 제외, 최대 5개)"""
-        
-        content = f"사용자 입력: {text_input}"
-        if image_description:
-            content += f"\n이미지 설명: {image_description}"
-        
-        messages = [
-            {
-                "role": "system",
-                "content": f"""주어진 텍스트와 이미지 설명에서 핵심 키워드를 추출해주세요.
+    def _get_keyword_system_message(self, emotion: str) -> str:
+        """키워드 추출 시스템 메시지"""
+        return f"""주어진 텍스트와 이미지 설명에서 핵심 키워드를 추출해주세요.
 
 조건:
 - 최대 5개의 키워드
@@ -144,71 +122,26 @@ class DiaryAIService:
 
 응답 형식: ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]
 JSON 배열 형태로만 답해주세요."""
-            },
-            {
-                "role": "user",
-                "content": content
-            }
-        ]
-        
-        response = self.client.chat_completion(
-            messages=messages,
-            temperature=0.5,
-            max_tokens=100
-        )
-        
-        try:
-            # JSON 파싱
-            keywords_json = response["content"].strip()
-            keywords = json.loads(keywords_json)
-            
-            # 최대 5개로 제한
-            return keywords[:5] if isinstance(keywords, list) else []
-            
-        except json.JSONDecodeError:
-            logger.error(f"키워드 JSON 파싱 실패: {response['content']}")
-            # 파싱 실패시 쉼표로 분리 시도
-            keywords = [k.strip() for k in response["content"].split(",")]
-            return keywords[:5]
 
-    def _generate_quote(
-        self,
-        text_input: str,
-        image_description: Optional[str] = None,
-        emotion: str = "",
-        keywords: List[str] = None,
-        writing_style: WritingStyle = WritingStyle.SHORT_STORY,
-        content_length: ContentLength = ContentLength.MEDIUM,
+    def _get_quote_system_message(
+        self, 
+        emotion: str, 
+        writing_style: WritingStyle, 
+        content_length: ContentLength
     ) -> str:
-        """글귀 생성"""
-        
-        keywords = keywords or []
-        
-        # 길이별 문장 수 가이드
+        """글귀 생성 시스템 메시지"""
         length_guide = {
             ContentLength.SHORT: "1-2문장",
             ContentLength.MEDIUM: "3-5문장", 
             ContentLength.LONG: "6-10문장"
         }
         
-        # 문체별 스타일 가이드
         style_guide = {
             WritingStyle.POEM: "시적이고 운율이 있는 표현으로, 은유와 상징을 사용해주세요.",
             WritingStyle.SHORT_STORY: "자연스럽고 따뜻한 문체로, 이야기하듯 편안하게 써주세요."
         }
         
-        content = f"사용자 입력: {text_input}"
-        if image_description:
-            content += f"\n이미지 설명: {image_description}"
-            
-        content += f"\n감정: {emotion}"
-        if keywords:
-            content += f"\n키워드: {', '.join(keywords)}"
-        
-        messages = [
-            {
-                "role": "system",
-                "content": f"""당신은 감성적이고 위로가 되는 글을 쓰는 작가입니다.
+        return f"""당신은 감성적이고 위로가 되는 글을 쓰는 작가입니다.
 
 주어진 정보를 바탕으로 사용자에게 위로와 공감이 되는 글귀를 써주세요.
 
@@ -222,11 +155,91 @@ JSON 배열 형태로만 답해주세요."""
 - 한국어로 작성
 
 글귀만 작성해주세요."""
-            },
-            {
-                "role": "user",
-                "content": content
-            }
+
+    def _analyze_emotion(
+        self, 
+        text_input: str, 
+        image_description: Optional[str] = None
+    ) -> str:
+        """감정 분석"""
+        content = self._build_content(text_input, image_description)
+        
+        messages = [
+            {"role": "system", "content": self._get_emotion_system_message()},
+            {"role": "user", "content": content}
+        ]
+        
+        response = self.client.chat_completion(
+            messages=messages,
+            temperature=0.3,
+            max_tokens=50
+        )
+        
+        return response["content"].strip()
+
+    def _parse_keywords(self, response_content: str) -> List[str]:
+        """키워드 응답 파싱"""
+        try:
+            keywords_json = response_content.strip()
+            keywords = json.loads(keywords_json)
+            return keywords[:5] if isinstance(keywords, list) else []
+        except json.JSONDecodeError:
+            logger.error(f"키워드 JSON 파싱 실패: {response_content}")
+            keywords = [k.strip() for k in response_content.split(",")]
+            return keywords[:5]
+
+    def _extract_keywords(
+        self, 
+        text_input: str, 
+        image_description: Optional[str] = None,
+        emotion: str = ""
+    ) -> List[str]:
+        """키워드 추출 (감정 제외, 최대 5개)"""
+        content = self._build_content(text_input, image_description)
+        
+        messages = [
+            {"role": "system", "content": self._get_keyword_system_message(emotion)},
+            {"role": "user", "content": content}
+        ]
+        
+        response = self.client.chat_completion(
+            messages=messages,
+            temperature=0.5,
+            max_tokens=100
+        )
+        
+        return self._parse_keywords(response["content"])
+
+    def _build_quote_content(
+        self, 
+        text_input: str, 
+        image_description: Optional[str] = None, 
+        emotion: str = "", 
+        keywords: List[str] = None
+    ) -> str:
+        """글귀 생성용 콘텐츠 구성"""
+        content = self._build_content(text_input, image_description)
+        content += f"\n감정: {emotion}"
+        if keywords:
+            content += f"\n키워드: {', '.join(keywords)}"
+        return content
+
+    def _generate_quote(
+        self,
+        text_input: str,
+        image_description: Optional[str] = None,
+        emotion: str = "",
+        keywords: List[str] = None,
+        writing_style: WritingStyle = WritingStyle.SHORT_STORY,
+        content_length: ContentLength = ContentLength.MEDIUM,
+    ) -> str:
+        """글귀 생성"""
+        keywords = keywords or []
+        content = self._build_quote_content(text_input, image_description, emotion, keywords)
+        
+        messages = [
+            {"role": "system", "content": self._get_quote_system_message(emotion, writing_style, content_length)},
+            {"role": "user", "content": content}
         ]
         
         response = self.client.chat_completion(
@@ -262,13 +275,7 @@ JSON 배열 형태로만 답해주세요."""
             )
             logger.info("글귀 생성 완료")
             
-            return {
-                "emotion": emotion,
-                "keywords": keywords,
-                "quote": quote,
-                "writing_style": writing_style,
-                "content_length": content_length
-            }
+            return self._build_result(emotion, keywords, quote, writing_style, content_length)
             
         except Exception as e:
             logger.error(f"다이어리 AI 비동기 분석 오류: {str(e)}")
@@ -280,29 +287,11 @@ JSON 배열 형태로만 답해주세요."""
         image_description: Optional[str] = None
     ) -> str:
         """비동기 감정 분석"""
-        
-        content = f"사용자 입력: {text_input}"
-        if image_description:
-            content += f"\n이미지 설명: {image_description}"
+        content = self._build_content(text_input, image_description)
         
         messages = [
-            {
-                "role": "system",
-                "content": """당신은 전문 심리 상담사입니다. 주어진 텍스트와 이미지 설명을 바탕으로 감정을 분석해주세요.
-
-감정은 다음 중 하나로 분류해주세요:
-- 행복 (happiness)
-- 슬픔 (sadness) 
-- 화남 (anger)
-- 평온 (peace)
-- 불안 (unrest)
-
-응답은 감정 단어 하나만 한국어로 답해주세요."""
-            },
-            {
-                "role": "user", 
-                "content": content
-            }
+            {"role": "system", "content": self._get_emotion_system_message()},
+            {"role": "user", "content": content}
         ]
         
         response = await self.client.async_chat_completion(
@@ -320,30 +309,11 @@ JSON 배열 형태로만 답해주세요."""
         emotion: str = ""
     ) -> List[str]:
         """비동기 키워드 추출"""
-        
-        content = f"사용자 입력: {text_input}"
-        if image_description:
-            content += f"\n이미지 설명: {image_description}"
+        content = self._build_content(text_input, image_description)
         
         messages = [
-            {
-                "role": "system",
-                "content": f"""주어진 텍스트와 이미지 설명에서 핵심 키워드를 추출해주세요.
-
-조건:
-- 최대 5개의 키워드
-- 감정 단어는 제외 (특히 '{emotion}' 관련 단어 제외)
-- 명사 중심으로 추출
-- 구체적이고 의미 있는 단어 선택
-- 한국어로 응답
-
-응답 형식: ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]
-JSON 배열 형태로만 답해주세요."""
-            },
-            {
-                "role": "user",
-                "content": content
-            }
+            {"role": "system", "content": self._get_keyword_system_message(emotion)},
+            {"role": "user", "content": content}
         ]
         
         response = await self.client.async_chat_completion(
@@ -352,15 +322,7 @@ JSON 배열 형태로만 답해주세요."""
             max_tokens=100
         )
         
-        try:
-            keywords_json = response["content"].strip()
-            keywords = json.loads(keywords_json)
-            return keywords[:5] if isinstance(keywords, list) else []
-            
-        except json.JSONDecodeError:
-            logger.error(f"키워드 JSON 파싱 실패: {response['content']}")
-            keywords = [k.strip() for k in response["content"].split(",")]
-            return keywords[:5]
+        return self._parse_keywords(response["content"])
 
     async def _async_generate_quote(
         self,
@@ -372,50 +334,12 @@ JSON 배열 형태로만 답해주세요."""
         content_length: ContentLength = ContentLength.MEDIUM,
     ) -> str:
         """비동기 글귀 생성"""
-        
         keywords = keywords or []
-        
-        length_guide = {
-            ContentLength.SHORT: "1-2문장",
-            ContentLength.MEDIUM: "3-5문장", 
-            ContentLength.LONG: "6-10문장"
-        }
-        
-        style_guide = {
-            WritingStyle.POEM: "시적이고 운율이 있는 표현으로, 은유와 상징을 사용해주세요.",
-            WritingStyle.SHORT_STORY: "자연스럽고 따뜻한 문체로, 이야기하듯 편안하게 써주세요."
-        }
-        
-        content = f"사용자 입력: {text_input}"
-        if image_description:
-            content += f"\n이미지 설명: {image_description}"
-            
-        content += f"\n감정: {emotion}"
-        if keywords:
-            content += f"\n키워드: {', '.join(keywords)}"
+        content = self._build_quote_content(text_input, image_description, emotion, keywords)
         
         messages = [
-            {
-                "role": "system",
-                "content": f"""당신은 감성적이고 위로가 되는 글을 쓰는 작가입니다.
-
-주어진 정보를 바탕으로 사용자에게 위로와 공감이 되는 글귀를 써주세요.
-
-조건:
-- 문체: {writing_style.value} ({style_guide[writing_style]})
-- 길이: {content_length.value} ({length_guide[content_length]})
-- 감정 '{emotion}'을 자연스럽게 반영
-- 키워드들을 적절히 활용
-- 따뜻하고 위로가 되는 톤
-- 강요하지 않는 부드러운 조언
-- 한국어로 작성
-
-글귀만 작성해주세요."""
-            },
-            {
-                "role": "user",
-                "content": content
-            }
+            {"role": "system", "content": self._get_quote_system_message(emotion, writing_style, content_length)},
+            {"role": "user", "content": content}
         ]
         
         response = await self.client.async_chat_completion(
