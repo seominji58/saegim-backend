@@ -49,6 +49,9 @@ python-multipart==0.0.6
 # 파일 저장소
 minio==7.2.0
 
+# 이미지 처리
+Pillow==10.1.0
+
 # 시스템 모니터링
 psutil==5.9.6
 

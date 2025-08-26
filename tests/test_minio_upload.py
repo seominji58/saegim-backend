@@ -367,6 +367,92 @@ class TestMinIOUploader:
 
         assert url == expected_url
 
+    def test_generate_thumbnail_object_key(self, mock_minio_client):
+        """썸네일 객체 키 생성 테스트"""
+        from app.utils.minio_upload import MinIOUploader
+
+        uploader = MinIOUploader()
+        file_id = "test-uuid"
+        filename = "test_image.PNG"
+
+        with patch("app.utils.minio_upload.datetime") as mock_datetime:
+            mock_datetime.now.return_value.strftime.return_value = "2024/01/15"
+
+            object_key = uploader._generate_thumbnail_object_key(file_id, filename)
+
+            assert object_key == "thumbnails/2024/01/15/test-uuid_thumb.jpg"
+
+    def test_create_thumbnail(self, mock_minio_client):
+        """썸네일 생성 테스트"""
+        from app.utils.minio_upload import MinIOUploader
+        from PIL import Image as PILImage
+        import io
+
+        uploader = MinIOUploader()
+        
+        # 간단한 테스트 이미지 생성
+        test_image = PILImage.new('RGB', (300, 300), color='red')
+        img_buffer = io.BytesIO()
+        test_image.save(img_buffer, format='JPEG')
+        img_data = img_buffer.getvalue()
+
+        # 썸네일 생성
+        thumbnail_data = uploader._create_thumbnail(img_data, size=(150, 150))
+
+        # 썸네일이 생성되었는지 확인
+        assert thumbnail_data
+        assert len(thumbnail_data) > 0
+        
+        # 썸네일 이미지를 다시 열어서 크기 확인
+        thumbnail_image = PILImage.open(io.BytesIO(thumbnail_data))
+        assert thumbnail_image.size[0] <= 150
+        assert thumbnail_image.size[1] <= 150
+
+    @pytest.mark.asyncio
+    async def test_upload_image_with_thumbnail_success(self, mock_minio_client, sample_image_file):
+        """이미지와 썸네일 업로드 성공 테스트"""
+        from app.utils.minio_upload import MinIOUploader
+        from PIL import Image as PILImage
+        import io
+
+        uploader = MinIOUploader()
+
+        # 실제 이미지 데이터를 Mock 파일에 추가
+        test_image = PILImage.new('RGB', (300, 300), color='blue')
+        img_buffer = io.BytesIO()
+        test_image.save(img_buffer, format='JPEG')
+        sample_image_file.read = lambda: img_buffer.getvalue()
+
+        with (
+            patch.object(
+                uploader,
+                "_generate_object_key",
+                return_value="images/2024/01/15/test.jpg",
+            ),
+            patch.object(
+                uploader,
+                "_generate_thumbnail_object_key", 
+                return_value="thumbnails/2024/01/15/test_thumb.jpg",
+            ),
+            patch.object(
+                uploader,
+                "_generate_image_url",
+                side_effect=[
+                    "http://localhost:9000/test/images/2024/01/15/test.jpg",
+                    "http://localhost:9000/test/thumbnails/2024/01/15/test_thumb.jpg"
+                ]
+            ),
+        ):
+            file_id, original_url, thumbnail_url = await uploader.upload_image_with_thumbnail(sample_image_file)
+
+            # UUID 형식 확인
+            assert uuid.UUID(file_id)  # 유효한 UUID인지 확인
+            assert original_url == "http://localhost:9000/test/images/2024/01/15/test.jpg"
+            assert thumbnail_url == "http://localhost:9000/test/thumbnails/2024/01/15/test_thumb.jpg"
+
+            # MinIO 클라이언트가 두 번 호출되었는지 확인 (원본 + 썸네일)
+            assert mock_minio_client.put_object.call_count == 2
+
 
 class TestConvenienceFunctions:
     """편의 함수들 테스트"""
@@ -390,6 +476,26 @@ class TestConvenienceFunctions:
 
             assert result == ("file-id", "http://test.com/image.jpg")
             # async 함수는 호출 확인이 다름
+
+    @pytest.mark.asyncio
+    async def test_upload_image_with_thumbnail_to_minio(self, sample_image_file):
+        """upload_image_with_thumbnail_to_minio 편의 함수 테스트"""
+        with patch("app.utils.minio_upload.get_minio_uploader") as mock_get_uploader:
+            from app.utils.minio_upload import upload_image_with_thumbnail_to_minio
+
+            mock_uploader = MagicMock()
+            mock_get_uploader.return_value = mock_uploader
+
+            # async 메서드를 올바르게 Mock
+            async def mock_upload_with_thumbnail(file, thumbnail_size=(150, 150)):
+                return ("file-id", "http://test.com/image.jpg", "http://test.com/thumbnail.jpg")
+
+            mock_uploader.upload_image_with_thumbnail = mock_upload_with_thumbnail
+
+            result = await upload_image_with_thumbnail_to_minio(sample_image_file)
+
+            assert result == ("file-id", "http://test.com/image.jpg", "http://test.com/thumbnail.jpg")
+            assert len(result) == 3  # 파일 ID, 원본 URL, 썸네일 URL
 
     def test_delete_image_from_minio(self):
         """delete_image_from_minio 편의 함수 테스트"""

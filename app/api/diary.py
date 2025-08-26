@@ -13,11 +13,31 @@ from app.models.user import User
 from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryCreateRequest, DiaryUpdateRequest
 from app.schemas.base import BaseResponse
 from app.services.diary import DiaryService
-from app.utils.minio_upload import upload_image_to_minio
+from app.utils.minio_upload import upload_image_with_thumbnail_to_minio, get_minio_uploader
 from app.models.image import Image
 from app.models.diary import DiaryEntry
 
 router = APIRouter()
+
+
+def _extract_object_key_from_url(url: str) -> str:
+    """MinIO URL에서 객체 키 추출"""
+    try:
+        # URL에서 버킷 이름 이후의 경로를 객체 키로 추출
+        # 예: http://localhost:9000/saegim-images/images/2023/12/01/uuid.jpg -> images/2023/12/01/uuid.jpg
+        parts = url.split('/')
+        bucket_index = -1
+        for i, part in enumerate(parts):
+            if 'saegim-images' in part or part == 'saegim-images':
+                bucket_index = i
+                break
+        
+        if bucket_index != -1 and bucket_index + 1 < len(parts):
+            return '/'.join(parts[bucket_index + 1:])
+        
+        return ""
+    except Exception:
+        return ""
 
 
 @router.get("", response_model=BaseResponse[List[DiaryListResponse]])
@@ -169,34 +189,14 @@ async def upload_diary_image(
         )
 
     try:
-        # 로컬 파일 시스템에 이미지 저장
-        import os
-        from pathlib import Path
-
-        # 업로드 디렉토리 생성
-        upload_dir = Path("uploads/images")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        # 고유 파일명 생성
-        file_extension = Path(image.filename).suffix if image.filename else ".jpg"
-        file_id = str(uuid.uuid4())
-        filename = f"{file_id}{file_extension}"
-
-        # 파일 저장
-        file_path = upload_dir / filename
-        with open(file_path, "wb") as buffer:
-            content = await image.read()
-            buffer.write(content)
-
-        # 파일 경로 설정 (웹에서 접근 가능한 경로)
-        web_file_path = f"/uploads/images/{filename}"
-        web_thumbnail_path = f"/uploads/images/{filename}"  # 썸네일은 나중에 별도로 생성
+        # MinIO에 이미지와 썸네일 업로드
+        file_id, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(image)
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
             diary_id=diary_id,
-            file_path=web_file_path,
-            thumbnail_path=web_thumbnail_path,
+            file_path=original_url,
+            thumbnail_path=thumbnail_url,
             mime_type=image.content_type,
             file_size=image.size,
             exif_removed=True
@@ -272,6 +272,21 @@ async def delete_diary_image(
         )
 
     try:
+        # MinIO에서 실제 파일 삭제
+        uploader = get_minio_uploader()
+        
+        # 원본 이미지 삭제
+        if image.file_path:
+            original_object_key = _extract_object_key_from_url(image.file_path)
+            if original_object_key:
+                uploader.delete_image(original_object_key)
+        
+        # 썸네일 삭제
+        if image.thumbnail_path:
+            thumbnail_object_key = _extract_object_key_from_url(image.thumbnail_path)
+            if thumbnail_object_key:
+                uploader.delete_image(thumbnail_object_key)
+
         # 데이터베이스에서 이미지 정보 삭제
         session.delete(image)
         session.commit()
