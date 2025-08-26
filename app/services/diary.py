@@ -33,9 +33,12 @@ class DiaryService:
         # 기본 쿼리 구성
         statement = select(DiaryEntry)
 
-        # 사용자별 필터링
+        # 사용자별 필터링 (Soft Delete 제외)
         if user_id is not None:
-            statement = statement.where(DiaryEntry.user_id == user_id)
+            statement = statement.where(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.deleted_at.is_(None)
+            )
 
         # 통합 검색 (제목 또는 내용)
         if searchTerm:
@@ -66,10 +69,13 @@ class DiaryService:
         else:
             statement = statement.order_by(DiaryEntry.created_at.asc())
 
-        # 전체 개수 조회 (user_id 필터 적용)
+        # 전체 개수 조회 (user_id 필터 적용, Soft Delete 제외)
         count_statement = select(func.count(DiaryEntry.id))
         if user_id is not None:
-            count_statement = count_statement.where(DiaryEntry.user_id == user_id)
+            count_statement = count_statement.where(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.deleted_at.is_(None)
+            )
 
         total_count = self.session.exec(count_statement).one()
 
@@ -83,9 +89,10 @@ class DiaryService:
         return diaries, total_count
 
     def get_diary_by_id(self, diary_id: str, user_id: Optional[str] = None) -> Optional[DiaryEntry]:
-        """ID로 다이어리 조회"""
+        """ID로 다이어리 조회 (Soft Delete 제외)"""
         statement = select(DiaryEntry).where(
-            DiaryEntry.id == diary_id
+            DiaryEntry.id == diary_id,
+            DiaryEntry.deleted_at.is_(None)
         )
 
         if user_id is not None:
@@ -108,6 +115,7 @@ class DiaryService:
             selectinload(DiaryEntry.images)
         ).where(
             DiaryEntry.user_id == user_id,
+            DiaryEntry.deleted_at.is_(None),
             func.date(DiaryEntry.created_at) >= start_date,
             func.date(DiaryEntry.created_at) <= end_date
         ).order_by(DiaryEntry.created_at.desc())

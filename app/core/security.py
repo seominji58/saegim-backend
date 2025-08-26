@@ -13,7 +13,7 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import get_settings
-from app.utils.encryption import password_hasher, data_encryptor
+from app.utils import password_hasher, data_encryptor
 
 settings = get_settings()
 security = HTTPBearer()

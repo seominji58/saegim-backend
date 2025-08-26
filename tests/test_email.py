@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import os
 from app.utils.email_service import EmailService
 from app.core.config import settings
 
@@ -18,7 +19,7 @@ async def test_email_sending():
     email_service = EmailService()
     
     # 테스트 이메일 주소 (실제 이메일로 변경하세요)
-    test_email = "alswlalswl58@naver.com"  # 실제 테스트할 이메일로 변경
+    test_email = os.getenv("TEST_EMAIL", "test@example.com")  # 환경변수에서 테스트 이메일 읽기
     
     try:
         print(f"테스트 이메일 발송 중: {test_email}")

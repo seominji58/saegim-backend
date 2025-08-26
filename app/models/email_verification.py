@@ -18,7 +18,7 @@ class EmailVerification(Base):
         Index("idx_email_code", "email", "verification_code"),
         Index("idx_expires", "expires_at", postgresql_where=text("expires_at IS NOT NULL")),
         CheckConstraint("char_length(verification_code) = 6", name="ck_verif_code_len"),
-        CheckConstraint("verification_type IN ('signup','change')", name="ck_verification_type"),
+        CheckConstraint("verification_type IN ('signup','change','restore')", name="ck_verification_type"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
