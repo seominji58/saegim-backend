@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from sqlmodel import Session, select, func
 from datetime import datetime, date
 import random
+import json
 from app.models.diary import DiaryEntry
 from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
 
@@ -130,11 +131,10 @@ class DiaryService:
         ai_emotion = random.choice(emotions)
         ai_emotion_confidence = round(random.uniform(0.1, 0.9), 2)
         ai_generated_text = f"AI가 생성한 {ai_emotion}한 감정의 텍스트입니다."
+
+        mock_keywords = ["일기"] if not diary_create.content or len(diary_create.content.strip()) < 2 else [diary_create.content.strip()[:2]]
         # keywords를 JSON 문자열로 변환
-        keywords_json = None
-        if diary_create.keywords:
-            import json
-            keywords_json = json.dumps(diary_create.keywords)
+        keywords_json = json.dumps(mock_keywords, ensure_ascii=False)
 
         # 새 다이어리 엔트리 생성
         new_diary = DiaryEntry(
