@@ -113,7 +113,6 @@ class DiaryCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, description="다이어리 내용")
     user_emotion: Optional[str] = Field(None, description="사용자 감정")
     is_public: bool = Field(False, description="공개 여부")
-    keywords: Optional[List[str]] = Field(None, description="키워드 목록")
 
     @field_validator('user_emotion')
     @classmethod
@@ -124,19 +123,6 @@ class DiaryCreateRequest(BaseModel):
             if v not in allowed_emotions:
                 raise ValueError(f'감정은 {allowed_emotions} 중 하나여야 합니다')
         return v
-
-    @field_validator('keywords', mode='before')
-    @classmethod
-    def parse_keywords(cls, v):
-        """keywords를 JSON 문자열에서 리스트로 변환"""
-        if isinstance(v, str):
-            try:
-                return json.loads(v) if v else []
-            except json.JSONDecodeError:
-                return []
-        elif isinstance(v, list):
-            return v
-        return []
 
     class Config:
         from_attributes = True
