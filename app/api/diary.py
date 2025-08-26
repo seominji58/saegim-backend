@@ -2,19 +2,38 @@
 다이어리 API 라우터 (JWT 인증 기반)
 """
 
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, UploadFile, File
-from sqlmodel import Session, select
-from datetime import date
 import uuid
-from app.db.database import get_session
+from datetime import date
+from typing import List, Optional
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+    status,
+)
+from sqlmodel import Session, select
+
 from app.core.deps import get_current_user
-from app.models.user import User
-from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryCreateRequest, DiaryUpdateRequest
-from app.schemas.base import BaseResponse
-from app.services.diary import DiaryService
-from app.utils.minio_upload import upload_image_with_thumbnail_to_minio, get_minio_uploader
+from app.db.database import get_session
 from app.models.image import Image
+from app.models.user import User
+from app.schemas.base import BaseResponse
+from app.schemas.diary import (
+    DiaryCreateRequest,
+    DiaryListResponse,
+    DiaryResponse,
+    DiaryUpdateRequest,
+)
+from app.services.diary import DiaryService
+from app.utils.minio_upload import (
+    get_minio_uploader,
+    upload_image_with_thumbnail_to_minio,
+)
 
 router = APIRouter()
 
@@ -24,16 +43,16 @@ def _extract_object_key_from_url(url: str) -> str:
     try:
         # URL에서 버킷 이름 이후의 경로를 객체 키로 추출
         # 예: http://localhost:9000/saegim-images/images/2023/12/01/uuid.jpg -> images/2023/12/01/uuid.jpg
-        parts = url.split('/')
+        parts = url.split("/")
         bucket_index = -1
         for i, part in enumerate(parts):
-            if 'saegim-images' in part or part == 'saegim-images':
+            if "saegim-images" in part or part == "saegim-images":
                 bucket_index = i
                 break
-        
+
         if bucket_index != -1 and bucket_index + 1 < len(parts):
-            return '/'.join(parts[bucket_index + 1:])
-        
+            return "/".join(parts[bucket_index + 1 :])
+
         return ""
     except Exception:
         return ""
@@ -74,8 +93,7 @@ async def get_my_diaries(
     diary_responses = [DiaryListResponse.from_orm(diary) for diary in diaries]
 
     return BaseResponse(
-        data=diary_responses,
-        message=f"다이어리 목록 조회 성공 (총 {total_count}개)"
+        data=diary_responses, message=f"다이어리 목록 조회 성공 (총 {total_count}개)"
     )
 
 
@@ -93,7 +111,7 @@ async def get_calendar_diaries(
     diaries = diary_service.get_diaries_by_date_range(
         user_id=current_user.id,  # JWT에서 추출한 사용자 ID 사용
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
     )
 
     # 응답 데이터 변환
@@ -124,9 +142,7 @@ async def get_diary(
         )
 
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(
-        diary_id=diary_id, user_id=current_user.id
-    )
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
 
     if not diary:
         raise HTTPException(
@@ -164,9 +180,7 @@ async def upload_diary_image(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(
-        diary_id=diary_id, user_id=current_user.id
-    )
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
 
     if not diary:
         raise HTTPException(
@@ -175,7 +189,7 @@ async def upload_diary_image(
         )
 
     # 이미지 파일 검증
-    if not image.content_type.startswith('image/'):
+    if not image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="이미지 파일만 업로드할 수 있습니다.",
@@ -188,8 +202,10 @@ async def upload_diary_image(
         )
 
     try:
-        # MinIO에 이미지와 썸네일 업로드  
-        _, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(image)
+        # MinIO에 이미지와 썸네일 업로드
+        _, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(
+            image
+        )
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
@@ -198,7 +214,7 @@ async def upload_diary_image(
             thumbnail_path=thumbnail_url,
             mime_type=image.content_type,
             file_size=image.size,
-            exif_removed=True
+            exif_removed=True,
         )
 
         session.add(new_image)
@@ -211,16 +227,16 @@ async def upload_diary_image(
                 "file_path": new_image.file_path,
                 "thumbnail_path": new_image.thumbnail_path,
                 "mime_type": new_image.mime_type,
-                "file_size": new_image.file_size
+                "file_size": new_image.file_size,
             },
-            message="이미지 업로드 성공"
+            message="이미지 업로드 성공",
         )
 
     except Exception as e:
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"이미지 업로드 실패: {str(e)}"
+            detail=f"이미지 업로드 실패: {str(e)}",
         )
 
 
@@ -246,9 +262,7 @@ async def delete_diary_image(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(
-        diary_id=diary_id, user_id=current_user.id
-    )
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
 
     if not diary:
         raise HTTPException(
@@ -258,10 +272,7 @@ async def delete_diary_image(
 
     # 이미지 존재 여부 및 권한 확인
     image = session.exec(
-        select(Image).where(
-            Image.id == image_id,
-            Image.diary_id == diary_id
-        )
+        select(Image).where(Image.id == image_id, Image.diary_id == diary_id)
     ).first()
 
     if not image:
@@ -273,13 +284,13 @@ async def delete_diary_image(
     try:
         # MinIO에서 실제 파일 삭제
         uploader = get_minio_uploader()
-        
+
         # 원본 이미지 삭제
         if image.file_path:
             original_object_key = _extract_object_key_from_url(image.file_path)
             if original_object_key:
                 uploader.delete_image(original_object_key)
-        
+
         # 썸네일 삭제
         if image.thumbnail_path:
             thumbnail_object_key = _extract_object_key_from_url(image.thumbnail_path)
@@ -291,19 +302,21 @@ async def delete_diary_image(
         session.commit()
 
         return BaseResponse(
-            data={"message": "이미지 삭제 성공"},
-            message="이미지가 성공적으로 삭제되었습니다."
+            data={"message": "이미지 삭제 성공"}, message="이미지가 성공적으로 삭제되었습니다."
         )
 
     except Exception as e:
         session.rollback()
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.error(f"이미지 삭제 실패 - diary_id: {diary_id}, image_id: {image_id}, error: {str(e)}")
+        logger.error(
+            f"이미지 삭제 실패 - diary_id: {diary_id}, image_id: {image_id}, error: {str(e)}"
+        )
         logger.exception("상세 오류 정보:")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"이미지 삭제 실패: {str(e)}"
+            detail=f"이미지 삭제 실패: {str(e)}",
         )
 
 
@@ -327,9 +340,7 @@ async def get_diary_images(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(
-        diary_id=diary_id, user_id=current_user.id
-    )
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
 
     if not diary:
         raise HTTPException(
@@ -338,25 +349,24 @@ async def get_diary_images(
         )
 
     # 해당 다이어리의 이미지들 조회
-    images = session.exec(
-        select(Image).where(Image.diary_id == diary_id)
-    ).all()
+    images = session.exec(select(Image).where(Image.diary_id == diary_id)).all()
 
     # 이미지 정보 반환
     image_list = []
     for img in images:
-        image_list.append({
-            "id": str(img.id),
-            "file_path": img.file_path,
-            "thumbnail_path": img.thumbnail_path,
-            "mime_type": img.mime_type,
-            "file_size": img.file_size,
-            "created_at": img.created_at.isoformat() if img.created_at else None
-        })
+        image_list.append(
+            {
+                "id": str(img.id),
+                "file_path": img.file_path,
+                "thumbnail_path": img.thumbnail_path,
+                "mime_type": img.mime_type,
+                "file_size": img.file_size,
+                "created_at": img.created_at.isoformat() if img.created_at else None,
+            }
+        )
 
     return BaseResponse(
-        data=image_list,
-        message=f"다이어리 이미지 조회 성공 (총 {len(image_list)}개)"
+        data=image_list, message=f"다이어리 이미지 조회 성공 (총 {len(image_list)}개)"
     )
 
 
@@ -375,8 +385,7 @@ async def create_diary(
     created_diary = diary_service.create_diary(diary_create, current_user.id)
 
     return BaseResponse(
-        data=DiaryResponse.from_orm(created_diary),
-        message="다이어리 생성 성공"
+        data=DiaryResponse.from_orm(created_diary), message="다이어리 생성 성공"
     )
 
 
@@ -405,23 +414,17 @@ async def update_diary(
     existing_diary = diary_service.get_diary_by_id(diary_id)
     if not existing_diary:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="다이어리를 찾을 수 없습니다"
+            status_code=status.HTTP_404_NOT_FOUND, detail="다이어리를 찾을 수 없습니다"
         )
 
     # 본인의 다이어리만 수정 가능하도록 검증
     if existing_diary.user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="해당 다이어리를 수정할 권한이 없습니다"
+            status_code=status.HTTP_403_FORBIDDEN, detail="해당 다이어리를 수정할 권한이 없습니다"
         )
 
     updated_diary = diary_service.update_diary(diary_id, diary_update)
 
     return BaseResponse(
-        data=DiaryResponse.from_orm(updated_diary),
-        message="다이어리 수정 성공"
+        data=DiaryResponse.from_orm(updated_diary), message="다이어리 수정 성공"
     )
-
-
-

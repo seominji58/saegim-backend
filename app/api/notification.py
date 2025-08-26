@@ -189,19 +189,26 @@ async def send_diary_reminder_manual(
 @router.post(
     "/ai-content-ready/{diary_id}",
     response_model=BaseResponse[NotificationSendResponse],
-    summary="AI 콘텐츠 준비 완료 알림",
-    description="현재 사용자의 다이어리에 대한 AI 콘텐츠 생성 완료 알림을 전송합니다.",
+    summary="[관리자/테스트] AI 콘텐츠 준비 완료 알림 수동 전송",
+    description="테스트 또는 관리 목적으로 현재 사용자의 다이어리에 대한 AI 콘텐츠 생성 완료 알림을 수동 전송합니다. 일반적으로는 다이어리 생성 시 자동으로 발송됩니다.",
 )
-async def send_ai_content_ready(
+async def send_ai_content_ready_manual(
     diary_id: str,
     current_user_id: UUID = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
-    """AI 콘텐츠 준비 완료 알림"""
+    """AI 콘텐츠 준비 완료 알림 수동 전송 (관리자/테스트용)
+
+    주의: 이 엔드포인트는 테스트나 관리 목적으로만 사용해야 합니다.
+    실제 운영에서는 다이어리 생성 시(DiaryService.create_diary)에 의해
+    자동으로 알림이 발송됩니다.
+    """
     result = await NotificationService.send_ai_content_ready(
         str(current_user_id), diary_id, session
     )
-    return BaseResponse(success=True, message="AI 콘텐츠 준비 완료 알림이 전송되었습니다.", data=result)
+    return BaseResponse(
+        success=True, message="AI 콘텐츠 준비 완료 알림이 수동으로 전송되었습니다. (테스트/관리용)", data=result
+    )
 
 
 # ==================== 알림 이력 조회 ====================
