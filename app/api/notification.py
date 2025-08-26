@@ -4,26 +4,27 @@ FCM 푸시 알림, 인앱 알림 관리 및 읽음 처리 통합 API
 """
 
 from typing import List
-from fastapi import APIRouter, Depends, status, Query, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import select
 from uuid import UUID
 
-from app.db.database import get_session
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.core.security import get_current_user_id_from_cookie
-from app.services.notification_service import NotificationService
+from app.db.database import get_session
+from app.models.fcm import NotificationHistory
+from app.models.notification import Notification
 from app.schemas.base import BaseResponse
 from app.schemas.notification import (
     FCMTokenRegisterRequest,
     FCMTokenResponse,
-    NotificationSettingsUpdate,
-    NotificationSettingsResponse,
+    NotificationHistoryResponse,
     NotificationSendRequest,
     NotificationSendResponse,
-    NotificationHistoryResponse,
+    NotificationSettingsResponse,
+    NotificationSettingsUpdate,
 )
-from app.models.notification import Notification
-from app.models.fcm import NotificationHistory
+from app.services.notification_service import NotificationService
 
 router = APIRouter(tags=["Notifications"])
 
@@ -39,9 +40,7 @@ router = APIRouter(tags=["Notifications"])
 )
 async def notification_health_check():
     """알림 서비스 상태 확인"""
-    return BaseResponse(
-        success=True, message="알림 서비스가 정상 작동 중입니다.", data="healthy"
-    )
+    return BaseResponse(success=True, message="알림 서비스가 정상 작동 중입니다.", data="healthy")
 
 
 @router.post(
@@ -60,9 +59,7 @@ def register_fcm_token(
     token = NotificationService.register_token(
         str(current_user_id), token_data, session
     )
-    return BaseResponse(
-        success=True, message="FCM 토큰이 성공적으로 등록되었습니다.", data=token
-    )
+    return BaseResponse(success=True, message="FCM 토큰이 성공적으로 등록되었습니다.", data=token)
 
 
 @router.get(
@@ -77,9 +74,7 @@ def get_fcm_tokens(
 ):
     """FCM 토큰 목록 조회"""
     tokens = NotificationService.get_user_tokens(str(current_user_id), session)
-    return BaseResponse(
-        success=True, message="FCM 토큰 목록을 성공적으로 조회했습니다.", data=tokens
-    )
+    return BaseResponse(success=True, message="FCM 토큰 목록을 성공적으로 조회했습니다.", data=tokens)
 
 
 @router.delete(
@@ -120,9 +115,7 @@ def get_notification_settings(
     settings = NotificationService.get_notification_settings(
         str(current_user_id), session
     )
-    return BaseResponse(
-        success=True, message="알림 설정을 성공적으로 조회했습니다.", data=settings
-    )
+    return BaseResponse(success=True, message="알림 설정을 성공적으로 조회했습니다.", data=settings)
 
 
 @router.patch(
@@ -172,17 +165,24 @@ async def send_notification(
 @router.post(
     "/diary-reminder",
     response_model=BaseResponse[NotificationSendResponse],
-    summary="다이어리 작성 알림 전송",
-    description="현재 사용자에게 다이어리 작성 알림을 전송합니다.",
+    summary="[관리자/테스트] 다이어리 작성 알림 수동 전송",
+    description="테스트 또는 관리 목적으로 현재 사용자에게 다이어리 작성 알림을 수동 전송합니다. 일반적으로는 개인화된 스케줄러에 의해 자동 발송됩니다.",
 )
-async def send_diary_reminder(
+async def send_diary_reminder_manual(
     current_user_id: UUID = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
-    """다이어리 작성 알림 전송"""
-    result = await NotificationService.send_diary_reminder(str(current_user_id), session)
+    """다이어리 작성 알림 수동 전송 (관리자/테스트용)
+
+    주의: 이 엔드포인트는 테스트나 관리 목적으로만 사용해야 합니다.
+    실제 운영에서는 개인화된 스케줄러(diary_reminder_scheduler.py)에 의해
+    사용자별 설정 시간에 맞춰 자동으로 알림이 발송됩니다.
+    """
+    result = await NotificationService.send_diary_reminder(
+        str(current_user_id), session
+    )
     return BaseResponse(
-        success=True, message="다이어리 작성 알림이 전송되었습니다.", data=result
+        success=True, message="다이어리 작성 알림이 수동으로 전송되었습니다. (테스트/관리용)", data=result
     )
 
 
@@ -198,10 +198,10 @@ async def send_ai_content_ready(
     session: Session = Depends(get_session),
 ):
     """AI 콘텐츠 준비 완료 알림"""
-    result = await NotificationService.send_ai_content_ready(str(current_user_id), diary_id, session)
-    return BaseResponse(
-        success=True, message="AI 콘텐츠 준비 완료 알림이 전송되었습니다.", data=result
+    result = await NotificationService.send_ai_content_ready(
+        str(current_user_id), diary_id, session
     )
+    return BaseResponse(success=True, message="AI 콘텐츠 준비 완료 알림이 전송되었습니다.", data=result)
 
 
 # ==================== 알림 이력 조회 ====================
@@ -223,9 +223,7 @@ def get_notification_history(
     history = NotificationService.get_notification_history(
         str(current_user_id), limit, offset, session
     )
-    return BaseResponse(
-        success=True, message="알림 이력을 성공적으로 조회했습니다.", data=history
-    )
+    return BaseResponse(success=True, message="알림 이력을 성공적으로 조회했습니다.", data=history)
 
 
 # ==================== 알림 읽음 처리 ====================

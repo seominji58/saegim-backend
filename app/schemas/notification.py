@@ -4,12 +4,13 @@ FCM (Firebase Cloud Messaging) 및 인앱 알림 통합 스키마
 """
 
 from __future__ import annotations
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-from uuid import UUID
-from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DeviceType(str, Enum):
@@ -96,12 +97,8 @@ class NotificationSettingsUpdate(BaseModel):
     anniversary: Optional[bool] = Field(None, description="기념일")
     friend_share: Optional[bool] = Field(None, description="친구 공유")
     quiet_hours_enabled: Optional[bool] = Field(None, description="조용 시간 활성화")
-    quiet_start_time: Optional[str] = Field(
-        None, description="조용 시간 시작", max_length=5
-    )
-    quiet_end_time: Optional[str] = Field(
-        None, description="조용 시간 종료", max_length=5
-    )
+    quiet_start_time: Optional[str] = Field(None, description="조용 시간 시작", max_length=5)
+    quiet_end_time: Optional[str] = Field(None, description="조용 시간 종료", max_length=5)
     frequency: Optional[NotificationFrequency] = Field(None, description="알림 주기")
 
 
@@ -152,8 +149,16 @@ class NotificationSettingsResponse(BaseModel):
     ai_content_ready: bool
     weekly_report: bool
     marketing: bool
-    quiet_hours_start: Optional[str]
-    quiet_hours_end: Optional[str]
+
+    # 다이어리 리마인더 상세 설정
+    diary_reminder_time: Optional[str] = Field(None, description="다이어리 리마인더 시간 (HH:MM)")
+    diary_reminder_days: Optional[List[str]] = Field(
+        None, description="다이어리 리마인더 요일 ['mon','tue',...]"
+    )
+
+    # 기존 필드 (하위 호환성)
+    quiet_hours_start: Optional[str] = Field(None, description="조용 시간 시작 (deprecated)")
+    quiet_hours_end: Optional[str] = Field(None, description="조용 시간 종료 (deprecated)")
 
 
 class NotificationSendResponse(BaseModel):
