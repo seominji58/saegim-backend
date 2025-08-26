@@ -16,6 +16,7 @@ repos:
       - id: black
         language_version: python3
         files: \.py$
+        stages: [pre-commit]
 
   # isort - import 정렬 (Python 파일만)
   - repo: https://github.com/pycqa/isort
@@ -24,6 +25,7 @@ repos:
       - id: isort
         args: ["--profile", "black"]
         files: \.py$
+        stages: [pre-commit]
 
   # flake8 - 린터 (Python 파일만)
   - repo: https://github.com/pycqa/flake8
