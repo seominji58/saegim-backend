@@ -5,8 +5,10 @@
 from typing import List, Optional, Tuple
 from sqlmodel import Session, select, func
 from datetime import datetime, date
+import random
+import json
 from app.models.diary import DiaryEntry
-from app.schemas.diary import DiaryUpdateRequest
+from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
 
 
 class DiaryService:
@@ -120,6 +122,41 @@ class DiaryService:
         ).order_by(DiaryEntry.created_at.desc())
 
         return self.session.exec(statement).all()
+
+    def create_diary(self, diary_create: DiaryCreateRequest, user_id: str) -> DiaryEntry:
+        """새로운 다이어리 생성"""
+
+        # 임시 AI 다이어리 생성 결과 생성
+        emotions = ["happy", "sad", "angry", "peaceful", "unrest"]
+        ai_emotion = random.choice(emotions)
+        ai_emotion_confidence = round(random.uniform(0.1, 0.9), 2)
+        ai_generated_text = f"AI가 생성한 {ai_emotion}한 감정의 텍스트입니다."
+
+        mock_keywords = ["일기"] if not diary_create.content or len(diary_create.content.strip()) < 2 else [diary_create.content.strip()[:2]]
+        # keywords를 JSON 문자열로 변환
+        keywords_json = json.dumps(mock_keywords, ensure_ascii=False)
+
+        # 새 다이어리 엔트리 생성
+        new_diary = DiaryEntry(
+            user_id=user_id,
+            title=diary_create.title,
+            content=diary_create.content,
+            user_emotion=diary_create.user_emotion,
+            ai_emotion=ai_emotion, 
+            ai_emotion_confidence=ai_emotion_confidence, 
+            ai_generated_text=ai_generated_text,
+            is_public=diary_create.is_public,
+            keywords=keywords_json,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+
+        # 데이터베이스에 저장
+        self.session.add(new_diary)
+        self.session.commit()
+        self.session.refresh(new_diary)
+
+        return new_diary
 
     def update_diary(self, diary_id: str, diary_update: DiaryUpdateRequest) -> Optional[DiaryEntry]:
         """다이어리 수정"""

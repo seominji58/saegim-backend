@@ -107,6 +107,27 @@ class DiaryListResponse(BaseModel):
         from_attributes = True
 
 
+class DiaryCreateRequest(BaseModel):
+    """다이어리 생성 요청 스키마"""
+    title: str = Field(..., min_length=1, max_length=255, description="다이어리 제목")
+    content: str = Field(..., min_length=1, description="다이어리 내용")
+    user_emotion: Optional[str] = Field(None, description="사용자 감정")
+    is_public: bool = Field(False, description="공개 여부")
+
+    @field_validator('user_emotion')
+    @classmethod
+    def validate_emotion(cls, v):
+        """감정 값 검증"""
+        if v is not None:
+            allowed_emotions = ['happy', 'sad', 'angry', 'peaceful', 'unrest']
+            if v not in allowed_emotions:
+                raise ValueError(f'감정은 {allowed_emotions} 중 하나여야 합니다')
+        return v
+
+    class Config:
+        from_attributes = True
+
+
 class DiaryUpdateRequest(BaseModel):
     """다이어리 수정 요청 스키마"""
     title: Optional[str] = None

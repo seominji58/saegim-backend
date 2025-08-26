@@ -170,35 +170,35 @@ async def send_notification(
 
 
 @router.post(
-    "/diary-reminder/{user_id}",
+    "/diary-reminder",
     response_model=BaseResponse[NotificationSendResponse],
     summary="다이어리 작성 알림 전송",
-    description="특정 사용자에게 다이어리 작성 알림을 전송합니다.",
+    description="현재 사용자에게 다이어리 작성 알림을 전송합니다.",
 )
 async def send_diary_reminder(
-    user_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """다이어리 작성 알림 전송"""
-    result = await NotificationService.send_diary_reminder(user_id, session)
+    result = await NotificationService.send_diary_reminder(str(current_user_id), session)
     return BaseResponse(
         success=True, message="다이어리 작성 알림이 전송되었습니다.", data=result
     )
 
 
 @router.post(
-    "/ai-content-ready/{user_id}/{diary_id}",
+    "/ai-content-ready/{diary_id}",
     response_model=BaseResponse[NotificationSendResponse],
     summary="AI 콘텐츠 준비 완료 알림",
-    description="AI 콘텐츠 생성 완료 알림을 전송합니다.",
+    description="현재 사용자의 다이어리에 대한 AI 콘텐츠 생성 완료 알림을 전송합니다.",
 )
 async def send_ai_content_ready(
-    user_id: str,
     diary_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
     session: Session = Depends(get_session),
 ):
     """AI 콘텐츠 준비 완료 알림"""
-    result = await NotificationService.send_ai_content_ready(user_id, diary_id, session)
+    result = await NotificationService.send_ai_content_ready(str(current_user_id), diary_id, session)
     return BaseResponse(
         success=True, message="AI 콘텐츠 준비 완료 알림이 전송되었습니다.", data=result
     )
