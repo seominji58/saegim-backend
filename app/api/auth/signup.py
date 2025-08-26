@@ -18,7 +18,7 @@ from app.models.email_verification import EmailVerification
 from app.utils.encryption import password_hasher
 from app.schemas.base import BaseResponse
 from app.core.security import create_access_token, create_refresh_token
-from app.models.utils.email_service import EmailService
+from app.utils.email_service import EmailService
 from app.core.deps import get_current_user
 
 router = APIRouter(tags=["auth"])

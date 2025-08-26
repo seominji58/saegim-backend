@@ -14,7 +14,7 @@ from app.models.diary import DiaryEntry
 from app.models.email_verification import EmailVerification
 
 from app.schemas.base import BaseResponse
-from app.models.utils.email_service import EmailService
+from app.utils.email_service import EmailService
 from app.core.deps import get_session
 import logging
 

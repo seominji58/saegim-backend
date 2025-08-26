@@ -1,0 +1,10 @@
+[33m3129acf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m "하드코딩된 개인정보 제거"
+[33ma56b572[m Merge branch 'develop' of https://github.com/aicc6/saegim-backend into develop/smj
+[33mdf802a6[m "feat: 계정 복구 기능 구현 (이메일 인증 코드 방식),삭제된 계정 복구 기능 추가"
+[33me52b87a[m test: FCM 서비스 테스트에서 SQLAlchemy 2.0 패턴 적용 및 Mock 개선
+[33m3457316[m Merge branch 'develop' into feature/sy
+[33mfd3b96e[m feat: 정적 파일 서빙 기능 추가 및 샘플 이미지 생성 로직 구현
+[33m9c206c6[m feat: 알림 설정 및 토큰 관련 테스트 수정
+[33maf58ff4[m feat: FCMService를 NotificationService로 변경하여 테스트 코드 수정
+[33m0131cfe[m ai 생성 및 db 저장
+[33m1b6164d[m feat: 이메일 발송 테스트 스크립트 위치 변경
