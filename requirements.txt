@@ -55,3 +55,6 @@ psutil==5.9.6
 # 모니터링 및 로깅
 prometheus-fastapi-instrumentator==6.1.0
 python-json-logger==2.0.7
+
+# AI 관련
+openai==1.68.0

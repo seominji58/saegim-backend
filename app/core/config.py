@@ -101,6 +101,10 @@ class Settings(BaseSettings):
         "SENDGRID_FROM_EMAIL", ""
     )
 
+    # OpenAI 설정
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_default_model: str = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5")
+
     # 쿠키 설정
     cookie_domain: str = os.getenv("COOKIE_DOMAIN", "localhost")
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
