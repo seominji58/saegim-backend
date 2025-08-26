@@ -421,7 +421,12 @@ class TestMinIOUploader:
         test_image = PILImage.new('RGB', (300, 300), color='blue')
         img_buffer = io.BytesIO()
         test_image.save(img_buffer, format='JPEG')
-        sample_image_file.read = lambda: img_buffer.getvalue()
+        
+        # async read 메서드로 수정
+        async def async_read():
+            return img_buffer.getvalue()
+        
+        sample_image_file.read = async_read
 
         with (
             patch.object(

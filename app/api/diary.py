@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, UploadFile, File
 from sqlmodel import Session, select
 from datetime import date
 import uuid
@@ -15,7 +15,6 @@ from app.schemas.base import BaseResponse
 from app.services.diary import DiaryService
 from app.utils.minio_upload import upload_image_with_thumbnail_to_minio, get_minio_uploader
 from app.models.image import Image
-from app.models.diary import DiaryEntry
 
 router = APIRouter()
 
@@ -189,8 +188,8 @@ async def upload_diary_image(
         )
 
     try:
-        # MinIO에 이미지와 썸네일 업로드
-        file_id, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(image)
+        # MinIO에 이미지와 썸네일 업로드  
+        _, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(image)
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
@@ -423,4 +422,6 @@ async def update_diary(
         data=DiaryResponse.from_orm(updated_diary),
         message="다이어리 수정 성공"
     )
+
+
 

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "")
     minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "")
     minio_secure: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
-    minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim-images")
+    minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
     allowed_hosts: Union[List[str], str] = os.getenv(
