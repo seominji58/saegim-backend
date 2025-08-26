@@ -300,6 +300,22 @@ class NotificationService:
                     message="전송할 활성 토큰이 없습니다.",
                 )
 
+            # notification 테이블에 알림 생성 (사용자별로 하나씩)
+            from app.models.notification import Notification
+            created_notifications = {}
+            
+            for user_id in notification_data.user_ids:
+                notification = Notification(
+                    user_id=user_id,
+                    type=notification_data.notification_type,
+                    title=notification_data.title,
+                    message=notification_data.body,
+                    data=notification_data.data,
+                )
+                session.add(notification)
+                session.flush()  # ID를 얻기 위해 flush
+                created_notifications[user_id] = notification.id
+
             # 각 토큰에 대해 알림 전송
             for token_model in all_tokens:
                 try:
@@ -329,9 +345,8 @@ class NotificationService:
                     # 알림 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        notification_id=created_notifications.get(str(token_model.user_id)),
                         fcm_token_id=token_model.id,
-                        title=notification_data.title,
-                        body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status=status_value,
                         data_payload={
@@ -340,6 +355,8 @@ class NotificationService:
                             "success": result["success"],
                             "error_type": result.get("error_type"),
                             "fcm_response": result.get("response"),
+                            "title": notification_data.title,  # data_payload에 저장
+                            "body": notification_data.body,  # data_payload에 저장
                         },
                         sent_at=datetime.now(timezone.utc)
                         if result["success"]
@@ -361,13 +378,16 @@ class NotificationService:
                     # 실패 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
+                        notification_id=created_notifications.get(str(token_model.user_id)),
                         fcm_token_id=token_model.id,
-                        title=notification_data.title,
-                        body=notification_data.body,
                         notification_type=notification_data.notification_type,
                         status="failed",
                         error_message=str(e),
-                        data_payload={"token": token_model.token[:10] + "..."},
+                        data_payload={
+                            "token": token_model.token[:10] + "...",
+                            "title": notification_data.title,  # data_payload에 저장
+                            "body": notification_data.body,  # data_payload에 저장
+                        },
                     )
                     session.add(history)
 
@@ -505,6 +525,7 @@ class NotificationService:
                     NotificationHistory.opened_at,
                     NotificationHistory.created_at,
                     NotificationHistory.error_message,
+                    NotificationHistory.data_payload,  # data_payload에서 title, body 가져오기
                     Notification.title,
                     Notification.message,
                     Notification.is_read,
@@ -534,8 +555,9 @@ class NotificationService:
                     opened_at=result.opened_at,
                     created_at=result.created_at,
                     error_message=result.error_message,
-                    title=result.title,
-                    message=result.message,
+                    # notification이 있으면 그것을 우선 사용, 없으면 data_payload에서 가져오기
+                    title=result.title or (result.data_payload.get("title") if result.data_payload else None),
+                    message=result.message or (result.data_payload.get("body") if result.data_payload else None),
                     is_read=result.is_read,
                 )
                 for result in results
