@@ -88,7 +88,34 @@ class EmailService:
             url = "https://api.sendgrid.com/v3/mail/send"
             
             # 이메일 타입에 따른 제목과 내용
-            if email_type == "email_change":
+            if email_type == "restore":
+                subject = "[Saegim] 계정 복구 인증"
+                html_content = f"""
+                <html>
+                <body>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #5C8D89;">Saegim 계정 복구 인증</h2>
+                        <p>안녕하세요! Saegim 서비스의 계정 복구 요청이 있었습니다.</p>
+                        <p>아래 인증 코드를 입력하여 계정 복구를 완료해주세요.</p>
+                        
+                        <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
+                            <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
+                        </div>
+                        
+                        <p><strong>이 인증 코드는 10분 후에 만료됩니다.</strong></p>
+                        
+                        <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
+                        
+                        <hr style="margin: 30px 0;">
+                        <p style="color: #666; font-size: 12px;">
+                            이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                            문의사항이 있으시면 고객센터에 연락해주세요.
+                        </p>
+                    </div>
+                </body>
+                </html>
+                """
+            elif email_type == "email_change":
                 subject = "[Saegim] 이메일 변경 인증"
                 html_content = f"""
                 <html>
@@ -220,7 +247,7 @@ class EmailService:
             # 이메일 메시지 생성
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = self.from_email
+            msg['From'] = self.smtp_username
             msg['To'] = to_email
             
             # HTML 내용 추가
@@ -440,7 +467,7 @@ class EmailService:
             # 이메일 메시지 생성
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = self.from_email
+            msg['From'] = self.smtp_username
             msg['To'] = to_email
             
             # HTML 내용 추가
@@ -852,3 +879,5 @@ class EmailService:
         except Exception as e:
             logger.error(f"SMTP social error email sending failed: {e}")
             return False
+
+

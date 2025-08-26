@@ -10,7 +10,7 @@ import uuid
 from app.db.database import get_session
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryUpdateRequest
+from app.schemas.diary import DiaryResponse, DiaryListResponse, DiaryCreateRequest, DiaryUpdateRequest
 from app.schemas.base import BaseResponse
 from app.services.diary import DiaryService
 from app.utils.minio_upload import upload_image_to_minio
@@ -343,6 +343,26 @@ async def get_diary_images(
     return BaseResponse(
         data=image_list,
         message=f"다이어리 이미지 조회 성공 (총 {len(image_list)}개)"
+    )
+
+
+@router.post("", response_model=BaseResponse[DiaryResponse])
+async def create_diary(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    diary_create: DiaryCreateRequest,
+) -> BaseResponse[DiaryResponse]:
+    """JWT 인증된 사용자의 다이어리 생성"""
+
+    diary_service = DiaryService(session)
+
+    # diary_id 변수 제거하고 diary_create와 current_user.id만 전달
+    created_diary = diary_service.create_diary(diary_create, current_user.id)
+
+    return BaseResponse(
+        data=DiaryResponse.from_orm(created_diary),
+        message="다이어리 생성 성공"
     )
 
 

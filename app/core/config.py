@@ -44,8 +44,8 @@ class Settings(BaseSettings):
 
     # MinIO 설정
     minio_endpoint: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-    minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "")
+    minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "")
     minio_secure: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
     minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim-images")
 
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # SendGrid 설정
     sendgrid_api_key: str = os.getenv("SENDGRID_API_KEY", "")
     sendgrid_from_email: str = os.getenv(
-        "SENDGRID_FROM_EMAIL", "alswlalalswl58@naver.com"
+        "SENDGRID_FROM_EMAIL", ""
     )
 
     # 쿠키 설정
