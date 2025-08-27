@@ -4,7 +4,6 @@ AI 텍스트 생성 서비스 (OpenAI API 사용)
 
 import json
 import logging
-import re
 import time
 import uuid
 from enum import Enum
@@ -313,9 +312,9 @@ class AIService:
             }
 
             length_info = {
-                "short": {"name": "단문", "desc": "1-2문장"},
-                "medium": {"name": "중문", "desc": "3-5문장"},
-                "long": {"name": "장문", "desc": "6-10문장"},
+                "short": {"name": "단문", "desc": "1-2문장, 최대 50자 이내"},
+                "medium": {"name": "중문", "desc": "3-5문장, 최대 150자 이내"},
+                "long": {"name": "장문", "desc": "6-10문장, 최대 300자 이내"},
             }
 
             style_guide = style_info.get(
@@ -334,9 +333,10 @@ class AIService:
 
 3. 글귀 생성:
    - 문체: {style_guide["name"]} ({style_guide["desc"]})
-   - 길이: {length_guide["name"]} ({length_guide["desc"]})
+   - 길이: {length_guide["name"]} ({length_guide["desc"]}) - 반드시 이 길이를 지켜주세요
    - 따뜻하고 위로가 되는 톤
    - 분석된 감정과 키워드를 자연스럽게 반영
+   - 중요: 글귀는 반드시 요청된 길이 제한 내에서 생성해야 합니다
 
 응답 형식 (JSON):
 {{
@@ -372,62 +372,43 @@ JSON 형식으로만 답해주세요."""
 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON 파싱 실패: {result_json}, 오류: {str(e)}")
-                # 파싱 실패 시 fallback 처리
-                return await self._fallback_analysis(prompt, style, length)
+                # 파싱 실패 시 예외 발생
+                raise AIGenerationFailedException(
+                    detail=f"AI 응답 파싱 실패: {str(e)}",
+                    error_type="PARSING_ERROR",
+                )
 
         except Exception as e:
             logger.error(f"통합 AI 분석 실패: {str(e)}")
 
-            # OpenAI API 관련 예외 타입별 처리
+            # OpenAI API 관련 예외 타입별 처리 및 예외 발생
             error_str = str(e).lower()
 
             if "rate limit" in error_str or "quota" in error_str:
                 # API 호출 한도 초과
-                logger.warning(f"OpenAI API 호출 한도 초과, fallback 사용: {str(e)}")
+                logger.error(f"OpenAI API 호출 한도 초과: {str(e)}")
+                raise AIGenerationFailedException(
+                    detail="OpenAI API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.",
+                    error_type="RATE_LIMIT_ERROR",
+                )
             elif "service unavailable" in error_str or "timeout" in error_str:
                 # 서비스 일시적 불가
-                logger.warning(f"OpenAI 서비스 일시적 불가, fallback 사용: {str(e)}")
+                logger.error(f"OpenAI 서비스 일시적 불가: {str(e)}")
+                raise AIGenerationFailedException(
+                    detail="AI 서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
+                    error_type="SERVICE_UNAVAILABLE",
+                )
             elif "token" in error_str and "limit" in error_str:
                 # 토큰 한도 초과
-                logger.warning(f"토큰 한도 초과, fallback 사용: {str(e)}")
+                logger.error(f"토큰 한도 초과: {str(e)}")
+                raise AIGenerationFailedException(
+                    detail="입력 텍스트가 너무 깁니다. 더 짧은 내용으로 다시 시도해주세요.",
+                    error_type="TOKEN_LIMIT_ERROR",
+                )
             else:
                 # 기타 AI 생성 오류
-                logger.warning(f"AI 생성 오류, fallback 사용: {str(e)}")
-
-            return await self._fallback_analysis(prompt, style, length)
-
-    async def _fallback_analysis(
-        self, prompt: str, style: str, length: str
-    ) -> Dict[str, Any]:
-        """API 호출 실패 시 대체 분석"""
-        # 스타일별 문체 적용
-        style_prefix = {
-            "poem": "시처럼 부드럽게 흘러가는",
-            "short_story": "이야기처럼 따뜻한",
-        }
-
-        prefix = style_prefix.get(style, "")
-
-        # 길이별 기본 응답 생성
-        length_mapping = {
-            "short": f"{prefix} {prompt[:10]}...에 대한 생각이 마음을 따뜻하게 합니다.".strip(),
-            "medium": f"오늘의 하루를 돌아보며, {prefix} {prompt[:20]}...에 대한 생각이 마음을 따뜻하게 합니다. 이런 순간들이 소중합니다.".strip(),
-            "long": f"오늘의 하루를 돌아보며, {prefix} {prompt[:20]}...에 대한 생각이 마음을 따뜻하게 합니다. 이런 순간들이 소중하며, 우리의 일상 속에서 찾아가는 작은 행복들이 모여 큰 의미를 만들어갑니다.".strip(),
-        }
-
-        return {
-            "emotion": "평온",
-            "keywords": self._extract_keywords_fallback(prompt),
-            "generated_text": length_mapping.get(length, length_mapping["medium"]),
-            "confidence": 0.5,
-            "tokens_used": 0,
-        }
-
-    def _extract_keywords_fallback(self, prompt: str) -> list:
-        """기본 키워드 추출 (AI 분석 실패시 사용)"""
-        # 쉼표, 공백으로 분리하고 2글자 이상만 필터링
-        words = re.split(r"[,\s]+", prompt)
-        keywords = [word.strip() for word in words if len(word.strip()) >= 2]
-
-        # 상위 5개 키워드 반환
-        return keywords[:5]
+                logger.error(f"AI 생성 오류: {str(e)}")
+                raise AIGenerationFailedException(
+                    detail=f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
+                    error_type="GENERATION_ERROR",
+                )
