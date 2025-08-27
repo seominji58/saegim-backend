@@ -2,23 +2,26 @@
 AI 텍스트 생성 서비스 (OpenAI API 사용)
 """
 
-import time
-from typing import Dict, Any, Optional, Tuple
-import logging
-from sqlalchemy import select, func
-from app.schemas.create_diary import CreateDiaryRequest
-from app.models.ai_usage_log import AIUsageLog
-from app.utils.openai_utils import get_openai_client
-from app.exceptions.ai import (
-    RegenerationLimitExceededException,
-    AIGenerationFailedException,
-    SessionNotFoundException,
-    InvalidRequestException,
-)
-import uuid
 import json
+import logging
 import re
+import time
+import uuid
 from enum import Enum
+from typing import Any, Dict
+
+from sqlalchemy import func, select
+
+from app.exceptions.ai import (
+    AIGenerationFailedException,
+    InvalidRequestException,
+    RegenerationLimitExceededException,
+    SessionNotFoundException,
+)
+from app.models.ai_usage_log import AIUsageLog
+from app.schemas.create_diary import CreateDiaryRequest
+from app.services.notification_service import NotificationService
+from app.utils.openai_utils import get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +63,7 @@ class AIService:
         try:
             logger.info(f"AI 텍스트 생성 시작: {data.prompt[:50]}...")
 
+            start_time = time.time()
             # 통합된 AI 분석 및 글귀 생성 (한 번의 API 호출)
             ai_result = await self._generate_complete_analysis(
                 data.prompt, data.style, data.length
@@ -78,7 +82,9 @@ class AIService:
                 "tokens_used": ai_result["tokens_used"],
             }
 
-            # 세션 ID 처리 및 재생성 카운트 계산
+            # 재생성 시 session_id 을 같이 전달 받음
+            # openai 요청 생성(최초 요청은 session_id 생성 및 regeneration_count 1)
+            logger.info(f"data.session_id: {data.session_id}")
             session_id = data.session_id or str(uuid.uuid4())
             logger.info(f"세션 ID: {session_id}")
 
@@ -101,7 +107,7 @@ class AIService:
                 )
 
             # 통합 AI 분석 로그 저장 (감정분석 + 키워드추출 + 글귀생성)
-            integrated_log = AIUsageLog(
+            ai_usage_log = AIUsageLog(
                 user_id=user_id,
                 api_type="integrated_analysis",  # 새로운 통합 분석 타입
                 session_id=session_id,
@@ -117,13 +123,43 @@ class AIService:
                 tokens_used=ai_response.get("tokens_used", 0),
                 regeneration_count=regeneration_count,
             )
-            self.db.add(integrated_log)
+            self.db.add(ai_usage_log)
 
             # 데이터베이스 커밋
             self.db.commit()
             logger.info(
-                f"통합 AI 분석 로그 저장 완료 - ID: {integrated_log.id}, 토큰 사용량: {ai_response.get('tokens_used', 0)}"
+                f"통합 AI 분석 로그 저장 완료 - ID: {ai_usage_log.id}, 토큰 사용량: {ai_response.get('tokens_used', 0)}"
             )
+
+            # 처리 시간 계산 및 조건부 알림 발송
+            processing_time = time.time() - start_time
+            NOTIFICATION_THRESHOLD_SECONDS = 3.0  # 3초 이상 걸린 경우에만 알림 발송
+
+            if processing_time >= NOTIFICATION_THRESHOLD_SECONDS:
+                logger.info(
+                    f"AI 텍스트 생성 시간이 {processing_time:.2f}초로 임계값({NOTIFICATION_THRESHOLD_SECONDS}초) 초과, 알림 발송"
+                )
+                try:
+                    notification_result = (
+                        await NotificationService.send_ai_content_ready(
+                            user_id, session_id, self.db
+                        )
+                    )
+                    if notification_result.success_count > 0:
+                        logger.info(
+                            f"AI 텍스트 생성 후 콘텐츠 완료 알림 발송 성공: session_id={session_id}, user_id={user_id}, 처리시간={processing_time:.2f}초"
+                        )
+                    else:
+                        logger.warning(
+                            f"AI 텍스트 생성 후 콘텐츠 완료 알림 발송 실패: session_id={session_id}, user_id={user_id}"
+                        )
+                except Exception as e:
+                    # 알림 발송 실패가 AI 텍스트 생성을 방해하지 않도록 함
+                    logger.error(
+                        f"AI 텍스트 생성 후 콘텐츠 완료 알림 발송 중 오류: session_id={session_id}, user_id={user_id}, error={str(e)}"
+                    )
+            else:
+                logger.info(f"AI 텍스트 생성 시간이 {processing_time:.2f}초로 빠름, 알림 발송 생략")
 
             # 실제 프론트에 필요한 응답 생성
             result = {
@@ -143,7 +179,6 @@ class AIService:
             }
             # 응답
             return result
-
         except RegenerationLimitExceededException:
             # 재생성 제한 예외는 그대로 전파
             raise

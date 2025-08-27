@@ -12,6 +12,7 @@ from pathlib import Path
 from minio import Minio
 from minio.error import S3Error
 from fastapi import HTTPException, UploadFile, status
+from PIL import Image
 
 from app.core.config import get_settings
 
@@ -142,6 +143,102 @@ class MinIOUploader:
         """
         return self._generate_image_url(object_key)
 
+    def _create_thumbnail(self, image_data: bytes, size: Tuple[int, int] = (150, 150), quality: int = 85) -> bytes:
+        """
+        이미지 데이터로부터 썸네일 생성
+
+        Args:
+            image_data: 원본 이미지 데이터
+            size: 썸네일 크기 (기본값: 150x150)
+            quality: JPEG 품질 (기본값: 85)
+
+        Returns:
+            bytes: 썸네일 이미지 데이터
+        """
+        try:
+            # 이미지 열기
+            with Image.open(io.BytesIO(image_data)) as img:
+                # RGB 모드로 변환 (RGBA 등 다른 모드 지원)
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                
+                # 원본 비율 유지하면서 리사이즈
+                img.thumbnail(size, Image.Resampling.LANCZOS)
+                
+                # 썸네일 데이터를 BytesIO로 저장
+                thumbnail_buffer = io.BytesIO()
+                img.save(thumbnail_buffer, 'JPEG', quality=quality, optimize=True)
+                thumbnail_buffer.seek(0)
+                
+                return thumbnail_buffer.getvalue()
+                
+        except Exception as e:
+            logger.error(f"썸네일 생성 실패: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"썸네일 생성 중 오류가 발생했습니다: {str(e)}",
+            )
+
+    async def upload_image_with_thumbnail(self, file: UploadFile, thumbnail_size: Tuple[int, int] = (150, 150)) -> Tuple[str, str, str]:
+        """
+        이미지를 MinIO에 업로드하고 썸네일도 생성하여 업로드
+
+        Args:
+            file: 업로드할 파일 객체
+            thumbnail_size: 썸네일 크기 (기본값: 150x150)
+
+        Returns:
+            Tuple[str, str, str]: (파일 ID, 원본 이미지 URL, 썸네일 URL)
+        """
+        try:
+            # 파일 검증
+            self._validate_file(file)
+
+            # 파일 읽기
+            file_content = await file.read()
+
+            # 고유 파일 ID 생성
+            file_id = str(uuid.uuid4())
+
+            # 객체 키 생성
+            original_object_key = self._generate_object_key(file_id, file.filename)
+            thumbnail_object_key = self._generate_thumbnail_object_key(file_id, file.filename)
+
+            # 원본 이미지 업로드
+            self.client.put_object(
+                bucket_name=self.bucket_name,
+                object_name=original_object_key,
+                data=io.BytesIO(file_content),
+                length=len(file_content),
+                content_type=file.content_type,
+            )
+
+            # 썸네일 생성 및 업로드
+            thumbnail_data = self._create_thumbnail(file_content, thumbnail_size)
+            self.client.put_object(
+                bucket_name=self.bucket_name,
+                object_name=thumbnail_object_key,
+                data=io.BytesIO(thumbnail_data),
+                length=len(thumbnail_data),
+                content_type="image/jpeg",
+            )
+
+            # URL 생성
+            original_url = self._generate_image_url(original_object_key)
+            thumbnail_url = self._generate_image_url(thumbnail_object_key)
+
+            logger.info(f"이미지 및 썸네일 업로드 성공: {file.filename} -> {original_object_key}, {thumbnail_object_key}")
+            return file_id, original_url, thumbnail_url
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"이미지 및 썸네일 업로드 실패: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"이미지 및 썸네일 업로드 중 오류가 발생했습니다: {str(e)}",
+            )
+
     def _validate_file(self, file: UploadFile) -> None:
         """파일 검증"""
         # 파일 크기 확인 (최대 15MB)
@@ -171,6 +268,12 @@ class MinIOUploader:
         file_extension = Path(original_filename).suffix.lower()
         timestamp = datetime.now().strftime("%Y/%m/%d")
         return f"images/{timestamp}/{file_id}{file_extension}"
+
+    def _generate_thumbnail_object_key(self, file_id: str, original_filename: str) -> str:
+        """썸네일용 객체 키 생성"""
+        file_extension = Path(original_filename).suffix.lower()
+        timestamp = datetime.now().strftime("%Y/%m/%d")
+        return f"thumbnails/{timestamp}/{file_id}_thumb.jpg"
 
     def _generate_image_url(self, object_key: str) -> str:
         """이미지 URL 생성"""
@@ -204,6 +307,21 @@ async def upload_image_to_minio(file: UploadFile) -> Tuple[str, str]:
     """
     uploader = get_minio_uploader()
     return await uploader.upload_image(file)
+
+
+async def upload_image_with_thumbnail_to_minio(file: UploadFile, thumbnail_size: Tuple[int, int] = (150, 150)) -> Tuple[str, str, str]:
+    """
+    이미지와 썸네일을 MinIO에 업로드하는 편의 함수
+
+    Args:
+        file: 업로드할 파일 객체
+        thumbnail_size: 썸네일 크기 (기본값: 150x150)
+
+    Returns:
+        Tuple[str, str, str]: (파일 ID, 원본 이미지 URL, 썸네일 URL)
+    """
+    uploader = get_minio_uploader()
+    return await uploader.upload_image_with_thumbnail(file, thumbnail_size)
 
 
 def delete_image_from_minio(object_key: str) -> bool:

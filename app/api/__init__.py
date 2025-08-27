@@ -17,10 +17,12 @@ from app.api.auth.restore import router as restore_router
 from app.api.admin.cleanup import router as cleanup_router
 from app.api.diary import router as diary_router
 from app.api.notification import router as notification_router
+from app.api.public import router as public_router
 
 router = APIRouter()
 
 router.include_router(health_router)
+router.include_router(public_router, prefix="/api/public", tags=["public"])
 router.include_router(diary_router, prefix="/api/diary")
 router.include_router(
     notification_router, prefix="/api/notifications"

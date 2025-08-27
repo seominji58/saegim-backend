@@ -135,11 +135,11 @@ def create_sample_images(session: Session, diaries: list):
     if diaries:
         first_diary = diaries[0]
         
-        # 샘플 이미지 데이터
+        # 샘플 이미지 데이터 (MinIO URL 사용)
         sample_image = Image(
             diary_id=first_diary.id,
-            file_path="/uploads/images/happy1.jpg",
-            thumbnail_path="/uploads/thumbnails/happy1_thumb.jpg",
+            file_path="https://storage.seongjunlee.dev/saegim/images/sample/happy1.jpg",
+            thumbnail_path="https://storage.seongjunlee.dev/saegim/thumbnails/sample/happy1_thumb.jpg", 
             mime_type="image/jpeg",
             file_size=1024000,
             exif_removed=True

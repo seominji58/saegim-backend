@@ -1,10 +1,12 @@
 """애플리케이션 설정"""
-from typing import List, Union, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
-from functools import lru_cache
-import secrets
+
 import os
+import secrets
+from functools import lru_cache
+from typing import List, Union
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -47,7 +49,7 @@ class Settings(BaseSettings):
     minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "")
     minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "")
     minio_secure: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
-    minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim-images")
+    minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
     allowed_hosts: Union[List[str], str] = os.getenv(
@@ -97,9 +99,7 @@ class Settings(BaseSettings):
 
     # SendGrid 설정
     sendgrid_api_key: str = os.getenv("SENDGRID_API_KEY", "")
-    sendgrid_from_email: str = os.getenv(
-        "SENDGRID_FROM_EMAIL", ""
-    )
+    sendgrid_from_email: str = os.getenv("SENDGRID_FROM_EMAIL", "")
 
     # OpenAI 설정
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

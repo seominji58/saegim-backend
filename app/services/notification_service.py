@@ -3,25 +3,26 @@
 FCM 디바이스 토큰 관리, 푸시 알림 전송 및 인앱 알림 통합 관리
 """
 
-from typing import List, Dict
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, desc
-from app.utils.fcm_push import get_fcm_service
 import logging
+from datetime import datetime, timezone
+from typing import List
 
-from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
+from fastapi import HTTPException, status
+from sqlalchemy import and_, desc, select
+from sqlalchemy.orm import Session
+
 from app.models.diary import DiaryEntry
+from app.models.fcm import FCMToken, NotificationHistory, NotificationSettings
 from app.schemas.notification import (
     FCMTokenRegisterRequest,
     FCMTokenResponse,
-    NotificationSettingsUpdate,
-    NotificationSettingsResponse,
+    NotificationHistoryResponse,
     NotificationSendRequest,
     NotificationSendResponse,
-    NotificationHistoryResponse,
+    NotificationSettingsResponse,
+    NotificationSettingsUpdate,
 )
+from app.utils.fcm_push import get_fcm_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,8 @@ class NotificationService:
         user_id: str, token_data: FCMTokenRegisterRequest, session: Session
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
-        from sqlalchemy.dialects.postgresql import insert
         from psycopg2.errors import UniqueViolation
+        from sqlalchemy.dialects.postgresql import insert
 
         try:
             # PostgreSQL UPSERT를 사용하여 동시성 이슈 해결
@@ -192,6 +193,10 @@ class NotificationService:
                 ai_content_ready=settings.ai_processing_enabled,
                 weekly_report=settings.report_notification_enabled,
                 marketing=settings.browser_push_enabled,
+                # 다이어리 리마인더 상세 설정 추가
+                diary_reminder_time=settings.diary_reminder_time,
+                diary_reminder_days=settings.diary_reminder_days or [],
+                # 기존 필드 (하위 호환성)
                 quiet_hours_start=settings.diary_reminder_time,
                 quiet_hours_end=settings.diary_reminder_time,
             )
@@ -250,6 +255,10 @@ class NotificationService:
                 ai_content_ready=settings.ai_processing_enabled,
                 weekly_report=settings.report_notification_enabled,
                 marketing=settings.browser_push_enabled,
+                # 다이어리 리마인더 상세 설정 추가
+                diary_reminder_time=settings.diary_reminder_time,
+                diary_reminder_days=settings.diary_reminder_days or [],
+                # 기존 필드 (하위 호환성)
                 quiet_hours_start=settings.diary_reminder_time,
                 quiet_hours_end=settings.diary_reminder_time,
             )
@@ -302,8 +311,9 @@ class NotificationService:
 
             # notification 테이블에 알림 생성 (사용자별로 하나씩)
             from app.models.notification import Notification
+
             created_notifications = {}
-            
+
             for user_id in notification_data.user_ids:
                 notification = Notification(
                     user_id=user_id,
@@ -345,13 +355,14 @@ class NotificationService:
                     # 알림 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
-                        notification_id=created_notifications.get(str(token_model.user_id)),
+                        notification_id=created_notifications.get(
+                            str(token_model.user_id)
+                        ),
                         fcm_token_id=token_model.id,
                         notification_type=notification_data.notification_type,
                         status=status_value,
                         data_payload={
-                            "token": token_model.token[:10]
-                            + "...",  # 보안을 위해 일부만 저장
+                            "token": token_model.token[:10] + "...",  # 보안을 위해 일부만 저장
                             "success": result["success"],
                             "error_type": result.get("error_type"),
                             "fcm_response": result.get("response"),
@@ -361,11 +372,15 @@ class NotificationService:
                         sent_at=datetime.now(timezone.utc)
                         if result["success"]
                         else None,
-                        error_message=result.get("response", {})
-                        .get("error", {})
-                        .get("message")
-                        if not result["success"]
-                        else None,
+                        error_message=(
+                            str(result.get("response", {}).get("error", {}).get("message", ""))  # type: ignore[attr-defined]
+                            if (
+                                not result["success"]
+                                and isinstance(result, dict)
+                                and isinstance(result.get("response"), dict)
+                            )
+                            else None
+                        ),
                     )
                     session.add(history)
 
@@ -378,7 +393,9 @@ class NotificationService:
                     # 실패 기록 저장
                     history = NotificationHistory(
                         user_id=token_model.user_id,
-                        notification_id=created_notifications.get(str(token_model.user_id)),
+                        notification_id=created_notifications.get(
+                            str(token_model.user_id)
+                        ),
                         fcm_token_id=token_model.id,
                         notification_type=notification_data.notification_type,
                         status="failed",
@@ -556,8 +573,16 @@ class NotificationService:
                     created_at=result.created_at,
                     error_message=result.error_message,
                     # notification이 있으면 그것을 우선 사용, 없으면 data_payload에서 가져오기
-                    title=result.title or (result.data_payload.get("title") if result.data_payload else None),
-                    message=result.message or (result.data_payload.get("body") if result.data_payload else None),
+                    title=result.title
+                    or (
+                        result.data_payload.get("title")
+                        if result.data_payload
+                        else None
+                    ),
+                    message=result.message
+                    or (
+                        result.data_payload.get("body") if result.data_payload else None
+                    ),
                     is_read=result.is_read,
                 )
                 for result in results
@@ -601,17 +626,13 @@ class NotificationService:
                         not result["success"]
                         and result.get("error_type") == "UNREGISTERED"
                     ):
-                        logger.info(
-                            f"무효한 토큰 비활성화: {token_model.token[:10]}..."
-                        )
+                        logger.info(f"무효한 토큰 비활성화: {token_model.token[:10]}...")
                         token_model.is_active = False
                         token_model.updated_at = datetime.now(timezone.utc)
                         cleanup_count += 1
 
                 except Exception as e:
-                    logger.error(
-                        f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}"
-                    )
+                    logger.error(f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}")
                     continue
 
             session.commit()

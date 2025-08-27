@@ -31,7 +31,27 @@
 pip install -r requirements.txt
 ```
 
-### 2. 환경 설정
+### 2. 개발 도구 설정 (코드 품질 관리)
+
+프로젝트는 자동 포맷팅과 코드 품질 검사를 위해 pre-commit을 사용합니다:
+
+```bash
+# pre-commit hook 설치 (커밋 시 자동 포맷팅/린트)
+pre-commit install
+
+# 기존 모든 파일에 포맷팅 적용 (최초 1회)
+pre-commit run --all-files
+```
+
+**포함된 도구들:**
+- **Black**: Python 코드 자동 포맷팅
+- **isort**: import 구문 자동 정렬
+- **flake8**: 코드 품질 검사 (PEP8 준수)
+- **mypy**: 타입 힌트 검증 (선택사항)
+
+이제 커밋할 때마다 변경된 Python 파일이 자동으로 포맷팅되고 코드 품질이 검사됩니다.
+
+### 3. 환경 설정
 
 프로젝트 루트에 `.env` 파일을 생성하고 다음 환경변수들을 설정하세요:
 
@@ -67,7 +87,7 @@ SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ```
 
-### 3. 데이터베이스 초기화
+### 4. 데이터베이스 초기화
 
 ```bash
 python -m app.db.init_db
@@ -79,7 +99,7 @@ python -m app.db.init_db
 -   샘플 사용자 생성
 -   샘플 다이어리 데이터 생성
 
-### 4. 한글 인코딩 설정 (Windows 환경)
+### 5. 한글 인코딩 설정 (Windows 환경)
 
 Windows 환경에서 한글 로그와 응답이 깨지는 문제를 해결하기 위해 다음 방법 중 하나를 사용하세요:
 
@@ -111,7 +131,7 @@ $env:PYTHONLEGACYWINDOWSSTDIO="utf-8"
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. 이메일 서비스 설정 (선택사항)
+### 6. 이메일 서비스 설정 (선택사항)
 
 #### SendGrid 설정 (추천 - 무료)
 
@@ -140,7 +160,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 **참고**: 이메일 설정이 없어도 회원가입 기능은 정상 작동하지만, 이메일 인증과 환영 이메일이 발송되지 않습니다.
 
-### 6. 서버 실행
+### 7. 서버 실행
 
 #### Windows 환경 (한글 인코딩 지원)
 ```bash
@@ -161,7 +181,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 7. API 문서 확인
+### 8. API 문서 확인
 
 브라우저에서 다음 URL을 열어 API 문서를 확인할 수 있습니다:
 
