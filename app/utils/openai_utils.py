@@ -29,7 +29,7 @@ class OpenAIConfig:
         base_url: Optional[str] = None,
         timeout: float = 60.0,
         max_retries: int = 3,
-        default_model: str = "gpt-5",
+        default_model: str = "gpt-4o-mini",
         temperature: float = 1.0,
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")

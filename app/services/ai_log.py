@@ -353,7 +353,7 @@ JSON 형식으로만 답해주세요."""
             ]
 
             response = await client.async_chat_completion(
-                messages=messages, temperature=0.7, max_completion_tokens=500
+                messages=messages, max_completion_tokens=500
             )
             logger.info(f"OpenAI API 응답: {response}")
 
