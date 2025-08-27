@@ -30,7 +30,7 @@ class OpenAIConfig:
         timeout: float = 60.0,
         max_retries: int = 3,
         default_model: str = "gpt-5",
-        temperature: float = 0.7,
+        temperature: float = 1.0,
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.base_url = base_url
@@ -83,14 +83,23 @@ class OpenAIClient:
             API 응답 데이터
         """
         try:
-            response: ChatCompletion = self.client.chat.completions.create(
-                model=model or self.config.default_model,
-                messages=messages,
-                temperature=temperature
-                if temperature is not None
-                else self.config.temperature,
-                max_completion_tokens=max_completion_tokens,
+            # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
+            create_params = {
+                "model": model or self.config.default_model,
+                "messages": messages,
+                "max_completion_tokens": max_completion_tokens,
                 **kwargs,
+            }
+
+            # temperature 파라미터 처리 (gpt-5는 기본값 1만 지원)
+            target_temp = (
+                temperature if temperature is not None else self.config.temperature
+            )
+            if target_temp != 1.0:  # 기본값이 아닐 때만 추가
+                create_params["temperature"] = target_temp
+
+            response: ChatCompletion = self.client.chat.completions.create(
+                **create_params
             )
 
             return {
@@ -144,15 +153,22 @@ class OpenAIClient:
         비동기 채팅 완성 API 호출
         """
         try:
-            response = await self.async_client.chat.completions.create(
-                model=model or self.config.default_model,
-                messages=messages,
-                temperature=temperature
-                if temperature is not None
-                else self.config.temperature,
-                max_completion_tokens=max_completion_tokens,
+            # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
+            create_params = {
+                "model": model or self.config.default_model,
+                "messages": messages,
+                "max_completion_tokens": max_completion_tokens,
                 **kwargs,
+            }
+
+            # temperature 파라미터 처리 (gpt-5는 기본값 1만 지원)
+            target_temp = (
+                temperature if temperature is not None else self.config.temperature
             )
+            if target_temp != 1.0:  # 기본값이 아닐 때만 추가
+                create_params["temperature"] = target_temp
+
+            response = await self.async_client.chat.completions.create(**create_params)
 
             return {
                 "id": response.id,
@@ -205,16 +221,23 @@ class OpenAIClient:
         스트리밍 채팅 완성 API 호출
         """
         try:
-            stream = self.client.chat.completions.create(
-                model=model or self.config.default_model,
-                messages=messages,
-                temperature=temperature
-                if temperature is not None
-                else self.config.temperature,
-                max_completion_tokens=max_completion_tokens,
-                stream=True,
+            # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
+            create_params = {
+                "model": model or self.config.default_model,
+                "messages": messages,
+                "max_completion_tokens": max_completion_tokens,
+                "stream": True,
                 **kwargs,
+            }
+
+            # temperature 파라미터 처리 (gpt-5는 기본값 1만 지원)
+            target_temp = (
+                temperature if temperature is not None else self.config.temperature
             )
+            if target_temp != 1.0:  # 기본값이 아닐 때만 추가
+                create_params["temperature"] = target_temp
+
+            stream = self.client.chat.completions.create(**create_params)
 
             for chunk in stream:
                 if (
@@ -255,16 +278,23 @@ class OpenAIClient:
         비동기 스트리밍 채팅 완성 API 호출
         """
         try:
-            stream = await self.async_client.chat.completions.create(
-                model=model or self.config.default_model,
-                messages=messages,
-                temperature=temperature
-                if temperature is not None
-                else self.config.temperature,
-                max_completion_tokens=max_completion_tokens,
-                stream=True,
+            # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
+            create_params = {
+                "model": model or self.config.default_model,
+                "messages": messages,
+                "max_completion_tokens": max_completion_tokens,
+                "stream": True,
                 **kwargs,
+            }
+
+            # temperature 파라미터 처리 (gpt-5는 기본값 1만 지원)
+            target_temp = (
+                temperature if temperature is not None else self.config.temperature
             )
+            if target_temp != 1.0:  # 기본값이 아닐 때만 추가
+                create_params["temperature"] = target_temp
+
+            stream = await self.async_client.chat.completions.create(**create_params)
 
             async for chunk in stream:
                 if (
