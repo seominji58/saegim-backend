@@ -6,8 +6,16 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from openai import AsyncOpenAI, OpenAI
-from openai.types.chat import ChatCompletion
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    OpenAI,
+    RateLimitError,
+)
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +63,7 @@ class OpenAIClient:
 
     def chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[ChatCompletionMessageParam],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_completion_tokens: Optional[int] = None,
@@ -105,13 +113,28 @@ class OpenAIClient:
                 "role": response.choices[0].message.role,
             }
 
+        except RateLimitError as e:
+            logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
+            raise
+        except APITimeoutError as e:
+            logger.error(f"OpenAI API 타임아웃: {str(e)}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"OpenAI API 연결 오류: {str(e)}")
+            raise
+        except APIStatusError as e:
+            logger.error(f"OpenAI API 상태 오류 (HTTP {e.status_code}): {str(e)}")
+            raise
+        except APIError as e:
+            logger.error(f"OpenAI API 오류: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI chat completion 오류: {str(e)}")
+            logger.error(f"OpenAI chat completion 예상치 못한 오류: {str(e)}")
             raise
 
     async def async_chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[ChatCompletionMessageParam],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_completion_tokens: Optional[int] = None,
@@ -151,13 +174,28 @@ class OpenAIClient:
                 "role": response.choices[0].message.role,
             }
 
+        except RateLimitError as e:
+            logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
+            raise
+        except APITimeoutError as e:
+            logger.error(f"OpenAI API 타임아웃: {str(e)}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"OpenAI API 연결 오류: {str(e)}")
+            raise
+        except APIStatusError as e:
+            logger.error(f"OpenAI API 상태 오류 (HTTP {e.status_code}): {str(e)}")
+            raise
+        except APIError as e:
+            logger.error(f"OpenAI API 오류: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI async chat completion 오류: {str(e)}")
+            logger.error(f"OpenAI async chat completion 예상치 못한 오류: {str(e)}")
             raise
 
     def stream_chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[ChatCompletionMessageParam],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_completion_tokens: Optional[int] = None,
@@ -179,16 +217,35 @@ class OpenAIClient:
             )
 
             for chunk in stream:
-                if chunk.choices[0].delta.content:
+                if (
+                    chunk.choices
+                    and len(chunk.choices) > 0
+                    and chunk.choices[0].delta.content is not None
+                ):
                     yield chunk.choices[0].delta.content
 
+        except RateLimitError as e:
+            logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
+            raise
+        except APITimeoutError as e:
+            logger.error(f"OpenAI API 타임아웃: {str(e)}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"OpenAI API 연결 오류: {str(e)}")
+            raise
+        except APIStatusError as e:
+            logger.error(f"OpenAI API 상태 오류 (HTTP {e.status_code}): {str(e)}")
+            raise
+        except APIError as e:
+            logger.error(f"OpenAI API 오류: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI stream chat completion 오류: {str(e)}")
+            logger.error(f"OpenAI stream chat completion 예상치 못한 오류: {str(e)}")
             raise
 
     async def async_stream_chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[ChatCompletionMessageParam],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_completion_tokens: Optional[int] = None,
@@ -210,11 +267,30 @@ class OpenAIClient:
             )
 
             async for chunk in stream:
-                if chunk.choices[0].delta.content:
+                if (
+                    chunk.choices
+                    and len(chunk.choices) > 0
+                    and chunk.choices[0].delta.content is not None
+                ):
                     yield chunk.choices[0].delta.content
 
+        except RateLimitError as e:
+            logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
+            raise
+        except APITimeoutError as e:
+            logger.error(f"OpenAI API 타임아웃: {str(e)}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"OpenAI API 연결 오류: {str(e)}")
+            raise
+        except APIStatusError as e:
+            logger.error(f"OpenAI API 상태 오류 (HTTP {e.status_code}): {str(e)}")
+            raise
+        except APIError as e:
+            logger.error(f"OpenAI API 오류: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"OpenAI async stream chat completion 오류: {str(e)}")
+            logger.error(f"OpenAI async stream chat completion 예상치 못한 오류: {str(e)}")
             raise
 
 
@@ -236,7 +312,7 @@ def simple_chat(
 ) -> str:
     """간단한 채팅 API 호출"""
     client = get_openai_client()
-    messages = [{"role": "user", "content": message}]
+    messages: List[ChatCompletionMessageParam] = [{"role": "user", "content": message}]
     response = client.chat_completion(messages, model=model, temperature=temperature)
     return response["content"]
 
@@ -246,7 +322,7 @@ async def simple_async_chat(
 ) -> str:
     """간단한 비동기 채팅 API 호출"""
     client = get_openai_client()
-    messages = [{"role": "user", "content": message}]
+    messages: List[ChatCompletionMessageParam] = [{"role": "user", "content": message}]
     response = await client.async_chat_completion(
         messages, model=model, temperature=temperature
     )
