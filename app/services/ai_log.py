@@ -4,13 +4,17 @@ AI 텍스트 생성 서비스 (OpenAI API 사용)
 
 import time
 from typing import Dict, Any, Optional, Tuple
-from fastapi import HTTPException
 import logging
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from app.schemas.create_diary import CreateDiaryRequest
 from app.models.ai_usage_log import AIUsageLog
 from app.utils.openai_utils import get_openai_client
+from app.exceptions.ai import (
+    RegenerationLimitExceededException,
+    AIGenerationFailedException,
+    SessionNotFoundException,
+    InvalidRequestException
+)
 import uuid
 import json
 import re
@@ -54,6 +58,9 @@ class AIService:
         try:
             logger.info(f"AI 텍스트 생성 시작: {data.prompt[:50]}...")
             
+            # 요청 데이터 유효성 검사
+            self.validate_request(data)
+            
             # 통합된 AI 분석 및 글귀 생성 (한 번의 API 호출)
             ai_result = await self._generate_complete_analysis(data.prompt, data.style, data.length)
             logger.info("통합 AI 분석 및 글귀 생성 완료")
@@ -82,6 +89,15 @@ class AIService:
             )
             existing_logs = self.db.execute(statement).scalars().all()
             regeneration_count = len(existing_logs) + 1
+            
+            # 재생성 횟수 제한 체크 (5회까지만 허용)
+            if regeneration_count > 5:
+                logger.warning(f"재생성 횟수 초과: 사용자 {user_id}, 세션 {session_id}, 시도 횟수: {regeneration_count}")
+                raise RegenerationLimitExceededException(
+                    current_count=regeneration_count,
+                    max_count=5,
+                    session_id=session_id
+                )
             
             # 통합 AI 분석 로그 저장 (감정분석 + 키워드추출 + 글귀생성)
             integrated_log = AIUsageLog(
@@ -113,13 +129,160 @@ class AIService:
                 "ai_emotion_confidence": emotion_analysis.get("confidence", 0.85),
                 "keywords": keywords,
                 "session_id": session_id,
+                "regeneration_info": {
+                    "current_count": regeneration_count,
+                    "max_count": 5,
+                    "remaining_count": 5 - regeneration_count,
+                    "can_regenerate": regeneration_count < 5
+                }
             }
             # 응답
             return result
             
+        except RegenerationLimitExceededException:
+            # 재생성 제한 예외는 그대로 전파
+            raise
         except Exception as e:
             logger.error(f"AI 텍스트 생성 실패: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"AI 텍스트 생성 중 오류: {str(e)}")
+            raise AIGenerationFailedException(
+                detail=f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
+                error_type="GENERATION_ERROR"
+            )
+    
+    def get_regeneration_status(self, session_id: str) -> Dict[str, Any]:
+        """
+        특정 세션의 재생성 횟수 정보 조회
+        
+        Args:
+            session_id: 세션 ID
+            
+        Returns:
+            Dict: 재생성 횟수 정보
+        """
+        try:
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.api_type == 'integrated_analysis')
+            )
+            existing_logs = self.db.execute(statement).scalars().all()
+            current_count = len(existing_logs)
+            
+            return {
+                "session_id": session_id,
+                "current_count": current_count,
+                "max_count": 5,
+                "remaining_count": max(0, 5 - current_count),
+                "can_regenerate": current_count < 5,
+                "is_limit_reached": current_count >= 5
+            }
+            
+        except Exception as e:
+            logger.error(f"재생성 상태 조회 실패: {str(e)}")
+            raise SessionNotFoundException(session_id=session_id)
+    
+    def get_user_daily_stats(self, user_id: str) -> Dict[str, Any]:
+        """
+        사용자의 일일 AI 사용 통계 조회
+        
+        Args:
+            user_id: 사용자 ID
+            
+        Returns:
+            Dict: 일일 AI 사용 통계
+        """
+        try:
+            from datetime import datetime, timezone
+            
+            # 오늘 날짜 기준으로 조회
+            today = datetime.now(timezone.utc).date()
+            
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.user_id == user_id)
+                .where(AIUsageLog.api_type == 'integrated_analysis')
+                .where(func.date(AIUsageLog.created_at) == today)
+            )
+            
+            logs = self.db.execute(statement).scalars().all()
+            
+            # 세션별 통계
+            session_stats = {}
+            total_tokens = 0
+            total_requests = len(logs)
+            
+            for log in logs:
+                session_id = str(log.session_id)
+                if session_id not in session_stats:
+                    session_stats[session_id] = {
+                        "session_id": session_id,
+                        "request_count": 0,
+                        "tokens_used": 0,
+                        "first_request": log.created_at,
+                        "last_request": log.created_at
+                    }
+                
+                session_stats[session_id]["request_count"] += 1
+                session_stats[session_id]["tokens_used"] += (log.tokens_used or 0)
+                session_stats[session_id]["last_request"] = max(
+                    session_stats[session_id]["last_request"], 
+                    log.created_at
+                )
+                
+                total_tokens += (log.tokens_used or 0)
+            
+            return {
+                "user_id": user_id,
+                "date": today.isoformat(),
+                "total_sessions": len(session_stats),
+                "total_requests": total_requests,
+                "total_tokens_used": total_tokens,
+                "average_tokens_per_request": round(total_tokens / total_requests, 2) if total_requests > 0 else 0,
+                "sessions": list(session_stats.values())
+            }
+            
+        except Exception as e:
+            logger.error(f"사용자 일일 통계 조회 실패: {str(e)}")
+            raise InvalidRequestException(
+                detail=f"사용자 통계 조회 중 오류가 발생했습니다: {str(e)}",
+                field="user_id"
+            )
+    
+    def validate_request(self, data: CreateDiaryRequest) -> None:
+        """
+        AI 텍스트 생성 요청 유효성 검사
+        
+        Args:
+            data: 다이어리 생성 요청 데이터
+            
+        Raises:
+            InvalidRequestException: 잘못된 요청 데이터
+        """
+        if not data.prompt or len(data.prompt.strip()) < 2:
+            raise InvalidRequestException(
+                detail="프롬프트는 최소 2자 이상이어야 합니다.",
+                field="prompt"
+            )
+        
+        if len(data.prompt) > 1000:
+            raise InvalidRequestException(
+                detail="프롬프트는 최대 1000자까지 입력 가능합니다.",
+                field="prompt"
+            )
+        
+        valid_styles = ["poem", "short_story"]
+        if data.style not in valid_styles:
+            raise InvalidRequestException(
+                detail=f"지원하지 않는 스타일입니다. 사용 가능한 스타일: {', '.join(valid_styles)}",
+                field="style"
+            )
+        
+        valid_lengths = ["short", "medium", "long"]
+        if data.length not in valid_lengths:
+            raise InvalidRequestException(
+                detail=f"지원하지 않는 길이입니다. 사용 가능한 길이: {', '.join(valid_lengths)}",
+                field="length"
+            )
     
     
     async def _generate_complete_analysis(
@@ -204,6 +367,23 @@ JSON 형식으로만 답해주세요."""
                 
         except Exception as e:
             logger.error(f"통합 AI 분석 실패: {str(e)}")
+            
+            # OpenAI API 관련 예외 타입별 처리
+            error_str = str(e).lower()
+            
+            if "rate limit" in error_str or "quota" in error_str:
+                # API 호출 한도 초과
+                logger.warning(f"OpenAI API 호출 한도 초과, fallback 사용: {str(e)}")
+            elif "service unavailable" in error_str or "timeout" in error_str:
+                # 서비스 일시적 불가
+                logger.warning(f"OpenAI 서비스 일시적 불가, fallback 사용: {str(e)}")
+            elif "token" in error_str and "limit" in error_str:
+                # 토큰 한도 초과
+                logger.warning(f"토큰 한도 초과, fallback 사용: {str(e)}")
+            else:
+                # 기타 AI 생성 오류
+                logger.warning(f"AI 생성 오류, fallback 사용: {str(e)}")
+            
             return await self._fallback_analysis(prompt, style, length)
     
     async def _fallback_analysis(self, prompt: str, style: str, length: str) -> Dict[str, Any]:
