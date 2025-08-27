@@ -36,7 +36,7 @@ class AIUsageLog(Base):
         ),
         Index("idx_ai_usage_api_type", "api_type"),
         CheckConstraint(
-            "api_type IN ('generate', 'keywords', 'emotion_analysis')",
+            "api_type IN ('generate', 'keywords', 'emotion_analysis', 'integrated_analysis')",
             name="ck_ai_usage_api_type",
         ),
         CheckConstraint(
