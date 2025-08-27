@@ -2,10 +2,11 @@
 OpenAI API 호출 유틸리티 함수
 """
 
-import os
 import logging
-from typing import Dict, List, Optional, Any
-from openai import OpenAI, AsyncOpenAI
+import os
+from typing import Any, Dict, List, Optional
+
+from openai import AsyncOpenAI, OpenAI
 from openai.types.chat import ChatCompletion
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,7 @@ class OpenAIConfig:
         self.temperature = temperature
 
         if not self.api_key:
-            raise ValueError(
-                "OpenAI API 키가 설정되지 않았습니다. OPENAI_API_KEY 환경변수를 확인하세요."
-            )
+            raise ValueError("OpenAI API 키가 설정되지 않았습니다. OPENAI_API_KEY 환경변수를 확인하세요.")
 
 
 class OpenAIClient:
@@ -59,7 +58,7 @@ class OpenAIClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        max_completion_tokens: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -69,7 +68,7 @@ class OpenAIClient:
             messages: 대화 메시지 리스트
             model: 사용할 모델 (기본값: config의 default_model)
             temperature: 창의성 수준 (0.0~2.0, 기본값: config의 temperature)
-            max_tokens: 최대 토큰 수
+            max_completion_tokens: 최대 완성 토큰 수
             **kwargs: 추가 파라미터
 
         Returns:
@@ -82,7 +81,7 @@ class OpenAIClient:
                 temperature=temperature
                 if temperature is not None
                 else self.config.temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 **kwargs,
             )
 
@@ -115,7 +114,7 @@ class OpenAIClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        max_completion_tokens: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -128,7 +127,7 @@ class OpenAIClient:
                 temperature=temperature
                 if temperature is not None
                 else self.config.temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 **kwargs,
             )
 
@@ -161,7 +160,7 @@ class OpenAIClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        max_completion_tokens: Optional[int] = None,
         **kwargs,
     ):
         """
@@ -174,7 +173,7 @@ class OpenAIClient:
                 temperature=temperature
                 if temperature is not None
                 else self.config.temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 stream=True,
                 **kwargs,
             )
@@ -192,7 +191,7 @@ class OpenAIClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        max_completion_tokens: Optional[int] = None,
         **kwargs,
     ):
         """
@@ -205,7 +204,7 @@ class OpenAIClient:
                 temperature=temperature
                 if temperature is not None
                 else self.config.temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 stream=True,
                 **kwargs,
             )
