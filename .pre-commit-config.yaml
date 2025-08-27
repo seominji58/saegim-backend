@@ -51,4 +51,4 @@ repos:
         ]
         pass_filenames: true
         files: \.py$
-        exclude: ^(app/utils/|app/core/deps\.py|app/api/auth/)
+        exclude: ^(app/utils/|app/core/deps\.py|app/api/auth/|alembic/)
