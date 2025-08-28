@@ -3,9 +3,11 @@ AI 사용 로그 생성 서비스
 """
 
 import logging
+from typing import Any, Dict, Optional
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_usage_log import AIUsageLog
 from app.models.user import User
@@ -19,13 +21,19 @@ class CreateAIUsageLogService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_ai_usage_log(self, user_id: str, api_type: str, session_id: str, 
-                                 regeneration_count: int = 1, tokens_used: int = 0,
-                                 request_data: dict = None, 
-                                 response_data: dict = None) -> AIUsageLog:
+    async def create_ai_usage_log(
+        self,
+        user_id: str,
+        api_type: str,
+        session_id: str,
+        regeneration_count: int = 1,
+        tokens_used: int = 0,
+        request_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[Dict[str, Any]] = None,
+    ) -> AIUsageLog:
         """
         AI 사용 로그를 생성합니다.
-        
+
         Args:
             user_id: 사용자 ID (UUID 문자열)
             api_type: API 타입 (generate/keywords)
@@ -34,10 +42,10 @@ class CreateAIUsageLogService:
             tokens_used: 사용된 토큰 수
             request_data: 요청 데이터
             response_data: 응답 데이터
-            
+
         Returns:
             생성된 AI 사용 로그
-            
+
         Raises:
             ValueError: 사용자를 찾을 수 없거나 데이터 검증 실패 시
             SQLAlchemyError: 데이터베이스 오류 시
@@ -52,10 +60,15 @@ class CreateAIUsageLogService:
 
         # AI 사용 로그 생성
         ai_usage_log = await self._create_ai_usage_log_entry(
-            user.id, api_type, session_id, regeneration_count, 
-            tokens_used, request_data or {}, response_data or {}
+            user.id,
+            api_type,
+            session_id,
+            regeneration_count,
+            tokens_used,
+            request_data or {},
+            response_data or {},
         )
-        
+
         logger.info(f"AI 사용 로그 생성 성공: user_id={user.id}, log_id={ai_usage_log.id}")
         return ai_usage_log
 
@@ -73,13 +86,13 @@ class CreateAIUsageLogService:
             query = select(User).where(User.id == user_uuid)
             result = await self.db.execute(query)
             user = result.scalar_one_or_none()
-            
+
             if not user:
                 logger.warning(f"사용자 ID로 사용자를 찾을 수 없음: {user_id}")
                 return None
-                
+
             return user
-            
+
         except Exception as e:
             logger.error(f"사용자 조회 중 오류 발생: {e}")
             return None
@@ -87,17 +100,23 @@ class CreateAIUsageLogService:
     def _validate_log_data(self, api_type: str, regeneration_count: int) -> None:
         """로그 데이터를 검증합니다."""
         # API 타입 검증
-        if api_type not in ['generate', 'keywords']:
+        if api_type not in ["generate", "keywords"]:
             raise ValueError("유효하지 않은 API 타입입니다. 'generate' 또는 'keywords'여야 합니다.")
 
         # 재생성 횟수 검증
         if not (1 <= regeneration_count <= 5):
             raise ValueError("재생성 횟수는 1-5 범위 내여야 합니다.")
 
-    async def _create_ai_usage_log_entry(self, user_id: UUID, api_type: str, session_id: str,
-                                        regeneration_count: int, tokens_used: int,
-                                        request_data: dict, 
-                                        response_data: dict) -> AIUsageLog:
+    async def _create_ai_usage_log_entry(
+        self,
+        user_id: UUID,
+        api_type: str,
+        session_id: str,
+        regeneration_count: int,
+        tokens_used: int,
+        request_data: Dict[str, Any],
+        response_data: Dict[str, Any],
+    ) -> AIUsageLog:
         """데이터베이스에 AI 사용 로그 엔트리를 생성합니다."""
         try:
             # 새로운 AI 사용 로그 엔트리 생성
@@ -108,7 +127,7 @@ class CreateAIUsageLogService:
                 regeneration_count=regeneration_count,
                 tokens_used=tokens_used,
                 request_data=request_data,
-                response_data=response_data
+                response_data=response_data,
             )
 
             # 데이터베이스에 저장
