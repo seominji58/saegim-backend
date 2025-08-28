@@ -6,6 +6,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict
 
@@ -81,11 +82,9 @@ class AIService:
                 "tokens_used": ai_result["tokens_used"],
             }
 
-            # 재생성 시 session_id 을 같이 전달 받음
+            # 재생성 시 session_id 또는 sessionId를 같이 전달 받음
             # openai 요청 생성(최초 요청은 session_id 생성 및 regeneration_count 1)
-            logger.info(f"data.session_id: {data.session_id}")
-            session_id = data.session_id or str(uuid.uuid4())
-            logger.info(f"세션 ID: {session_id}")
+            session_id = getattr(data, 'sessionId', None) or data.session_id or str(uuid.uuid4())
 
             # 기존 세션 로그 조회 (통합 분석 타입으로)
             statement = (
@@ -93,13 +92,14 @@ class AIService:
                 .where(AIUsageLog.session_id == session_id)
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
+            
             existing_logs = self.db.execute(statement).scalars().all()
             regeneration_count = len(existing_logs) + 1
 
             # 재생성 횟수 제한 체크 (5회까지만 허용)
             if regeneration_count > 5:
                 logger.warning(
-                    f"재생성 횟수 초과: 사용자 {user_id}, 세션 {session_id}, 시도 횟수: {regeneration_count}"
+                    f"⚠️ 재생성 횟수 초과: 사용자 {user_id}, 세션 {session_id}, 시도 횟수: {regeneration_count}"
                 )
                 raise RegenerationLimitExceededException(
                     current_count=regeneration_count, max_count=5, session_id=session_id
@@ -204,6 +204,7 @@ class AIService:
                 .where(AIUsageLog.session_id == session_id)
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
+            
             existing_logs = self.db.execute(statement).scalars().all()
             current_count = len(existing_logs)
 
@@ -219,6 +220,36 @@ class AIService:
         except Exception as e:
             logger.error(f"재생성 상태 조회 실패: {str(e)}")
             raise SessionNotFoundException(session_id=session_id)
+
+    def test_db_connection(self) -> Dict[str, Any]:
+        """
+        DB 연결 상태 테스트
+        
+        Returns:
+            Dict: DB 연결 상태 정보
+        """
+        try:
+            # 간단한 쿼리 실행
+            statement = select(func.count()).select_from(AIUsageLog)
+            result = self.db.execute(statement).scalar()
+            
+            return {
+                "status": "success",
+                "message": "DB 연결 정상",
+                "total_logs": result,
+                "db_session": str(type(self.db)),
+                "timestamp": str(datetime.now())
+            }
+            
+        except Exception as e:
+            logger.error(f"DB 연결 테스트 실패: {str(e)}")
+            
+            return {
+                "status": "error",
+                "message": f"DB 연결 실패: {str(e)}",
+                "error_type": type(e).__name__,
+                "timestamp": str(datetime.now())
+            }
 
     def get_user_daily_stats(self, user_id: str) -> Dict[str, Any]:
         """

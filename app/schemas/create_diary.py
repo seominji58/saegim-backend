@@ -13,6 +13,7 @@ class CreateDiaryRequest(BaseModel):
     emotion: Optional[str] = Field(None, description="감정")
     regeneration_count: int = Field(1, ge=1, le=5, description="재생성 횟수 (1-5)")
     session_id: Optional[str] = Field(None, description="재생성 세션 ID (UUID 문자열)")
+    sessionId: Optional[str] = Field(None, description="재생성 세션 ID (카멜케이스, 프론트엔드 호환)")
     
     @field_validator('prompt')
     @classmethod
