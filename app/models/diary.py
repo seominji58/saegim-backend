@@ -2,23 +2,29 @@
 다이어리 모델
 """
 
-from typing import Optional, List, Dict, Any
-from uuid import UUID
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
+from uuid import UUID
+
 from sqlalchemy import (
-    String,
-    Float,
     Boolean,
-    DateTime,
-    ForeignKey,
     CheckConstraint,
-    Index,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from .image import Image
+    from .user import User
 
 
 class DiaryEntry(Base):
@@ -26,16 +32,18 @@ class DiaryEntry(Base):
 
     __tablename__ = "diaries"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
     title: Mapped[str] = mapped_column(String(255), index=True)
     content: Mapped[str] = mapped_column()
-    user_emotion: Mapped[Optional[str]] = mapped_column(String(20), index=True)
-    ai_emotion: Mapped[Optional[str]] = mapped_column(String(20))
-    ai_emotion_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    user_emotion: Mapped[str | None] = mapped_column(String(20), index=True)
+    ai_emotion: Mapped[str | None] = mapped_column(String(20))
+    ai_emotion_confidence: Mapped[float | None] = mapped_column(Float)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    ai_generated_text: Mapped[Optional[str]] = mapped_column()
+    ai_generated_text: Mapped[str | None] = mapped_column()
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
-    keywords: Mapped[Optional[List[str]]] = mapped_column(
+    keywords: Mapped[list[str] | None] = mapped_column(
         JSONB, nullable=True
     )  # JSONB 타입으로 변경
 
@@ -48,13 +56,13 @@ class DiaryEntry(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # 관계 설정
-    user: Mapped["User"] = relationship("User", back_populates="diaries")
-    images: Mapped[List["Image"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="diaries")
+    images: Mapped[list[Image]] = relationship(
         "Image", back_populates="diary", cascade="all, delete-orphan"
     )
 

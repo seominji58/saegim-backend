@@ -2,12 +2,14 @@
 다이어리 API 테스트 스크립트 (캘린더용)
 """
 
-import requests
 import json
 from datetime import date, timedelta
 
+import requests
+
 # API 기본 URL
 BASE_URL = "http://localhost:8000/api/diary"
+
 
 def test_get_diaries():
     """다이어리 목록 조회 테스트"""
@@ -31,6 +33,7 @@ def test_get_diaries():
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
 
+
 def test_get_diary():
     """특정 다이어리 조회 테스트"""
     print("=== 특정 다이어리 조회 테스트 ===")
@@ -40,6 +43,7 @@ def test_get_diary():
     print(f"Status Code: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
+
 
 def test_get_calendar_diaries():
     """캘린더용 다이어리 조회 테스트"""
@@ -53,12 +57,13 @@ def test_get_calendar_diaries():
         f"{BASE_URL}/calendar/1",
         params={
             "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d")
-        }
+            "end_date": end_date.strftime("%Y-%m-%d"),
+        },
     )
     print(f"Status Code: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
+
 
 def main():
     """메인 테스트 실행"""
@@ -81,6 +86,7 @@ def main():
         print("   서버 실행 명령: uvicorn app.main:app --reload")
     except Exception as e:
         print(f"❌ 테스트 중 오류 발생: {e}")
+
 
 if __name__ == "__main__":
     main()

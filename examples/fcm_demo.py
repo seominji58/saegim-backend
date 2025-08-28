@@ -5,17 +5,18 @@ FCM 푸시 알림 데모
 FCM 푸시 알림 기능의 간단한 사용 예제입니다.
 """
 
+import argparse
 import asyncio
 import sys
-import argparse
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 from app.core.config import get_settings
 from app.utils.fcm_push import (
-    send_push_notification,
-    send_diary_reminder,
     send_ai_analysis_complete,
+    send_diary_reminder,
+    send_push_notification,
 )
 
 # 프로젝트 루트를 Python 경로에 추가

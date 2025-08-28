@@ -68,7 +68,9 @@ def create_sample_diaries(session: Session, user_id: int):
             "content": "친구들과 함께한 점심 시간이 정말 즐거웠다. 오랜만에 만난 친구들과 수다를 떨며 웃고 떠들었다. 이런 순간들이 인생의 진짜 보물인 것 같다.",
             "user_emotion": "happy",
             "is_public": True,
-            "keywords": json.dumps(["친구", "점심", "웃음", "즐거움"], ensure_ascii=False),
+            "keywords": json.dumps(
+                ["친구", "점심", "웃음", "즐거움"], ensure_ascii=False
+            ),
         },
         {
             "title": "차분한 하루",
@@ -82,21 +84,27 @@ def create_sample_diaries(session: Session, user_id: int):
             "content": "내일 있을 회의가 걱정된다. 준비를 충분히 했지만 항상 긴장된다. 그래도 최선을 다해보자.",
             "user_emotion": "worried",
             "is_public": False,
-            "keywords": json.dumps(["회의", "준비", "긴장", "최선"], ensure_ascii=False),
+            "keywords": json.dumps(
+                ["회의", "준비", "긴장", "최선"], ensure_ascii=False
+            ),
         },
         {
             "title": "감사한 순간",
             "content": "가족들이 건강하고 행복하게 지내고 있다는 것이 가장 큰 감사다. 매일매일이 축복이다.",
             "user_emotion": "happy",
             "is_public": True,
-            "keywords": json.dumps(["가족", "건강", "행복", "감사", "축복"], ensure_ascii=False),
+            "keywords": json.dumps(
+                ["가족", "건강", "행복", "감사", "축복"], ensure_ascii=False
+            ),
         },
         {
             "title": "새로운 도전",
             "content": "새로운 프로젝트를 시작하게 되었다. 두렵지만도 하지만 설렘도 있다. 이번 기회에 더 많이 배우고 성장하고 싶다.",
             "user_emotion": "excited",
             "is_public": True,
-            "keywords": json.dumps(["프로젝트", "도전", "성장", "학습"], ensure_ascii=False),
+            "keywords": json.dumps(
+                ["프로젝트", "도전", "성장", "학습"], ensure_ascii=False
+            ),
         },
     ]
 

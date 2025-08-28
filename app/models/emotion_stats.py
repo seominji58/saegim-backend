@@ -4,13 +4,14 @@
 
 from typing import TYPE_CHECKING
 from uuid import UUID
+
 from sqlalchemy import (
-    String,
-    Integer,
+    CheckConstraint,
     ForeignKey,
     Index,
+    Integer,
+    String,
     UniqueConstraint,
-    CheckConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import text
@@ -40,7 +41,9 @@ class EmotionStats(Base):
         CheckConstraint("count >= 0", name="ck_emotion_stats_count"),
     )
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )

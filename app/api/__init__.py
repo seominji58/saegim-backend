@@ -28,7 +28,9 @@ router.include_router(diary_router, prefix="/api/diary")
 router.include_router(
     notification_public_router, prefix="/api/notifications"
 )  # 공개 알림 API
-router.include_router(notification_router, prefix="/api/notifications")  # 인증된 알림 API
+router.include_router(
+    notification_router, prefix="/api/notifications"
+)  # 인증된 알림 API
 router.include_router(legacy_router)  # 레거시 리다이렉트
 
 # Auth 라우터들을 /api/auth prefix로 통일

@@ -4,7 +4,6 @@
 
 import random
 from datetime import date, datetime
-from typing import List, Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -24,16 +23,16 @@ class DiaryService(SyncBaseService):
 
     def get_diaries(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         page: int = 1,
         page_size: int = 20,
-        searchTerm: Optional[str] = None,
-        emotion: Optional[str] = None,
-        is_public: Optional[bool] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        searchTerm: str | None = None,
+        emotion: str | None = None,
+        is_public: bool | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         sort_order: str = SortOrder.DESC.value,
-    ) -> Tuple[List[DiaryEntry], int]:
+    ) -> tuple[list[DiaryEntry], int]:
         """다이어리 목록 조회 (페이지네이션 포함)"""
 
         # 기본 쿼리 구성
@@ -95,8 +94,8 @@ class DiaryService(SyncBaseService):
         return diaries, total_count
 
     def get_diary_by_id(
-        self, diary_id: str, user_id: Optional[str] = None
-    ) -> Optional[DiaryEntry]:
+        self, diary_id: str, user_id: str | None = None
+    ) -> DiaryEntry | None:
         """ID로 다이어리 조회 (Soft Delete 제외)"""
         statement = select(DiaryEntry).where(
             DiaryEntry.id == diary_id, DiaryEntry.deleted_at.is_(None)
@@ -110,7 +109,7 @@ class DiaryService(SyncBaseService):
 
     def get_diaries_by_date_range(
         self, user_id: str, start_date: date, end_date: date
-    ) -> List[DiaryEntry]:
+    ) -> list[DiaryEntry]:
         """특정 날짜 범위의 다이어리 조회 (캘린더용) - 이미지 정보 포함"""
         # 이미지 관계를 함께 로드하기 위해 selectinload 사용
         from sqlalchemy.orm import selectinload
@@ -172,7 +171,7 @@ class DiaryService(SyncBaseService):
 
     def update_diary(
         self, diary_id: str, diary_update: DiaryUpdateRequest
-    ) -> Optional[DiaryEntry]:
+    ) -> DiaryEntry | None:
         """다이어리 수정"""
         diary = self.get_diary_by_id(diary_id)
 

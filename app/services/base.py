@@ -3,8 +3,6 @@
 """
 
 import logging
-from abc import ABC
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -12,10 +10,10 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-class BaseService(ABC):
+class BaseService:
     """모든 서비스의 기본 클래스"""
 
-    def __init__(self, db: Optional[AsyncSession | Session] = None):
+    def __init__(self, db: AsyncSession | Session | None = None):
         """
         서비스 초기화
 

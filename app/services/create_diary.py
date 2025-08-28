@@ -3,7 +3,7 @@ AI 사용 로그 생성 서비스
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -28,8 +28,8 @@ class CreateAIUsageLogService:
         session_id: str,
         regeneration_count: int = 1,
         tokens_used: int = 0,
-        request_data: Optional[Dict[str, Any]] = None,
-        response_data: Optional[Dict[str, Any]] = None,
+        request_data: dict[str, Any] | None = None,
+        response_data: dict[str, Any] | None = None,
     ) -> AIUsageLog:
         """
         AI 사용 로그를 생성합니다.
@@ -69,7 +69,9 @@ class CreateAIUsageLogService:
             response_data or {},
         )
 
-        logger.info(f"AI 사용 로그 생성 성공: user_id={user.id}, log_id={ai_usage_log.id}")
+        logger.info(
+            f"AI 사용 로그 생성 성공: user_id={user.id}, log_id={ai_usage_log.id}"
+        )
         return ai_usage_log
 
     async def _get_user_by_id(self, user_id: str) -> User | None:
@@ -101,7 +103,9 @@ class CreateAIUsageLogService:
         """로그 데이터를 검증합니다."""
         # API 타입 검증
         if api_type not in ["generate", "keywords"]:
-            raise ValueError("유효하지 않은 API 타입입니다. 'generate' 또는 'keywords'여야 합니다.")
+            raise ValueError(
+                "유효하지 않은 API 타입입니다. 'generate' 또는 'keywords'여야 합니다."
+            )
 
         # 재생성 횟수 검증
         if not (1 <= regeneration_count <= 5):
@@ -114,8 +118,8 @@ class CreateAIUsageLogService:
         session_id: str,
         regeneration_count: int,
         tokens_used: int,
-        request_data: Dict[str, Any],
-        response_data: Dict[str, Any],
+        request_data: dict[str, Any],
+        response_data: dict[str, Any],
     ) -> AIUsageLog:
         """데이터베이스에 AI 사용 로그 엔트리를 생성합니다."""
         try:

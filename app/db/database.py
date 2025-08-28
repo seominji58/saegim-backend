@@ -1,8 +1,8 @@
 """
 데이터베이스 연결 설정
 """
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session

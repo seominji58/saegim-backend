@@ -4,8 +4,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -24,7 +23,7 @@ class DiaryReminderScheduler:
     @staticmethod
     async def get_users_for_reminder_time(
         time: str, day: str, session: Session
-    ) -> List[User]:
+    ) -> list[User]:
         """
         특정 시간/요일에 알림받을 사용자 조회
 
@@ -62,7 +61,9 @@ class DiaryReminderScheduler:
             result = session.execute(final_query)
             users = result.scalars().all()
 
-            logger.info(f"시간 {time}, 요일 {day}에 알림받을 사용자 {len(users)}명 조회됨")
+            logger.info(
+                f"시간 {time}, 요일 {day}에 알림받을 사용자 {len(users)}명 조회됨"
+            )
             return list(users)
 
         except Exception as e:
@@ -86,7 +87,7 @@ class DiaryReminderScheduler:
             from app.models.fcm import NotificationHistory
 
             # 24시간 전 시간 계산
-            yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
+            yesterday = datetime.now(UTC) - timedelta(hours=24)
 
             # 최근 24시간 내 diary_reminder 알림 이력 확인
             stmt = select(NotificationHistory).where(
@@ -119,7 +120,7 @@ class DiaryReminderScheduler:
         """
         try:
             # 현재 시간 정보 가져오기
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             current_time = now.strftime("%H:%M")
             # 요일을 소문자 3자리로 변환 (mon, tue, wed, thu, fri, sat, sun)
             current_day = now.strftime("%a").lower()
@@ -162,11 +163,15 @@ class DiaryReminderScheduler:
                             logger.debug(f"User {user.id}: 다이어리 리마인더 발송 성공")
                         else:
                             error_count += 1
-                            logger.warning(f"User {user.id}: 다이어리 리마인더 발송 실패")
+                            logger.warning(
+                                f"User {user.id}: 다이어리 리마인더 발송 실패"
+                            )
 
                     except Exception as e:
                         error_count += 1
-                        logger.error(f"User {user.id} 다이어리 리마인더 발송 중 오류: {str(e)}")
+                        logger.error(
+                            f"User {user.id} 다이어리 리마인더 발송 중 오류: {str(e)}"
+                        )
 
                 # 결과 로깅
                 logger.info(

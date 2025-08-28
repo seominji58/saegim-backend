@@ -2,7 +2,6 @@
 
 import os
 from functools import lru_cache
-from typing import List, Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -51,7 +50,7 @@ class Settings(BaseSettings):
     minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
-    allowed_hosts: Union[List[str], str] = os.getenv(
+    allowed_hosts: list[str] | str = os.getenv(
         "ALLOWED_HOSTS", "http://localhost:3000,http://localhost:8080"
     )
 
@@ -118,7 +117,7 @@ class Settings(BaseSettings):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
 
-    def _parse_cors_origins(self, v: str) -> List[str]:
+    def _parse_cors_origins(self, v: str) -> list[str]:
         """CORS origins 문자열을 리스트로 파싱 (deprecated: field_validator 사용)"""
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
@@ -135,7 +134,7 @@ class Settings(BaseSettings):
         return self.environment.lower() == "production"
 
     @property
-    def cors_origins(self) -> List[str]:
+    def cors_origins(self) -> list[str]:
         """CORS origins 반환"""
         # allowed_hosts가 이미 field_validator로 처리되었으므로 그대로 반환
         if isinstance(self.allowed_hosts, list):
@@ -148,18 +147,24 @@ class Settings(BaseSettings):
     def model_post_init(self, __context):
         """설정 초기화 후 필수 환경변수 검증"""
         if not self.secret_key:
-            raise ValueError("SECRET_KEY 환경변수가 설정되지 않았습니다. " "보안을 위해 반드시 설정해야 합니다.")
+            raise ValueError(
+                "SECRET_KEY 환경변수가 설정되지 않았습니다. "
+                "보안을 위해 반드시 설정해야 합니다."
+            )
         if not self.encryption_key:
             raise ValueError(
-                "ENCRYPTION_KEY 환경변수가 설정되지 않았습니다. " "데이터 암호화를 위해 반드시 설정해야 합니다."
+                "ENCRYPTION_KEY 환경변수가 설정되지 않았습니다. "
+                "데이터 암호화를 위해 반드시 설정해야 합니다."
             )
         if len(self.secret_key) < 32:
             raise ValueError("SECRET_KEY는 보안을 위해 최소 32자 이상이어야 합니다.")
         if len(self.encryption_key) < 32:
-            raise ValueError("ENCRYPTION_KEY는 보안을 위해 최소 32자 이상이어야 합니다.")
+            raise ValueError(
+                "ENCRYPTION_KEY는 보안을 위해 최소 32자 이상이어야 합니다."
+            )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """설정 싱글톤 인스턴스 반환"""
     return Settings()

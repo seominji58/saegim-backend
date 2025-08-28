@@ -9,34 +9,17 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
 
-  # Black - 코드 포맷터 (Python 파일만)
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
+  # Ruff - 통합 린터/포맷터 (Black, isort, flake8 대체)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
     hooks:
-      - id: black
-        language_version: python3
+      - id: ruff
+        args: ["--fix", "--exit-non-zero-on-fix"]
         files: \.py$
         stages: [pre-commit]
-
-  # isort - import 정렬 (Python 파일만)
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
+      - id: ruff-format
         files: \.py$
         stages: [pre-commit]
-
-  # flake8 - 린터 (Python 파일만)
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        args: [
-          "--max-line-length=88",
-          "--extend-ignore=E203,W503,E501"
-        ]
-        files: \.py$
 
   # mypy - 타입 체킹 (선택사항) - staged 파일만 체크
   - repo: https://github.com/pre-commit/mirrors-mypy

@@ -83,7 +83,9 @@ class AppScheduler:
             logger.info("APScheduler가 성공적으로 설정되었습니다.")
 
         except ImportError:
-            logger.error("APScheduler가 설치되지 않았습니다. pip install apscheduler 를 실행해주세요.")
+            logger.error(
+                "APScheduler가 설치되지 않았습니다. pip install apscheduler 를 실행해주세요."
+            )
         except Exception as e:
             logger.error(f"APScheduler 설정 실패: {str(e)}")
 

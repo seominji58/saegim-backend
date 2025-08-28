@@ -3,9 +3,10 @@
 Docker 컨테이너 상태 확인 및 시스템 헬스체크
 """
 
-from datetime import datetime
-from typing import Dict, Any
 import os
+from datetime import datetime
+from typing import Any
+
 import psutil
 from fastapi import APIRouter
 
@@ -17,7 +18,7 @@ settings = get_settings()
 
 
 @router.get("/")
-def health_check() -> Dict[str, str]:
+def health_check() -> dict[str, str]:
     """기본 헬스체크 엔드포인트"""
     return {
         "status": "ok",
@@ -27,7 +28,7 @@ def health_check() -> Dict[str, str]:
 
 
 @router.get("/health")
-def detailed_health() -> Dict[str, Any]:
+def detailed_health() -> dict[str, Any]:
     """상세 헬스체크 엔드포인트"""
     return {
         "status": "healthy",

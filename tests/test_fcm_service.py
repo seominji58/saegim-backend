@@ -2,19 +2,20 @@
 FCM 서비스 레이어 테스트
 """
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime, timezone
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.notification_service import NotificationService
-from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
+import pytest
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.models.fcm import FCMToken, NotificationHistory, NotificationSettings
 from app.schemas.notification import (
     FCMTokenRegisterRequest,
-    NotificationSettingsUpdate,
     NotificationSendRequest,
+    NotificationSettingsUpdate,
 )
+from app.services.notification_service import NotificationService
 
 
 class TestNotificationService:
@@ -54,8 +55,8 @@ class TestNotificationService:
             device_type="web",
             device_info={"user_agent": "test-browser", "platform": "web"},
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     @pytest.fixture
@@ -71,8 +72,8 @@ class TestNotificationService:
             report_notification_enabled=True,
             ai_processing_enabled=True,
             browser_push_enabled=False,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     def test_register_token_new_token(
@@ -87,8 +88,8 @@ class TestNotificationService:
         mock_result.device_type = sample_token_request.device_type
         mock_result.device_info = sample_token_request.device_info
         mock_result.is_active = True
-        mock_result.created_at = datetime.now(timezone.utc)
-        mock_result.updated_at = datetime.now(timezone.utc)
+        mock_result.created_at = datetime.now(UTC)
+        mock_result.updated_at = datetime.now(UTC)
 
         # Mock session.execute().scalar_one() 체인
         mock_execute_result = Mock()
@@ -498,8 +499,8 @@ class TestNotificationService:
                 user_id=sample_user_id,
                 notification_type="diary_reminder",
                 status="sent",
-                sent_at=datetime.now(timezone.utc),
-                created_at=datetime.now(timezone.utc),
+                sent_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
             ),
             NotificationHistory(
                 id="history-2",
@@ -507,7 +508,7 @@ class TestNotificationService:
                 notification_type="ai_content_ready",
                 status="failed",
                 error_message="전송 실패",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
         ]
 

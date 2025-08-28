@@ -2,26 +2,31 @@
 AI 사용 로그 생성 스키마
 """
 
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field, field_validator
-from typing import Dict, Any, Optional, Literal
 
 
 class CreateDiaryRequest(BaseModel):
-    prompt: str = Field(..., min_length=2, max_length=1000, description="사용자 입력 프롬프트")
+    prompt: str = Field(
+        ..., min_length=2, max_length=1000, description="사용자 입력 프롬프트"
+    )
     style: Literal["poem", "short_story"] = Field(..., description="글쓰기 스타일")
     length: Literal["short", "medium", "long"] = Field(..., description="글쓰기 길이")
-    emotion: Optional[str] = Field(None, description="감정")
+    emotion: str | None = Field(None, description="감정")
     regeneration_count: int = Field(1, ge=1, le=5, description="재생성 횟수 (1-5)")
-    session_id: Optional[str] = Field(None, description="재생성 세션 ID (UUID 문자열)")
-    sessionId: Optional[str] = Field(None, description="재생성 세션 ID (카멜케이스, 프론트엔드 호환)")
-    
-    @field_validator('prompt')
+    session_id: str | None = Field(None, description="재생성 세션 ID (UUID 문자열)")
+    sessionId: str | None = Field(
+        None, description="재생성 세션 ID (카멜케이스, 프론트엔드 호환)"
+    )
+
+    @field_validator("prompt")
     @classmethod
     def validate_prompt(cls, v: str) -> str:
         if not v or len(v.strip()) < 2:
-            raise ValueError('프롬프트는 최소 2자 이상이어야 합니다.')
+            raise ValueError("프롬프트는 최소 2자 이상이어야 합니다.")
         if len(v) > 1000:
-            raise ValueError('프롬프트는 최대 1000자까지 입력 가능합니다.')
+            raise ValueError("프롬프트는 최대 1000자까지 입력 가능합니다.")
         return v.strip()
 
 
@@ -33,10 +38,10 @@ class AIUsageLogCreate(BaseModel):
     session_id: str = Field(..., description="재생성 세션 ID (UUID 문자열)")
     regeneration_count: int = Field(1, ge=1, le=5, description="재생성 횟수 (1-5)")
     tokens_used: int = Field(0, ge=0, description="사용된 토큰 수")
-    request_data: Dict[str, Any] = Field(
+    request_data: dict[str, Any] = Field(
         default_factory=dict, description="요청 데이터"
     )
-    response_data: Dict[str, Any] = Field(
+    response_data: dict[str, Any] = Field(
         default_factory=dict, description="응답 데이터"
     )
 
@@ -73,8 +78,8 @@ class AIUsageLogCreate(BaseModel):
         try:
             uuid.UUID(v)
             return v
-        except ValueError:
-            raise ValueError("유효하지 않은 UUID 형식입니다.")
+        except ValueError as e:
+            raise ValueError("유효하지 않은 UUID 형식입니다.") from e
 
     class Config:
         from_attributes = True
@@ -106,8 +111,8 @@ class AIUsageLogResponse(BaseModel):
     session_id: str = Field(..., description="재생성 세션 ID")
     regeneration_count: int = Field(..., description="재생성 횟수")
     tokens_used: int = Field(..., description="사용된 토큰 수")
-    request_data: Dict[str, Any] = Field(..., description="요청 데이터")
-    response_data: Dict[str, Any] = Field(..., description="응답 데이터")
+    request_data: dict[str, Any] = Field(..., description="요청 데이터")
+    response_data: dict[str, Any] = Field(..., description="응답 데이터")
     created_at: str = Field(..., description="생성일시")
     updated_at: str = Field(..., description="수정일시")
 

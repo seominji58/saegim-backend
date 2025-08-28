@@ -4,19 +4,21 @@
 import os
 from pathlib import Path
 
+
 def load_env_file():
     """
     .env 파일을 UTF-8로 읽어서 환경 변수로 설정
     """
-    env_path = Path('.env')
+    env_path = Path(".env")
     if env_path.exists():
-        with open(env_path, 'r', encoding='utf-8') as f:
+        with open(env_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 # 빈 줄이나 주석 줄은 건너뛰기
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     os.environ[key.strip()] = value.strip()
+
 
 # 환경 변수 로드
 load_env_file()

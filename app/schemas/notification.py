@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -59,8 +59,8 @@ class FCMTokenRegisterRequest(BaseModel):
 
     token: str = Field(..., description="FCM 토큰", max_length=255)
     device_type: DeviceType = Field(..., description="디바이스 타입")
-    device_info: Optional[Dict[str, Any]] = Field(None, description="디바이스 정보")
-    app_version: Optional[str] = Field(None, description="앱 버전", max_length=50)
+    device_info: dict[str, Any] | None = Field(None, description="디바이스 정보")
+    app_version: str | None = Field(None, description="앱 버전", max_length=50)
 
 
 class FCMTokenCreate(BaseModel):
@@ -70,7 +70,7 @@ class FCMTokenCreate(BaseModel):
 
     token: str = Field(..., description="FCM 토큰", max_length=255)
     device_type: DeviceType = Field(..., description="디바이스 타입")
-    device_info: Optional[Dict[str, Any]] = Field(None, description="디바이스 정보")
+    device_info: dict[str, Any] | None = Field(None, description="디바이스 정보")
 
 
 class NotificationSendRequest(BaseModel):
@@ -81,8 +81,8 @@ class NotificationSendRequest(BaseModel):
     title: str = Field(..., description="알림 제목", max_length=255)
     body: str = Field(..., description="알림 내용", max_length=1000)
     notification_type: str = Field(..., description="알림 타입")
-    user_ids: List[str] = Field(..., description="대상 사용자 ID 목록")
-    data: Optional[Dict[str, Any]] = Field(None, description="추가 데이터")
+    user_ids: list[str] = Field(..., description="대상 사용자 ID 목록")
+    data: dict[str, Any] | None = Field(None, description="추가 데이터")
 
 
 class NotificationSettingsUpdate(BaseModel):
@@ -90,16 +90,18 @@ class NotificationSettingsUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    enabled: Optional[bool] = Field(None, description="알림 활성화")
-    diary_reminder: Optional[bool] = Field(None, description="다이어리 리마인더")
-    ai_content_ready: Optional[bool] = Field(None, description="AI 콘텐츠 준비 완료")
-    emotion_trend: Optional[bool] = Field(None, description="감정 트렌드")
-    anniversary: Optional[bool] = Field(None, description="기념일")
-    friend_share: Optional[bool] = Field(None, description="친구 공유")
-    quiet_hours_enabled: Optional[bool] = Field(None, description="조용 시간 활성화")
-    quiet_start_time: Optional[str] = Field(None, description="조용 시간 시작", max_length=5)
-    quiet_end_time: Optional[str] = Field(None, description="조용 시간 종료", max_length=5)
-    frequency: Optional[NotificationFrequency] = Field(None, description="알림 주기")
+    enabled: bool | None = Field(None, description="알림 활성화")
+    diary_reminder: bool | None = Field(None, description="다이어리 리마인더")
+    ai_content_ready: bool | None = Field(None, description="AI 콘텐츠 준비 완료")
+    emotion_trend: bool | None = Field(None, description="감정 트렌드")
+    anniversary: bool | None = Field(None, description="기념일")
+    friend_share: bool | None = Field(None, description="친구 공유")
+    quiet_hours_enabled: bool | None = Field(None, description="조용 시간 활성화")
+    quiet_start_time: str | None = Field(
+        None, description="조용 시간 시작", max_length=5
+    )
+    quiet_end_time: str | None = Field(None, description="조용 시간 종료", max_length=5)
+    frequency: NotificationFrequency | None = Field(None, description="알림 주기")
 
 
 class TestNotificationCreate(BaseModel):
@@ -110,7 +112,7 @@ class TestNotificationCreate(BaseModel):
     type: str = Field(default="test", description="알림 타입")
     title: str = Field(..., description="알림 제목", max_length=255)
     message: str = Field(..., description="알림 메시지", max_length=1000)
-    data: Optional[Dict[str, Any]] = Field(None, description="추가 데이터")
+    data: dict[str, Any] | None = Field(None, description="추가 데이터")
 
 
 class DiaryNotificationCreate(BaseModel):
@@ -119,10 +121,10 @@ class DiaryNotificationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     type: NotificationType = Field(..., description="알림 타입")
-    diary_id: Optional[UUID] = Field(None, description="다이어리 ID")
+    diary_id: UUID | None = Field(None, description="다이어리 ID")
     title: str = Field(..., description="알림 제목", max_length=255)
     message: str = Field(..., description="알림 메시지", max_length=1000)
-    data: Optional[Dict[str, Any]] = Field(None, description="추가 데이터")
+    data: dict[str, Any] | None = Field(None, description="추가 데이터")
 
 
 # Response Schemas
@@ -134,10 +136,10 @@ class FCMTokenResponse(BaseModel):
     id: UUID
     token: str
     device_type: DeviceType
-    device_info: Optional[Dict[str, Any]]
+    device_info: dict[str, Any] | None
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
 
 class NotificationSettingsResponse(BaseModel):
@@ -151,14 +153,18 @@ class NotificationSettingsResponse(BaseModel):
     marketing: bool
 
     # 다이어리 리마인더 상세 설정
-    diary_reminder_time: Optional[str] = Field(None, description="다이어리 리마인더 시간 (HH:MM)")
-    diary_reminder_days: Optional[List[str]] = Field(
+    diary_reminder_time: str | None = Field(
+        None, description="다이어리 리마인더 시간 (HH:MM)"
+    )
+    diary_reminder_days: list[str] | None = Field(
         None, description="다이어리 리마인더 요일 ['mon','tue',...]"
     )
 
     # 기존 필드 (하위 호환성)
-    quiet_hours_start: Optional[str] = Field(None, description="조용 시간 시작 (deprecated)")
-    quiet_hours_end: Optional[str] = Field(None, description="조용 시간 종료 (deprecated)")
+    quiet_hours_start: str | None = Field(
+        None, description="조용 시간 시작 (deprecated)"
+    )
+    quiet_hours_end: str | None = Field(None, description="조용 시간 종료 (deprecated)")
 
 
 class NotificationSendResponse(BaseModel):
@@ -168,8 +174,8 @@ class NotificationSendResponse(BaseModel):
 
     success_count: int
     failure_count: int
-    successful_tokens: List[str]
-    failed_tokens: List[str]
+    successful_tokens: list[str]
+    failed_tokens: list[str]
     message: str
 
 
@@ -179,19 +185,19 @@ class NotificationHistoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    notification_id: Optional[str] = Field(None, description="연결된 알림 ID")
+    notification_id: str | None = Field(None, description="연결된 알림 ID")
     notification_type: str
     status: str
-    sent_at: Optional[datetime] = Field(None, description="전송 시간")
-    delivered_at: Optional[datetime] = Field(None, description="전달 시간")
-    opened_at: Optional[datetime] = Field(None, description="열람 시간")
+    sent_at: datetime | None = Field(None, description="전송 시간")
+    delivered_at: datetime | None = Field(None, description="전달 시간")
+    opened_at: datetime | None = Field(None, description="열람 시간")
     created_at: datetime
-    error_message: Optional[str] = Field(None, description="에러 메시지")
+    error_message: str | None = Field(None, description="에러 메시지")
 
     # notification 테이블에서 가져올 데이터
-    title: Optional[str] = Field(None, description="알림 제목 (from notification)")
-    message: Optional[str] = Field(None, description="알림 내용 (from notification)")
-    is_read: Optional[bool] = Field(None, description="읽음 상태 (from notification)")
+    title: str | None = Field(None, description="알림 제목 (from notification)")
+    message: str | None = Field(None, description="알림 내용 (from notification)")
+    is_read: bool | None = Field(None, description="읽음 상태 (from notification)")
 
     @field_validator("id", "notification_id", mode="before")
     @classmethod
@@ -207,5 +213,5 @@ class FCMTokenListResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    tokens: List[FCMTokenResponse]
+    tokens: list[FCMTokenResponse]
     total: int

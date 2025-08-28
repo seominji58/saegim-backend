@@ -4,8 +4,7 @@ FCM 디바이스 토큰 관리, 푸시 알림 전송 및 인앱 알림 통합 �
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, desc, select
@@ -76,12 +75,12 @@ class NotificationService(BaseService):
             # ON CONFLICT DO UPDATE - 중복 시 업데이트
             stmt = stmt.on_conflict_do_update(
                 constraint="uq_fcm_tokens_user_token",  # unique constraint 이름
-                set_=dict(
-                    device_type=stmt.excluded.device_type,
-                    device_info=stmt.excluded.device_info,
-                    is_active=stmt.excluded.is_active,
-                    updated_at=datetime.now(timezone.utc),
-                ),
+                set_={
+                    "device_type": stmt.excluded.device_type,
+                    "device_info": stmt.excluded.device_info,
+                    "is_active": stmt.excluded.is_active,
+                    "updated_at": datetime.now(UTC),
+                },
             ).returning(FCMToken)
 
             result = session.execute(stmt).scalar_one()
@@ -111,7 +110,7 @@ class NotificationService(BaseService):
                         existing_token.device_type = token_data.device_type
                         existing_token.device_info = token_data.device_info
                         existing_token.is_active = True
-                        existing_token.updated_at = datetime.now(timezone.utc)
+                        existing_token.updated_at = datetime.now(UTC)
 
                         session.add(existing_token)
                         session.commit()
@@ -130,16 +129,16 @@ class NotificationService(BaseService):
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail="FCM 토큰 등록에 실패했습니다.",
-                    )
+                    ) from retry_error
             else:
                 logger.error(f"Error registering FCM token: {str(e)}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="FCM 토큰 등록에 실패했습니다.",
-                )
+                ) from e
 
     @staticmethod
-    def get_user_tokens(user_id: str, session: Session) -> List[FCMTokenResponse]:
+    def get_user_tokens(user_id: str, session: Session) -> list[FCMTokenResponse]:
         """사용자의 활성 FCM 토큰 목록 조회"""
         try:
             stmt = select(FCMToken).where(
@@ -154,7 +153,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="FCM 토큰 목록 조회에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     def delete_token(user_id: str, token_id: str, session: Session) -> bool:
@@ -172,7 +171,7 @@ class NotificationService(BaseService):
                 )
 
             token.is_active = False
-            token.updated_at = datetime.now(timezone.utc)
+            token.updated_at = datetime.now(UTC)
 
             session.add(token)
             session.commit()
@@ -187,7 +186,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="FCM 토큰 삭제에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     def get_notification_settings(
@@ -231,7 +230,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 설정 조회에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     def update_notification_settings(
@@ -270,7 +269,7 @@ class NotificationService(BaseService):
                 if model_field and hasattr(settings, model_field):
                     setattr(settings, model_field, value)
 
-            settings.updated_at = datetime.now(timezone.utc)
+            settings.updated_at = datetime.now(UTC)
             session.add(settings)
             session.commit()
             session.refresh(settings)
@@ -294,7 +293,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 설정 업데이트에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     async def send_notification(
@@ -375,7 +374,7 @@ class NotificationService(BaseService):
                                 f"토큰 {token_model.token[:10]}...이 UNREGISTERED 상태입니다. 비활성화합니다."
                             )
                             token_model.is_active = False
-                            token_model.updated_at = datetime.now(timezone.utc)
+                            token_model.updated_at = datetime.now(UTC)
 
                     # 알림 기록 저장
                     history = NotificationHistory(
@@ -387,16 +386,15 @@ class NotificationService(BaseService):
                         notification_type=notification_data.notification_type,
                         status=status_value,
                         data_payload={
-                            "token": token_model.token[:10] + "...",  # 보안을 위해 일부만 저장
+                            "token": token_model.token[:10]
+                            + "...",  # 보안을 위해 일부만 저장
                             "success": result["success"],
                             "error_type": result.get("error_type"),
                             "fcm_response": result.get("response"),
                             "title": notification_data.title,  # data_payload에 저장
                             "body": notification_data.body,  # data_payload에 저장
                         },
-                        sent_at=datetime.now(timezone.utc)
-                        if result["success"]
-                        else None,
+                        sent_at=datetime.now(UTC) if result["success"] else None,
                         error_message=(
                             NotificationService._extract_error_message(result)
                             if (
@@ -448,7 +446,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 전송에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     async def send_diary_reminder(
@@ -491,7 +489,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="다이어리 알림 전송에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     async def send_ai_content_ready(
@@ -544,12 +542,12 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="AI 콘텐츠 알림 전송에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     def get_notification_history(
         user_id: str, limit: int, offset: int, session: Session
-    ) -> List[NotificationHistoryResponse]:
+    ) -> list[NotificationHistoryResponse]:
         """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
         try:
             from app.models.notification import Notification
@@ -617,7 +615,7 @@ class NotificationService(BaseService):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="알림 기록 조회에 실패했습니다.",
-            )
+            ) from e
 
     @staticmethod
     async def cleanup_invalid_tokens(session: Session) -> int:
@@ -650,13 +648,17 @@ class NotificationService(BaseService):
                         not result["success"]
                         and result.get("error_type") == "UNREGISTERED"
                     ):
-                        logger.info(f"무효한 토큰 비활성화: {token_model.token[:10]}...")
+                        logger.info(
+                            f"무효한 토큰 비활성화: {token_model.token[:10]}..."
+                        )
                         token_model.is_active = False
-                        token_model.updated_at = datetime.now(timezone.utc)
+                        token_model.updated_at = datetime.now(UTC)
                         cleanup_count += 1
 
                 except Exception as e:
-                    logger.error(f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}")
+                    logger.error(
+                        f"토큰 검증 중 오류 {token_model.token[:10]}...: {str(e)}"
+                    )
                     continue
 
             session.commit()

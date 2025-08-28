@@ -2,22 +2,23 @@
 FCM API 엔드포인트 테스트
 """
 
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
-from fastapi.testclient import TestClient
-from fastapi import status
-from datetime import datetime, timezone
 
-from app.main import app
+import pytest
+from fastapi import status
+from fastapi.testclient import TestClient
+
 from app.core.security import get_current_user_id
 from app.db.database import get_session
-from app.services.notification_service import NotificationService
+from app.main import app
 from app.schemas.notification import (
     FCMTokenResponse,
-    NotificationSettingsResponse,
-    NotificationSendResponse,
     NotificationHistoryResponse,
+    NotificationSendResponse,
+    NotificationSettingsResponse,
 )
+from app.services.notification_service import NotificationService
 
 
 class TestFCMAPI:
@@ -67,8 +68,8 @@ class TestFCMAPI:
             device_type="web",
             device_id="test-device-456",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         mock_register.return_value = mock_response
 
@@ -111,8 +112,8 @@ class TestFCMAPI:
                 device_type="web",
                 device_id="device-1",
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             ),
             FCMTokenResponse(
                 id="token-id-2",
@@ -121,8 +122,8 @@ class TestFCMAPI:
                 device_type="mobile",
                 device_id="device-2",
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             ),
         ]
         mock_get_tokens.return_value = mock_tokens
@@ -174,8 +175,8 @@ class TestFCMAPI:
             ai_content_ready=True,
             weekly_summary=False,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         mock_get_settings.return_value = mock_settings
 
@@ -197,8 +198,8 @@ class TestFCMAPI:
             ai_content_ready=True,
             weekly_summary=True,
             is_active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         mock_update_settings.return_value = mock_settings
 
@@ -296,7 +297,7 @@ class TestFCMAPI:
                 body="오늘의 감정을 기록해보세요",
                 notification_type="diary_reminder",
                 status="sent",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
             NotificationHistoryResponse(
                 id="history-2",
@@ -306,7 +307,7 @@ class TestFCMAPI:
                 notification_type="ai_content_ready",
                 status="failed",
                 error_message="토큰 만료",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
         ]
         mock_get_history.return_value = mock_history

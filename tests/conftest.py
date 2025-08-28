@@ -2,8 +2,7 @@
 테스트용 공통 설정 및 픽스처
 """
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 from unittest.mock import Mock
 
 import pytest
@@ -43,8 +42,8 @@ def sample_user():
         provider="google",
         provider_id="google-123",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -58,8 +57,8 @@ def sample_fcm_token(sample_user):
         device_type="web",
         device_id="test-device-456",
         is_active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -73,8 +72,8 @@ def sample_notification_settings(sample_user):
         ai_content_ready=True,
         weekly_summary=False,
         is_active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -88,7 +87,7 @@ def sample_notification_history(sample_user):
         body="테스트 메시지",
         notification_type="diary_reminder",
         status="sent",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -114,4 +113,4 @@ def mock_env_vars(monkeypatch):
 
 
 # 마커 설정
-pytest_plugins: List[str] = []
+pytest_plugins: list[str] = []

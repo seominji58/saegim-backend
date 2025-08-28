@@ -3,22 +3,23 @@
 새김 프로젝트에서 암호화 기능을 사용하는 방법을 보여줍니다.
 """
 
-import sys
 import os
+import sys
 
-# 프로젝트 루트를 Python 경로에 추가
+# 프로젝트 루트를 Python 경로에 추가 (import 전에 실행 필요)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.utils.encryption import (
-    hash_password,
-    verify_password,
-    encrypt_data,
-    decrypt_data,
-    DataEncryption,
-)
+# ruff: noqa: E402
 from app.core.security import (
     decode_access_token,
     security_service,
+)
+from app.utils.encryption import (
+    DataEncryption,
+    decrypt_data,
+    encrypt_data,
+    hash_password,
+    verify_password,
 )
 
 
@@ -109,7 +110,7 @@ def demo_dict_encryption():
 
     # 검증
     original_match = all(
-        diary_entry[key] == decrypted_entry[key] for key in diary_entry.keys()
+        diary_entry[key] == decrypted_entry[key] for key in diary_entry
     )
     print(f"\n복호화 검증: {original_match}")
     print()

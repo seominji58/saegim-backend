@@ -3,26 +3,27 @@ FCM (Firebase Cloud Messaging) 관련 모델
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Dict, Any
-from uuid import UUID
+
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from sqlalchemy import (
-    String,
-    DateTime,
     Boolean,
-    Index,
-    UniqueConstraint,
     CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func, text
-from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.notification import Notification
+    from app.models.user import User
 
 from app.models.base import Base
 
@@ -58,7 +59,7 @@ class FCMToken(Base):
     device_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="web"
     )  # web, android, ios
-    device_info: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    device_info: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )  # user_agent, platform 등
 
@@ -75,13 +76,13 @@ class FCMToken(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
-    last_used_at: Mapped[Optional[datetime]] = mapped_column(
+    last_used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="fcm_tokens")
-    notification_history: Mapped[list["NotificationHistory"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="fcm_tokens")
+    notification_history: Mapped[list[NotificationHistory]] = relationship(
         "NotificationHistory", back_populates="fcm_token", cascade="all, delete-orphan"
     )
 
@@ -113,10 +114,10 @@ class NotificationSettings(Base):
     diary_reminder_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True
     )
-    diary_reminder_time: Mapped[Optional[str]] = mapped_column(
+    diary_reminder_time: Mapped[str | None] = mapped_column(
         String(5), nullable=True, default="21:00"
     )  # HH:MM 형식
-    diary_reminder_days: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    diary_reminder_days: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True, default=lambda: []
     )  # 리마인드 요일 배열 ['mon','tue',...]
     report_notification_enabled: Mapped[bool] = mapped_column(
@@ -141,7 +142,7 @@ class NotificationSettings(Base):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="notification_settings")
+    user: Mapped[User] = relationship("User", back_populates="notification_settings")
 
     def __repr__(self) -> str:
         return f"<NotificationSettings(id={self.id}, user_id={self.user_id}, push_enabled={self.push_enabled})>"
@@ -180,12 +181,12 @@ class NotificationHistory(Base):
     )
 
     # Foreign Key to Notification (새로 추가)
-    notification_id: Mapped[Optional[UUID]] = mapped_column(
+    notification_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("notifications.id", ondelete="SET NULL"), nullable=True
     )
 
     # FCM Token used for sending (optional, token might be deleted)
-    fcm_token_id: Mapped[Optional[UUID]] = mapped_column(
+    fcm_token_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("fcm_tokens.id", ondelete="SET NULL"), nullable=True
     )
 
@@ -194,22 +195,22 @@ class NotificationHistory(Base):
     # title, body 필드는 마이그레이션에서 제거됨
 
     # Additional Data
-    data_payload: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    data_payload: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )  # FCM data payload
 
     # Status and Tracking
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
-    error_message: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Timestamps
-    sent_at: Mapped[Optional[datetime]] = mapped_column(
+    sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    delivered_at: Mapped[Optional[datetime]] = mapped_column(
+    delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    opened_at: Mapped[Optional[datetime]] = mapped_column(
+    opened_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -217,11 +218,11 @@ class NotificationHistory(Base):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="notification_history")
-    notification: Mapped[Optional["Notification"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="notification_history")
+    notification: Mapped[Notification | None] = relationship(
         "Notification", back_populates="notification_history"
     )  # 새 관계 추가
-    fcm_token: Mapped[Optional["FCMToken"]] = relationship(
+    fcm_token: Mapped[FCMToken | None] = relationship(
         "FCMToken", back_populates="notification_history"
     )
 

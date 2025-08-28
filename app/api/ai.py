@@ -3,7 +3,7 @@ AI 관련 API 라우터
 AI 텍스트 생성 및 사용 로그 관리
 """
 
-from typing import Any, Dict, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -27,11 +27,11 @@ async def create_ai_usage_log(
     user_id: str,
     api_type: str,
     session_id: str,
+    db: Annotated[Session, Depends(get_session)],
     regeneration_count: int = 1,
     tokens_used: int = 0,
-    request_data: Optional[Dict[str, Any]] = None,
-    response_data: Optional[Dict[str, Any]] = None,
-    db: Session = Depends(get_session),
+    request_data: dict[str, Any] | None = None,
+    response_data: dict[str, Any] | None = None,
 ) -> BaseResponse[dict]:
     """AI 사용 로그 생성"""
     service = diary_service(db)
@@ -50,8 +50,8 @@ async def create_ai_usage_log(
 @router.post("/generate", response_model=BaseResponse[dict])
 async def generate_ai_text(
     data: CreateDiaryRequest,
-    user_id: str = Depends(get_current_user_id),
-    db: Session = Depends(get_session),
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    db: Annotated[Session, Depends(get_session)],
 ) -> BaseResponse[dict]:
     """AI 텍스트 생성"""
     ai_service = AIService(db)

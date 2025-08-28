@@ -4,7 +4,6 @@ JWT 토큰 무효화 및 검증
 """
 
 import logging
-from typing import Optional
 
 from app.services.base import BaseService
 
@@ -111,7 +110,7 @@ class TokenBlacklistService(BaseService):
 
 
 # 전역 토큰 블랙리스트 서비스 인스턴스 (초기화는 app 시작 시 수행)
-token_blacklist_service: Optional[TokenBlacklistService] = None
+token_blacklist_service: TokenBlacklistService | None = None
 
 
 def get_token_blacklist_service() -> TokenBlacklistService:

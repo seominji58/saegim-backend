@@ -3,8 +3,7 @@ OAuth 인증 서비스
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from fastapi import HTTPException, status
@@ -122,7 +121,7 @@ class GoogleOAuthService(BaseService):
 
     async def process_oauth_callback(
         self, code: str, db: Session
-    ) -> Tuple[User, OAuthToken]:
+    ) -> tuple[User, OAuthToken]:
         """OAuth 콜백 처리
 
         Args:
@@ -143,49 +142,46 @@ class GoogleOAuthService(BaseService):
         result = db.execute(stmt)
         user = result.scalar_one_or_none()
 
-        if user:
-            # Soft Delete된 계정인지 확인
-            if user.deleted_at is not None:
-                # timezone을 일치시켜서 비교
-                current_time = (
-                    datetime.now(user.deleted_at.tzinfo)
-                    if user.deleted_at.tzinfo
-                    else datetime.now()
-                )
-                deleted_time = (
-                    user.deleted_at.replace(tzinfo=None)
-                    if user.deleted_at.tzinfo
-                    else user.deleted_at
-                )
-                current_time_naive = (
-                    current_time.replace(tzinfo=None)
-                    if current_time.tzinfo
-                    else current_time
-                )
+        if user and user.deleted_at is not None:
+            # timezone을 일치시켜서 비교
+            current_time = (
+                datetime.now(user.deleted_at.tzinfo)
+                if user.deleted_at.tzinfo
+                else datetime.now()
+            )
+            deleted_time = (
+                user.deleted_at.replace(tzinfo=None)
+                if user.deleted_at.tzinfo
+                else user.deleted_at
+            )
+            current_time_naive = (
+                current_time.replace(tzinfo=None)
+                if current_time.tzinfo
+                else current_time
+            )
 
-                # 30일 이내인지 확인
-                if deleted_time >= current_time_naive - timedelta(days=30):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail={
-                            "error": "ACCOUNT_DELETED",
-                            "message": "탈퇴된 계정입니다. 30일 이내에 복구할 수 있습니다.",
-                            "deleted_at": user.deleted_at.isoformat(),
-                            "restore_available": True,
-                            "days_remaining": 30
-                            - (current_time_naive - deleted_time).days,
-                        },
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail={
-                            "error": "ACCOUNT_PERMANENTLY_DELETED",
-                            "message": "탈퇴 후 30일이 경과되어 복구할 수 없습니다.",
-                            "deleted_at": user.deleted_at.isoformat(),
-                            "restore_available": False,
-                        },
-                    )
+            # 30일 이내인지 확인
+            if deleted_time >= current_time_naive - timedelta(days=30):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "ACCOUNT_DELETED",
+                        "message": "탈퇴된 계정입니다. 30일 이내에 복구할 수 있습니다.",
+                        "deleted_at": user.deleted_at.isoformat(),
+                        "restore_available": True,
+                        "days_remaining": 30 - (current_time_naive - deleted_time).days,
+                    },
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "ACCOUNT_PERMANENTLY_DELETED",
+                        "message": "탈퇴 후 30일이 경과되어 복구할 수 없습니다.",
+                        "deleted_at": user.deleted_at.isoformat(),
+                        "restore_available": False,
+                    },
+                )
 
         if not user:
             user = User(
@@ -213,7 +209,7 @@ class GoogleOAuthService(BaseService):
             oauth_token.access_token = token_response.access_token
             oauth_token.refresh_token = token_response.refresh_token
             if token_response.expires_in:
-                oauth_token.expires_at = datetime.now(timezone.utc).replace(
+                oauth_token.expires_at = datetime.now(UTC).replace(
                     microsecond=0
                 ) + timedelta(seconds=token_response.expires_in)
         else:
@@ -222,7 +218,7 @@ class GoogleOAuthService(BaseService):
                 provider=OAuthProvider.GOOGLE.value,
                 access_token=token_response.access_token,
                 refresh_token=token_response.refresh_token,
-                expires_at=datetime.now(timezone.utc).replace(microsecond=0)
+                expires_at=datetime.now(UTC).replace(microsecond=0)
                 + timedelta(seconds=token_response.expires_in)
                 if token_response.expires_in
                 else None,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -17,13 +17,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 if TYPE_CHECKING:
+    from app.models.ai_usage_log import AIUsageLog
+    from app.models.diary import DiaryEntry
+    from app.models.emotion_stats import EmotionStats
+    from app.models.fcm import FCMToken, NotificationHistory, NotificationSettings
+    from app.models.notification import Notification
     from app.models.oauth_token import OAuthToken
     from app.models.password_reset_token import PasswordResetToken
-    from app.models.diary import DiaryEntry
-    from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
-    from app.models.emotion_stats import EmotionStats
-    from app.models.ai_usage_log import AIUsageLog
-    from app.models.notification import Notification
 
 from app.models.base import Base
 
@@ -56,14 +56,14 @@ class User(Base):
         primary_key=True, server_default=text("gen_random_uuid()")
     )
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_type: Mapped[str] = mapped_column(
         String(6), nullable=False, default="social"
     )
     nickname: Mapped[str] = mapped_column(String(50), nullable=False)
-    provider: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    provider_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    profile_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    provider_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    profile_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -75,42 +75,42 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # 관계 정의 - SQLAlchemy 2.0 방식
-    oauth_tokens: Mapped[List["OAuthToken"]] = relationship(
+    oauth_tokens: Mapped[list[OAuthToken]] = relationship(
         back_populates="user", lazy="select"
     )
-    reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(
+    reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
         back_populates="user", lazy="select"
     )
-    diaries: Mapped[List["DiaryEntry"]] = relationship(
+    diaries: Mapped[list[DiaryEntry]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )
 
     # FCM 관련 관계
-    fcm_tokens: Mapped[List["FCMToken"]] = relationship(
+    fcm_tokens: Mapped[list[FCMToken]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )
-    notification_settings: Mapped[Optional["NotificationSettings"]] = relationship(
+    notification_settings: Mapped[NotificationSettings | None] = relationship(
         back_populates="user",
         lazy="select",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    notification_history: Mapped[List["NotificationHistory"]] = relationship(
+    notification_history: Mapped[list[NotificationHistory]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )
 
     # 새로 추가된 관계들
-    emotion_stats: Mapped[List["EmotionStats"]] = relationship(
+    emotion_stats: Mapped[list[EmotionStats]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )
-    ai_usage_logs: Mapped[List["AIUsageLog"]] = relationship(
+    ai_usage_logs: Mapped[list[AIUsageLog]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )
-    notifications: Mapped[List["Notification"]] = relationship(
+    notifications: Mapped[list[Notification]] = relationship(
         back_populates="user", lazy="select", cascade="all, delete-orphan"
     )

@@ -1,7 +1,6 @@
 """
 OAuth 관련 스키마
 """
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -12,8 +11,8 @@ class GoogleOAuthResponse(BaseModel):
     """구글 OAuth 응답 스키마"""
 
     access_token: str
-    refresh_token: Optional[str] = None
-    id_token: Optional[str] = None
+    refresh_token: str | None = None
+    id_token: str | None = None
     token_type: str
     expires_in: int
 
@@ -24,5 +23,5 @@ class OAuthUserInfo(BaseModel):
     id: str
     email: str
     name: str
-    picture: Optional[str] = None
+    picture: str | None = None
     provider: str = OAuthProvider.GOOGLE.value

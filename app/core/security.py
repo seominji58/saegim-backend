@@ -5,7 +5,7 @@ JWT 토큰 생성/검증, 의존성 주입
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Annotated, Any
 from uuid import UUID
 
 import jwt
@@ -24,7 +24,7 @@ class JWTHandler:
 
     @staticmethod
     def create_access_token(
-        data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+        data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
         """
         JWT 액세스 토큰 생성
@@ -60,7 +60,7 @@ class JWTHandler:
 
     @staticmethod
     def create_refresh_token(
-        data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+        data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
         """
         JWT 리프레시 토큰 생성
@@ -95,7 +95,7 @@ class JWTHandler:
         )
 
     @staticmethod
-    def decode_token(token: str) -> Dict[str, Any]:
+    def decode_token(token: str) -> dict[str, Any]:
         """
         JWT 토큰 디코딩 및 검증
 
@@ -114,21 +114,21 @@ class JWTHandler:
             )
             return payload
 
-        except jwt.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="토큰이 만료되었습니다.",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
-        except jwt.JWTError:
+            ) from e
+        except jwt.JWTError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="유효하지 않은 토큰입니다.",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from e
 
     @staticmethod
-    def verify_token_type(payload: Dict[str, Any], expected_type: str) -> bool:
+    def verify_token_type(payload: dict[str, Any], expected_type: str) -> bool:
         """
         토큰 타입 검증
 
@@ -150,7 +150,7 @@ class SecurityService:
         self.password_hasher = password_hasher
         self.data_encryptor = data_encryptor
 
-    def create_user_tokens(self, user_id: int) -> Dict[str, str]:
+    def create_user_tokens(self, user_id: int) -> dict[str, str]:
         """
         사용자용 액세스/리프레시 토큰 생성
 
@@ -202,8 +202,8 @@ class SecurityService:
         return self.jwt_handler.create_access_token({"sub": user_id})
 
     def encrypt_sensitive_fields(
-        self, data: Dict[str, Any], sensitive_fields: list[str]
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], sensitive_fields: list[str]
+    ) -> dict[str, Any]:
         """
         민감한 필드 암호화
 
@@ -217,8 +217,8 @@ class SecurityService:
         return self.data_encryptor.encrypt_dict(data, sensitive_fields)
 
     def decrypt_sensitive_fields(
-        self, data: Dict[str, Any], sensitive_fields: list[str]
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], sensitive_fields: list[str]
+    ) -> dict[str, Any]:
         """
         민감한 필드 복호화
 
@@ -237,7 +237,7 @@ security_service = SecurityService()
 
 
 def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> UUID:
     """
     현재 사용자 ID 의존성
@@ -269,11 +269,11 @@ def get_current_user_id(
 
     try:
         return UUID(user_id)
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="유효하지 않은 사용자 ID입니다.",
-        )
+        ) from e
 
 
 def get_current_user_id_from_cookie(
@@ -311,14 +311,14 @@ def get_current_user_id_from_cookie(
 
         return UUID(user_id)
 
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="토큰 검증에 실패했습니다.",
-        )
+        ) from e
 
 
-def create_access_token(data: Dict[str, Any]) -> str:
+def create_access_token(data: dict[str, Any]) -> str:
     """
     액세스 토큰 생성 (전역 함수)
 
@@ -331,7 +331,7 @@ def create_access_token(data: Dict[str, Any]) -> str:
     return security_service.jwt_handler.create_access_token(data)
 
 
-def create_refresh_token(data: Dict[str, Any]) -> str:
+def create_refresh_token(data: dict[str, Any]) -> str:
     """
     리프레시 토큰 생성 (전역 함수)
 
@@ -344,7 +344,7 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     return security_service.jwt_handler.create_refresh_token(data)
 
 
-def decode_access_token(token: str) -> Dict[str, Any]:
+def decode_access_token(token: str) -> dict[str, Any]:
     """
     액세스 토큰 디코딩 (전역 함수)
 
@@ -357,7 +357,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
     return security_service.jwt_handler.decode_token(token)
 
 
-def decode_refresh_token(token: str) -> Dict[str, Any]:
+def decode_refresh_token(token: str) -> dict[str, Any]:
     """
     리프레시 토큰 디코딩 (전역 함수)
 

@@ -6,9 +6,9 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -59,7 +59,7 @@ class AIService:
         self,
         user_id: str,
         data: CreateDiaryRequest,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         try:
             logger.info(f"AI 텍스트 생성 시작: {data.prompt[:50]}...")
 
@@ -84,7 +84,9 @@ class AIService:
 
             # 재생성 시 session_id 또는 sessionId를 같이 전달 받음
             # openai 요청 생성(최초 요청은 session_id 생성 및 regeneration_count 1)
-            session_id = getattr(data, 'sessionId', None) or data.session_id or str(uuid.uuid4())
+            session_id = (
+                getattr(data, "sessionId", None) or data.session_id or str(uuid.uuid4())
+            )
 
             # 기존 세션 로그 조회 (통합 분석 타입으로)
             statement = (
@@ -92,7 +94,7 @@ class AIService:
                 .where(AIUsageLog.session_id == session_id)
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
-            
+
             existing_logs = self.db.execute(statement).scalars().all()
             regeneration_count = len(existing_logs) + 1
 
@@ -158,7 +160,9 @@ class AIService:
                         f"AI 텍스트 생성 후 콘텐츠 완료 알림 발송 중 오류: session_id={session_id}, user_id={user_id}, error={str(e)}"
                     )
             else:
-                logger.info(f"AI 텍스트 생성 시간이 {processing_time:.2f}초로 빠름, 알림 발송 생략")
+                logger.info(
+                    f"AI 텍스트 생성 시간이 {processing_time:.2f}초로 빠름, 알림 발송 생략"
+                )
 
             # 실제 프론트에 필요한 응답 생성
             result = {
@@ -186,9 +190,9 @@ class AIService:
             raise AIGenerationFailedException(
                 detail=f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
                 error_type="GENERATION_ERROR",
-            )
+            ) from e
 
-    def get_regeneration_status(self, session_id: str) -> Dict[str, Any]:
+    def get_regeneration_status(self, session_id: str) -> dict[str, Any]:
         """
         특정 세션의 재생성 횟수 정보 조회
 
@@ -204,7 +208,7 @@ class AIService:
                 .where(AIUsageLog.session_id == session_id)
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
-            
+
             existing_logs = self.db.execute(statement).scalars().all()
             current_count = len(existing_logs)
 
@@ -219,12 +223,12 @@ class AIService:
 
         except Exception as e:
             logger.error(f"재생성 상태 조회 실패: {str(e)}")
-            raise SessionNotFoundException(session_id=session_id)
+            raise SessionNotFoundException(session_id=session_id) from e
 
-    def test_db_connection(self) -> Dict[str, Any]:
+    def test_db_connection(self) -> dict[str, Any]:
         """
         DB 연결 상태 테스트
-        
+
         Returns:
             Dict: DB 연결 상태 정보
         """
@@ -232,26 +236,26 @@ class AIService:
             # 간단한 쿼리 실행
             statement = select(func.count()).select_from(AIUsageLog)
             result = self.db.execute(statement).scalar()
-            
+
             return {
                 "status": "success",
                 "message": "DB 연결 정상",
                 "total_logs": result,
                 "db_session": str(type(self.db)),
-                "timestamp": str(datetime.now())
+                "timestamp": str(datetime.now()),
             }
-            
+
         except Exception as e:
             logger.error(f"DB 연결 테스트 실패: {str(e)}")
-            
+
             return {
                 "status": "error",
                 "message": f"DB 연결 실패: {str(e)}",
                 "error_type": type(e).__name__,
-                "timestamp": str(datetime.now())
+                "timestamp": str(datetime.now()),
             }
 
-    def get_user_daily_stats(self, user_id: str) -> Dict[str, Any]:
+    def get_user_daily_stats(self, user_id: str) -> dict[str, Any]:
         """
         사용자의 일일 AI 사용 통계 조회
 
@@ -262,10 +266,10 @@ class AIService:
             Dict: 일일 AI 사용 통계
         """
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             # 오늘 날짜 기준으로 조회
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
 
             statement = (
                 select(AIUsageLog)
@@ -317,13 +321,13 @@ class AIService:
             raise InvalidRequestException(
                 detail=f"사용자 통계 조회 중 오류가 발생했습니다: {str(e)}",
                 field="user_id",
-            )
+            ) from e
 
     # validate_request 메소드 제거됨 - Pydantic 모델에서 자동 검증 처리
 
     async def _generate_complete_analysis(
         self, prompt: str, style: str, length: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         한 번의 API 호출로 감정 분석, 키워드 추출, 글귀 생성을 모두 처리
         """
@@ -407,7 +411,7 @@ JSON 형식으로만 답해주세요."""
                 raise AIGenerationFailedException(
                     detail=f"AI 응답 파싱 실패: {str(e)}",
                     error_type="PARSING_ERROR",
-                )
+                ) from e
 
         except Exception as e:
             logger.error(f"통합 AI 분석 실패: {str(e)}")
@@ -421,25 +425,25 @@ JSON 형식으로만 답해주세요."""
                 raise AIGenerationFailedException(
                     detail="OpenAI API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.",
                     error_type="RATE_LIMIT_ERROR",
-                )
+                ) from e
             elif "service unavailable" in error_str or "timeout" in error_str:
                 # 서비스 일시적 불가
                 logger.error(f"OpenAI 서비스 일시적 불가: {str(e)}")
                 raise AIGenerationFailedException(
                     detail="AI 서비스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
                     error_type="SERVICE_UNAVAILABLE",
-                )
+                ) from e
             elif "token" in error_str and "limit" in error_str:
                 # 토큰 한도 초과
                 logger.error(f"토큰 한도 초과: {str(e)}")
                 raise AIGenerationFailedException(
                     detail="입력 텍스트가 너무 깁니다. 더 짧은 내용으로 다시 시도해주세요.",
                     error_type="TOKEN_LIMIT_ERROR",
-                )
+                ) from e
             else:
                 # 기타 AI 생성 오류
                 logger.error(f"AI 생성 오류: {str(e)}")
                 raise AIGenerationFailedException(
                     detail=f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
                     error_type="GENERATION_ERROR",
-                )
+                ) from e

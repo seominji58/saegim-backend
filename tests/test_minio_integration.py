@@ -4,8 +4,9 @@ MinIO 실제 업로드 통합 테스트
 """
 
 import os
-import pytest
 from unittest.mock import Mock
+
+import pytest
 from fastapi import UploadFile
 
 
@@ -21,9 +22,9 @@ def setup_integration_test_env():
     os.environ["MINIO_BUCKET_NAME"] = "test"
 
     # 테스트가 test 버킷을 사용하는지 확인
-    assert os.environ["MINIO_BUCKET_NAME"] == "test", (
-        "테스트는 반드시 'test' 버킷을 사용해야 합니다"
-    )
+    assert (
+        os.environ["MINIO_BUCKET_NAME"] == "test"
+    ), "테스트는 반드시 'test' 버킷을 사용해야 합니다"
 
     # 설정 캐시 클리어 (lru_cache 때문에 캐시된 설정을 클리어)
     from app.core.config import get_settings
@@ -101,7 +102,7 @@ def real_large_image():
 @pytest.mark.asyncio
 async def test_webp_image_upload(real_webp_image):
     """실제 WebP 이미지 파일 업로드 테스트"""
-    from app.utils.minio_upload import upload_image_to_minio, delete_image_from_minio
+    from app.utils.minio_upload import delete_image_from_minio, upload_image_to_minio
 
     try:
         # 실제 업로드
@@ -137,8 +138,9 @@ async def test_webp_image_upload(real_webp_image):
 @pytest.mark.asyncio
 async def test_large_image_upload_should_fail(real_large_image):
     """대용량 이미지 업로드 실패 테스트 (15MB 제한 초과)"""
-    from app.utils.minio_upload import upload_image_to_minio
     from fastapi import HTTPException
+
+    from app.utils.minio_upload import upload_image_to_minio
 
     try:
         print("📊 대용량 이미지 테스트:")
@@ -174,12 +176,12 @@ def test_minio_connection():
         print(f"   버킷명: {uploader.bucket_name}")
 
         # 테스트 환경에서는 반드시 'test' 버킷을 사용해야 함
-        assert uploader.bucket_name == "test", (
-            f"통합 테스트는 'test' 버킷을 사용해야 하지만 '{uploader.bucket_name}'을 사용 중입니다"
-        )
-        assert os.environ.get("MINIO_BUCKET_NAME") == "test", (
-            "환경변수 MINIO_BUCKET_NAME이 'test'로 설정되지 않았습니다"
-        )
+        assert (
+            uploader.bucket_name == "test"
+        ), f"통합 테스트는 'test' 버킷을 사용해야 하지만 '{uploader.bucket_name}'을 사용 중입니다"
+        assert (
+            os.environ.get("MINIO_BUCKET_NAME") == "test"
+        ), "환경변수 MINIO_BUCKET_NAME이 'test'로 설정되지 않았습니다"
 
     except Exception as e:
         print(f"❌ MinIO 연결 실패: {e}")
@@ -190,9 +192,9 @@ def test_minio_connection():
 def test_bucket_name_enforcement():
     """통합 테스트에서 버킷명 강제 확인"""
     # 환경변수 확인
-    assert os.environ.get("MINIO_BUCKET_NAME") == "test", (
-        "통합 테스트는 반드시 'test' 버킷명을 사용해야 합니다"
-    )
+    assert (
+        os.environ.get("MINIO_BUCKET_NAME") == "test"
+    ), "통합 테스트는 반드시 'test' 버킷명을 사용해야 합니다"
 
     try:
         from app.utils.minio_upload import get_minio_uploader
@@ -200,9 +202,9 @@ def test_bucket_name_enforcement():
         uploader = get_minio_uploader()
 
         # 업로더 인스턴스의 버킷명 확인
-        assert uploader.bucket_name == "test", (
-            f"업로더가 잘못된 버킷명 '{uploader.bucket_name}'을 사용하고 있습니다"
-        )
+        assert (
+            uploader.bucket_name == "test"
+        ), f"업로더가 잘못된 버킷명 '{uploader.bucket_name}'을 사용하고 있습니다"
 
         print("✅ 버킷명 확인 완료: 'test' 버킷 사용 중")
 

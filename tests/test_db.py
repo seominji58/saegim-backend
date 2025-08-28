@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Tuple
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
@@ -25,7 +24,7 @@ if not DATABASE_URL:
     raise ValueError("환경 변수 DATABASE_URL이 설정되지 않았습니다.")
 
 
-def test_connection() -> Tuple[bool, str]:
+def test_connection() -> tuple[bool, str]:
     """
     데이터베이스 연결을 테스트합니다.
 

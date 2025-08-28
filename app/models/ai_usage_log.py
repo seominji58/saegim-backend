@@ -2,21 +2,22 @@
 AI 사용 로그 모델
 """
 
-from typing import TYPE_CHECKING, Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
+
 from sqlalchemy import (
-    String,
-    Integer,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
-    CheckConstraint,
+    Integer,
+    String,
     desc,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -47,16 +48,18 @@ class AIUsageLog(Base):
     )
 
     # 기본 필드
-    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )
     api_type: Mapped[str] = mapped_column(String(50), nullable=False)
     session_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
     regeneration_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    tokens_used: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    request_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
-    response_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    request_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    response_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # 타임스탬프 필드
     created_at: Mapped[datetime] = mapped_column(

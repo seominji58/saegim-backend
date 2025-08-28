@@ -3,26 +3,27 @@
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Dict, Any
-from uuid import UUID
+
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from sqlalchemy import (
-    String,
-    DateTime,
     Boolean,
-    Index,
     CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
     Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func, text
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import ForeignKey
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.fcm import NotificationHistory
+    from app.models.user import User
 
 from app.models.base import Base
 
@@ -63,7 +64,7 @@ class Notification(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Additional Data
-    data: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    data: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )  # 알림 관련 세부 데이터 (JSONB)
 
@@ -71,10 +72,10 @@ class Notification(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Scheduling
-    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
+    scheduled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )  # 예약 전송 시간
-    read_at: Mapped[Optional[datetime]] = mapped_column(
+    read_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )  # 읽음 시간
 
@@ -90,8 +91,8 @@ class Notification(Base):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="notifications")
-    notification_history: Mapped[list["NotificationHistory"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="notifications")
+    notification_history: Mapped[list[NotificationHistory]] = relationship(
         "NotificationHistory",
         back_populates="notification",
         cascade="all, delete-orphan",
