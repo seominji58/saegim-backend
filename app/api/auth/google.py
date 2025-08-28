@@ -72,13 +72,15 @@ async def google_callback(
             url=f"{settings.frontend_callback_url}?success=true"
         )
 
-        # 쿠키에 토큰 설정 (환경별 동적 설정)
+        # 쿠키에 토큰 설정 (환경별 보안 강화)
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=settings.cookie_httponly,
-            secure=settings.cookie_secure,
-            samesite=settings.cookie_samesite,
+            secure=settings.is_production,  # 운영 환경에서는 강제 HTTPS
+            samesite="strict"
+            if settings.is_production
+            else settings.cookie_samesite,  # 운영 환경에서는 strict
             max_age=settings.jwt_access_token_expire_minutes * 60,  # 분을 초로 변환
             path="/",
             domain=settings.cookie_domain,
@@ -88,8 +90,10 @@ async def google_callback(
             key="refresh_token",
             value=refresh_token,
             httponly=settings.cookie_httponly,
-            secure=settings.cookie_secure,
-            samesite=settings.cookie_samesite,
+            secure=settings.is_production,  # 운영 환경에서는 강제 HTTPS
+            samesite="strict"
+            if settings.is_production
+            else settings.cookie_samesite,  # 운영 환경에서는 strict
             max_age=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,  # 일을 초로 변환
             path="/",
             domain=settings.cookie_domain,

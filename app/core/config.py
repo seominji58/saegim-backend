@@ -145,7 +145,7 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
         """설정 초기화 후 필수 환경변수 검증"""
         if not self.secret_key:
             raise ValueError("SECRET_KEY 환경변수가 설정되지 않았습니다. " "보안을 위해 반드시 설정해야 합니다.")

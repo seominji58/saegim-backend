@@ -3,16 +3,16 @@ JWT 토큰 갱신 API 라우터
 """
 
 import logging
-from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
 
 from app.core.config import get_settings
 from app.core.security import (
-    decode_refresh_token,
     create_access_token,
     create_refresh_token,
+    decode_refresh_token,
 )
 from app.db.database import get_session
 from app.models.user import User
@@ -102,13 +102,15 @@ async def refresh_token(
             }
         )
 
-        # 쿠키에 새로운 토큰 설정 (환경별 동적 설정)
+        # 쿠키에 새로운 토큰 설정 (환경별 보안 강화)
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=settings.cookie_httponly,
-            secure=settings.cookie_secure,
-            samesite=settings.cookie_samesite,
+            secure=settings.is_production,  # 운영 환경에서는 강제 HTTPS
+            samesite="strict"
+            if settings.is_production
+            else settings.cookie_samesite,  # 운영 환경에서는 strict
             max_age=settings.jwt_access_token_expire_minutes * 60,  # 분을 초로 변환
             path="/",
             domain=settings.cookie_domain,
@@ -118,12 +120,11 @@ async def refresh_token(
             key="refresh_token",
             value=new_refresh_token,
             httponly=settings.cookie_httponly,
-            secure=settings.cookie_secure,
-            samesite=settings.cookie_samesite,
-            max_age=settings.jwt_refresh_token_expire_days
-            * 24
-            * 60
-            * 60,  # 일을 초로 변환
+            secure=settings.is_production,  # 운영 환경에서는 강제 HTTPS
+            samesite="strict"
+            if settings.is_production
+            else settings.cookie_samesite,  # 운영 환경에서는 strict
+            max_age=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,  # 일을 초로 변환
             path="/",
             domain=settings.cookie_domain,
         )
