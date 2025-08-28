@@ -1,31 +1,34 @@
 """
 OAuth 인증 서비스
 """
-from typing import Optional, Tuple
-import json
+
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Tuple
+
 import httpx
 from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.models.oauth_token import OAuthToken
+from app.models.user import User
+from app.schemas.oauth import GoogleOAuthResponse, OAuthUserInfo
+from app.services.base import BaseService
 
 # 로거 설정
 logger = logging.getLogger(__name__)
 
-from app.core.config import get_settings
-from app.schemas.oauth import GoogleOAuthResponse, OAuthUserInfo
-from app.models.oauth_token import OAuthToken
-from app.models.user import User
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-
 settings = get_settings()
 
 
-class GoogleOAuthService:
+class GoogleOAuthService(BaseService):
     """구글 OAuth 서비스"""
 
     def __init__(self):
         """초기화"""
+        super().__init__()  # BaseService 초기화 (DB 없이)
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
         self.redirect_uri = settings.google_redirect_uri
@@ -51,7 +54,7 @@ class GoogleOAuthService:
             "grant_type": "authorization_code",
             "redirect_uri": self.redirect_uri,
         }
-        
+
         logger.info(f"Requesting token with redirect_uri: {self.redirect_uri}")
         logger.info(f"Client ID configured: {self.client_id[:8]}...")
         logger.info(f"Token URL: {self.token_url}")
@@ -62,8 +65,14 @@ class GoogleOAuthService:
             response = await client.post(self.token_url, data=data)
 
             if response.status_code != 200:
-                error_detail = response.json() if response.content else "No error details available"
-                logger.error(f"Failed to get access token. Status: {response.status_code}, Details: {error_detail}")
+                error_detail = (
+                    response.json()
+                    if response.content
+                    else "No error details available"
+                )
+                logger.error(
+                    f"Failed to get access token. Status: {response.status_code}, Details: {error_detail}"
+                )
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Failed to get access token: {error_detail}",
@@ -97,10 +106,12 @@ class GoogleOAuthService:
             user_data = response.json()
             # 디버깅: 구글 API 응답 확인
             print(f"Google API Response: {user_data}")
-            
+
             # 구글 userinfo API 응답 구조 확인 및 안전한 ID 추출
-            user_id = user_data.get("sub") or user_data.get("id") or user_data.get("email")
-            
+            user_id = (
+                user_data.get("sub") or user_data.get("id") or user_data.get("email")
+            )
+
             return OAuthUserInfo(
                 id=user_id,  # 구글 사용자 ID (sub, id, 또는 email 폴백)
                 email=user_data["email"],
@@ -122,7 +133,7 @@ class GoogleOAuthService:
         """
         # 액세스 토큰 요청
         token_response = await self.get_access_token(code)
-        
+
         # 사용자 정보 요청
         user_info = await self.get_user_info(token_response.access_token)
 
@@ -135,10 +146,22 @@ class GoogleOAuthService:
             # Soft Delete된 계정인지 확인
             if user.deleted_at is not None:
                 # timezone을 일치시켜서 비교
-                current_time = datetime.now(user.deleted_at.tzinfo) if user.deleted_at.tzinfo else datetime.now()
-                deleted_time = user.deleted_at.replace(tzinfo=None) if user.deleted_at.tzinfo else user.deleted_at
-                current_time_naive = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
-                
+                current_time = (
+                    datetime.now(user.deleted_at.tzinfo)
+                    if user.deleted_at.tzinfo
+                    else datetime.now()
+                )
+                deleted_time = (
+                    user.deleted_at.replace(tzinfo=None)
+                    if user.deleted_at.tzinfo
+                    else user.deleted_at
+                )
+                current_time_naive = (
+                    current_time.replace(tzinfo=None)
+                    if current_time.tzinfo
+                    else current_time
+                )
+
                 # 30일 이내인지 확인
                 if deleted_time >= current_time_naive - timedelta(days=30):
                     raise HTTPException(
@@ -148,8 +171,9 @@ class GoogleOAuthService:
                             "message": "탈퇴된 계정입니다. 30일 이내에 복구할 수 있습니다.",
                             "deleted_at": user.deleted_at.isoformat(),
                             "restore_available": True,
-                            "days_remaining": 30 - (current_time_naive - deleted_time).days
-                        }
+                            "days_remaining": 30
+                            - (current_time_naive - deleted_time).days,
+                        },
                     )
                 else:
                     raise HTTPException(
@@ -158,8 +182,8 @@ class GoogleOAuthService:
                             "error": "ACCOUNT_PERMANENTLY_DELETED",
                             "message": "탈퇴 후 30일이 경과되어 복구할 수 없습니다.",
                             "deleted_at": user.deleted_at.isoformat(),
-                            "restore_available": False
-                        }
+                            "restore_available": False,
+                        },
                     )
 
         if not user:

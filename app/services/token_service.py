@@ -6,10 +6,12 @@ JWT 토큰 무효화 및 검증
 import logging
 from typing import Optional
 
+from app.services.base import BaseService
+
 logger = logging.getLogger(__name__)
 
 
-class TokenBlacklistService:
+class TokenBlacklistService(BaseService):
     """토큰 블랙리스트 관리 서비스"""
 
     def __init__(self, redis_client):
@@ -19,6 +21,7 @@ class TokenBlacklistService:
         Args:
             redis_client: Redis 클라이언트 인스턴스
         """
+        super().__init__()  # BaseService 초기화 (DB 없이)
         self.redis = redis_client
 
     async def revoke_token(self, token: str, expires_in: int) -> bool:

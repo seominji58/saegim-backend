@@ -22,13 +22,38 @@ from app.schemas.notification import (
     NotificationSettingsResponse,
     NotificationSettingsUpdate,
 )
+from app.services.base import BaseService
 from app.utils.fcm_push import get_fcm_service
 
 logger = logging.getLogger(__name__)
 
 
-class NotificationService:
+class NotificationService(BaseService):
     """알림 토큰 및 푸시 알림 관리 서비스"""
+
+    def __init__(self, db: Session = None):
+        """
+        알림 서비스 초기화
+
+        Args:
+            db: 데이터베이스 세션 (선택사항)
+        """
+        super().__init__(db)
+
+    @staticmethod
+    def _extract_error_message(result: dict) -> str:
+        """FCM 응답에서 에러 메시지를 안전하게 추출"""
+        try:
+            response = result.get("response")
+            if isinstance(response, dict):
+                error = response.get("error")
+                if isinstance(error, dict):
+                    message = error.get("message")
+                    if isinstance(message, str):
+                        return message
+            return ""
+        except (AttributeError, TypeError):
+            return ""
 
     @staticmethod
     def register_token(
@@ -373,11 +398,10 @@ class NotificationService:
                         if result["success"]
                         else None,
                         error_message=(
-                            str(result.get("response", {}).get("error", {}).get("message", ""))  # type: ignore[attr-defined]
+                            NotificationService._extract_error_message(result)
                             if (
-                                not result["success"]
+                                not result.get("success", False)
                                 and isinstance(result, dict)
-                                and isinstance(result.get("response"), dict)
                             )
                             else None
                         ),

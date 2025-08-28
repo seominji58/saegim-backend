@@ -11,13 +11,15 @@ from sqlmodel import Session, func, select
 
 from app.models.diary import DiaryEntry
 from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
+from app.services.base import SyncBaseService
 
 
-class DiaryService:
+class DiaryService(SyncBaseService):
     """다이어리 비즈니스 로직 (캘린더용)"""
 
     def __init__(self, session: Session):
-        self.session = session
+        super().__init__(session)
+        self.session = session  # 기존 코드 호환성을 위해 유지
 
     def get_diaries(
         self,
@@ -160,8 +162,8 @@ class DiaryService:
 
         # 데이터베이스에 저장
         self.session.add(new_diary)
-        self.session.commit()
-        self.session.refresh(new_diary)
+        self.sync_commit()
+        self.sync_refresh(new_diary)
 
         return new_diary
 
@@ -192,7 +194,7 @@ class DiaryService:
 
         # 데이터베이스에 저장
         self.session.add(diary)
-        self.session.commit()
-        self.session.refresh(diary)
+        self.sync_commit()
+        self.sync_refresh(diary)
 
         return diary
