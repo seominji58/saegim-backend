@@ -18,6 +18,7 @@ from fastapi import (
 )
 from sqlmodel import Session, select
 
+from app.constants import SortOrder
 from app.core.deps import get_current_user
 from app.db.database import get_session
 from app.models.image import Image
@@ -70,7 +71,7 @@ async def get_my_diaries(
     start_date: Optional[date] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
     sort_order: str = Query(
-        "desc",
+        SortOrder.DESC.value,
         description="정렬 순서 (asc: 오름차순, desc: 내림차순)",
         regex="^(asc|desc)$",
     ),

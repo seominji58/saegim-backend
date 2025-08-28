@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.deps import get_current_user
 from app.db.database import get_session
 from app.models.user import User
@@ -59,7 +60,7 @@ async def change_password(
     """
     try:
         # 1. 이메일 회원가입 사용자인지 확인
-        if current_user.account_type != "email":
+        if current_user.account_type != AccountType.EMAIL.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 로그인 사용자는 비밀번호 변경이 불가능합니다.",

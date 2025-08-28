@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr, validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.config import get_settings
 from app.core.security import create_access_token, create_refresh_token
 from app.db.database import get_session
@@ -148,7 +149,7 @@ async def signup(
             email=request.email,
             password_hash=hashed_password,
             nickname=request.nickname,
-            account_type="email",  # 이메일 회원가입
+            account_type=AccountType.EMAIL.value,  # 이메일 회원가입
             provider=None,  # 소셜 로그인이 아님
             provider_id=None,
             is_active=True,
@@ -331,7 +332,7 @@ async def login(
                 )
 
         # 3. 이메일 회원가입 사용자인지 확인
-        if user.account_type != "email":
+        if user.account_type != AccountType.EMAIL.value:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="소셜 로그인으로 가입된 계정입니다.",

@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType, OAuthProvider
 from app.core.config import get_settings
 from app.models.oauth_token import OAuthToken
 from app.models.user import User
@@ -191,8 +192,8 @@ class GoogleOAuthService(BaseService):
                 email=user_info.email,
                 nickname=user_info.name,
                 profile_image_url=user_info.picture,
-                account_type="social",
-                provider="google",
+                account_type=AccountType.SOCIAL.value,
+                provider=OAuthProvider.GOOGLE.value,
                 provider_id=user_info.id,  # 구글 사용자 ID 설정
                 is_active=True,
             )
@@ -203,7 +204,7 @@ class GoogleOAuthService(BaseService):
         # OAuth 토큰 저장/업데이트
         stmt = select(OAuthToken).where(
             OAuthToken.user_id == user.id,
-            OAuthToken.provider == "google",
+            OAuthToken.provider == OAuthProvider.GOOGLE.value,
         )
         result = db.execute(stmt)
         oauth_token = result.scalar_one_or_none()
@@ -218,7 +219,7 @@ class GoogleOAuthService(BaseService):
         else:
             oauth_token = OAuthToken(
                 user_id=user.id,
-                provider="google",
+                provider=OAuthProvider.GOOGLE.value,
                 access_token=token_response.access_token,
                 refresh_token=token_response.refresh_token,
                 expires_at=datetime.now(timezone.utc).replace(microsecond=0)

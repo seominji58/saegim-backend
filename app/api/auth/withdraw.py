@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.deps import get_current_user_id, get_session
 from app.core.security import password_hasher
 from app.models.ai_usage_log import AIUsageLog
@@ -79,7 +80,7 @@ async def withdraw_account(
         logger.info(f"사용자 조회 성공: {user.email}, 계정 타입: {user.account_type}")
 
         # 2. 계정 타입별 비밀번호 확인
-        if user.account_type == "email":
+        if user.account_type == AccountType.EMAIL.value:
             logger.info("이메일 계정 비밀번호 확인 중")
             # 이메일 계정은 비밀번호 필수
             if not request.password:
@@ -96,7 +97,7 @@ async def withdraw_account(
                     status_code=status.HTTP_401_UNAUTHORIZED, detail="비밀번호가 올바르지 않습니다."
                 )
             logger.info("이메일 계정 비밀번호 확인 성공")
-        elif user.account_type == "social":
+        elif user.account_type == AccountType.SOCIAL.value:
             logger.info("소셜 계정 탈퇴 - 비밀번호 확인 불필요")
             # 소셜 계정은 비밀번호 확인 불필요
             pass
@@ -199,7 +200,9 @@ async def withdraw_account(
         logger.info("쿠키 무효화 완료")
 
         # 9. 응답 생성
-        account_type_message = "이메일 계정" if user.account_type == "email" else "소셜 계정"
+        account_type_message = (
+            "이메일 계정" if user.account_type == AccountType.EMAIL.value else "소셜 계정"
+        )
         response_data = WithdrawResponse(
             message=f"{account_type_message} 탈퇴가 완료되었습니다. 30일 이내에 계정을 복구할 수 있습니다.",
             withdrawal_date=withdrawal_date,

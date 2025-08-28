@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.config import get_settings
 from app.core.deps import get_current_user
 from app.db.database import get_session
@@ -233,7 +234,7 @@ async def verify_password_and_change_email(
     """
     try:
         # 1. 이메일 회원가입 사용자인지 확인
-        if current_user.account_type != "email":
+        if current_user.account_type != AccountType.EMAIL.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 로그인 사용자는 비밀번호 확인이 필요하지 않습니다.",

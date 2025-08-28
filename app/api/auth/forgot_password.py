@@ -11,6 +11,7 @@ from pydantic import BaseModel, EmailStr, validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.config import settings
 from app.core.deps import get_session
 from app.models.password_reset_token import PasswordResetToken
@@ -76,7 +77,7 @@ async def send_password_reset_email(
             )
 
         # 소셜 계정 사용자인 경우
-        if user.account_type == "social":
+        if user.account_type == AccountType.SOCIAL.value:
             # 소셜 계정은 비밀번호 재설정 불가능 - 에러 페이지로 리다이렉트
             provider_name = user.provider or "소셜"
             raise HTTPException(
@@ -180,7 +181,7 @@ async def verify_password_reset_code(
             )
 
         # 소셜 계정 사용자인 경우
-        if user.account_type == "social":
+        if user.account_type == AccountType.SOCIAL.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 계정 사용자는 비밀번호 재설정이 불가능합니다.",
@@ -245,7 +246,7 @@ async def reset_password(
             )
 
         # 소셜 계정 사용자인 경우
-        if user.account_type == "social":
+        if user.account_type == AccountType.SOCIAL.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 계정 사용자는 비밀번호 재설정이 불가능합니다.",

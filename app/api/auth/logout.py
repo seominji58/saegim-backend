@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType, OAuthProvider
 from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.db.database import get_session
@@ -131,9 +132,14 @@ async def logout(
                 # 토큰이 유효하지 않아도 로그아웃은 성공으로 처리
 
         # 2. 구글 OAuth 세션 정리 (사용자 정보가 있는 경우에만)
-        if user and user.account_type == "social" and user.provider == "google":
+        if (
+            user
+            and user.account_type == AccountType.SOCIAL.value
+            and user.provider == OAuthProvider.GOOGLE.value
+        ):
             stmt = select(OAuthToken).where(
-                OAuthToken.user_id == current_user_id, OAuthToken.provider == "google"
+                OAuthToken.user_id == current_user_id,
+                OAuthToken.provider == OAuthProvider.GOOGLE.value,
             )
             result = db.execute(stmt)
             oauth_token = result.scalar_one_or_none()
@@ -190,7 +196,7 @@ async def logout(
                 "user_id": str(current_user_id) if current_user_id else None,
                 "account_type": user.account_type if user else None,
                 "provider": user.provider
-                if user and user.account_type == "social"
+                if user and user.account_type == AccountType.SOCIAL.value
                 else None,
                 "errors": error_details if error_details else None,
             },

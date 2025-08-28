@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.constants import AccountType
 from app.core.deps import get_session
 from app.models.diary import DiaryEntry
 from app.models.email_verification import EmailVerification
@@ -136,7 +137,9 @@ async def restore_account(
         db.commit()
 
         # 8. 응답 생성
-        account_type_message = "이메일 계정" if user.account_type == "email" else "소셜 계정"
+        account_type_message = (
+            "이메일 계정" if user.account_type == AccountType.EMAIL.value else "소셜 계정"
+        )
         response_data = RestoreResponse(
             message=f"{account_type_message}이 성공적으로 복구되었습니다.",
             restored_at=restored_at,

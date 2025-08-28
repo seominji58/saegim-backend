@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 
 from sqlmodel import Session, func, select
 
+from app.constants import EmotionType, SortOrder
 from app.models.diary import DiaryEntry
 from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
 from app.services.base import SyncBaseService
@@ -31,7 +32,7 @@ class DiaryService(SyncBaseService):
         is_public: Optional[bool] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        sort_order: str = "desc",
+        sort_order: str = SortOrder.DESC.value,
     ) -> Tuple[List[DiaryEntry], int]:
         """다이어리 목록 조회 (페이지네이션 포함)"""
 
@@ -68,7 +69,7 @@ class DiaryService(SyncBaseService):
         # # 정렬 (최신순) old
         # statement = statement.order_by(DiaryEntry.created_at.desc())
         # 정렬 적용
-        if sort_order.lower() == "desc":
+        if sort_order.lower() == SortOrder.DESC.value:
             statement = statement.order_by(DiaryEntry.created_at.desc())
         else:
             statement = statement.order_by(DiaryEntry.created_at.asc())
@@ -132,7 +133,7 @@ class DiaryService(SyncBaseService):
         """새로운 다이어리 생성"""
 
         # 임시 AI 다이어리 생성 결과 생성
-        emotions = ["happy", "sad", "angry", "peaceful", "unrest"]
+        emotions = [emotion.value for emotion in EmotionType]
         ai_emotion = random.choice(emotions)
         ai_emotion_confidence = round(random.uniform(0.1, 0.9), 2)
         ai_generated_text = f"AI가 생성한 {ai_emotion}한 감정의 텍스트입니다."
