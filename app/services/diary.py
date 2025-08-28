@@ -2,7 +2,6 @@
 다이어리 비즈니스 로직 서비스 (캘린더용)
 """
 
-import json
 import random
 from datetime import date, datetime
 from typing import List, Optional, Tuple
@@ -142,13 +141,12 @@ class DiaryService(SyncBaseService):
         ai_emotion_confidence = round(random.uniform(0.1, 0.9), 2)
         ai_generated_text = f"AI가 생성한 {ai_emotion}한 감정의 텍스트입니다."
 
+        # 키워드를 리스트로 직접 처리 (JSONB 타입이므로)
         mock_keywords = (
             ["일기"]
             if not diary_create.content or len(diary_create.content.strip()) < 2
             else [diary_create.content.strip()[:2]]
         )
-        # keywords를 JSON 문자열로 변환
-        keywords_json = json.dumps(mock_keywords, ensure_ascii=False)
 
         # 새 다이어리 엔트리 생성
         new_diary = DiaryEntry(
@@ -160,7 +158,7 @@ class DiaryService(SyncBaseService):
             ai_emotion_confidence=ai_emotion_confidence,
             ai_generated_text=ai_generated_text,
             is_public=diary_create.is_public,
-            keywords=keywords_json,
+            keywords=mock_keywords,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -186,13 +184,8 @@ class DiaryService(SyncBaseService):
 
         for field, value in update_data.items():
             if hasattr(diary, field):
-                # keywords 필드는 JSON 문자열로 변환
-                if field == "keywords" and isinstance(value, list):
-                    import json
-
-                    setattr(diary, field, json.dumps(value) if value else None)
-                else:
-                    setattr(diary, field, value)
+                # keywords 필드는 JSONB 타입이므로 리스트 그대로 저장
+                setattr(diary, field, value)
 
         # updated_at 필드 자동 업데이트
         diary.updated_at = datetime.utcnow()

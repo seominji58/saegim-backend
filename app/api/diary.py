@@ -2,7 +2,6 @@
 다이어리 API 라우터 (JWT 인증 기반)
 """
 
-import uuid
 from datetime import date
 from typing import List, Optional
 
@@ -36,6 +35,7 @@ from app.utils.minio_upload import (
     get_minio_uploader,
     upload_image_with_thumbnail_to_minio,
 )
+from app.utils.validators import validate_image_file, validate_uuid
 
 router = APIRouter()
 
@@ -135,13 +135,7 @@ async def get_diary(
     """JWT 인증된 사용자의 특정 다이어리 조회"""
 
     # UUID 형식 검증
-    try:
-        uuid.UUID(diary_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="잘못된 다이어리 ID 형식입니다.",
-        )
+    validate_uuid(diary_id, "다이어리 ID")
 
     diary_service = DiaryService(session)
     diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
@@ -172,13 +166,7 @@ async def upload_diary_image(
     """다이어리에 이미지 업로드"""
 
     # UUID 형식 검증
-    try:
-        uuid.UUID(diary_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="잘못된 다이어리 ID 형식입니다.",
-        )
+    validate_uuid(diary_id, "다이어리 ID")
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
@@ -191,17 +179,7 @@ async def upload_diary_image(
         )
 
     # 이미지 파일 검증
-    if not image.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미지 파일만 업로드할 수 있습니다.",
-        )
-
-    if image.size > 10 * 1024 * 1024:  # 10MB 제한
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="파일 크기는 10MB 이하여야 합니다.",
-        )
+    validate_image_file(image.content_type, image.size)
 
     try:
         # MinIO에 이미지와 썸네일 업로드
@@ -253,14 +231,8 @@ async def delete_diary_image(
     """다이어리 이미지 삭제"""
 
     # UUID 형식 검증
-    try:
-        uuid.UUID(diary_id)
-        uuid.UUID(image_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="잘못된 ID 형식입니다.",
-        )
+    validate_uuid(diary_id, "다이어리 ID")
+    validate_uuid(image_id, "이미지 ID")
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
@@ -332,13 +304,7 @@ async def get_diary_images(
     """다이어리의 기존 이미지들 조회"""
 
     # UUID 형식 검증
-    try:
-        uuid.UUID(diary_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="잘못된 다이어리 ID 형식입니다.",
-        )
+    validate_uuid(diary_id, "다이어리 ID")
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
@@ -404,13 +370,7 @@ async def update_diary(
     """JWT 인증된 사용자의 다이어리 수정"""
 
     # UUID 형식 검증
-    try:
-        uuid.UUID(diary_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="올바른 UUID 형식이 아닙니다",
-        )
+    validate_uuid(diary_id, "다이어리 ID")
 
     diary_service = DiaryService(session)
 
