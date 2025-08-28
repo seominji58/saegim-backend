@@ -4,6 +4,7 @@
 
 import logging
 from typing import Generator
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
@@ -30,16 +31,13 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-async def get_current_user_id(
-    request: Request, db: Session = Depends(get_session)
-) -> str:
+async def get_current_user_id(request: Request) -> str:
     """
     쿠키 또는 Bearer 토큰을 통해 현재 로그인한 사용자 ID 조회
     (소셜 로그인: 쿠키, 이메일 로그인: Bearer 토큰)
 
     Args:
         request: FastAPI Request 객체
-        db: 데이터베이스 세션
 
     Returns:
         현재 로그인한 사용자 ID
@@ -75,12 +73,18 @@ async def get_current_user_id(
 
 async def _extract_user_id(request: Request) -> str | None:
     """쿠키 또는 Bearer 토큰에서 사용자 ID 추출"""
+    logger.info("사용자 ID 추출 시작")
+
     try:
         # 1. 쿠키에서 토큰 확인 (소셜 로그인)
+        logger.info("쿠키에서 토큰 추출 시도")
         user_id = get_current_user_id_from_cookie(request)
         logger.info(f"쿠키에서 user_id 추출: {user_id}")
         return str(user_id)
-    except HTTPException:
+    except HTTPException as e:
+        logger.info(f"쿠키 인증 실패: {e.detail}")
+    except Exception as e:
+        logger.error(f"쿠키 인증 중 예상치 못한 오류: {e}")
         pass
 
     # 2. Authorization 헤더에서 토큰 확인 (이메일 로그인)
@@ -97,9 +101,23 @@ async def _extract_user_id(request: Request) -> str | None:
 
 async def _validate_user(user_id: str, db: Session) -> User:
     """사용자 존재 여부 및 활성 상태 확인"""
-    stmt = select(User).where(User.id == user_id, User.deleted_at is None)
+    logger.info(f"사용자 검증 시작: {user_id}")
+
+    try:
+        user_uuid = UUID(user_id)
+        logger.info(f"UUID 변환 성공: {user_uuid}")
+    except ValueError as e:
+        logger.error(f"UUID 변환 실패: {user_id}, 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 사용자 ID 형식입니다.",
+        )
+
+    stmt = select(User).where(User.id == user_uuid, User.deleted_at.is_(None))
     result = db.execute(stmt)
     user = result.scalar_one_or_none()
+
+    logger.info(f"데이터베이스 조회 결과: {'사용자 존재' if user else '사용자 없음'}")
 
     if user is None:
         logger.error(f"사용자를 찾을 수 없음: {user_id}")
