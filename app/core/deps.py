@@ -30,7 +30,9 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-async def get_current_user_id(request: Request, db: Session = Depends(get_db)) -> str:
+async def get_current_user_id(
+    request: Request, db: Session = Depends(get_session)
+) -> str:
     """
     쿠키 또는 Bearer 토큰을 통해 현재 로그인한 사용자 ID 조회
     (소셜 로그인: 쿠키, 이메일 로그인: Bearer 토큰)
@@ -115,7 +117,9 @@ async def _validate_user(user_id: str, db: Session) -> User:
     return user
 
 
-async def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+async def get_current_user(
+    request: Request, db: Session = Depends(get_session)
+) -> User:
     """
     쿠키 또는 Bearer 토큰을 통해 현재 로그인한 사용자 조회
     (소셜 로그인: 쿠키, 이메일 로그인: Bearer 토큰)
