@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.security import create_access_token, create_refresh_token

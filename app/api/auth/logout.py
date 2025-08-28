@@ -3,18 +3,19 @@
 """
 
 import logging
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any, Dict
+
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
-from fastapi.responses import JSONResponse
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import get_current_user_id, decode_access_token
+from app.core.security import decode_access_token
 from app.db.database import get_session
-from app.models.user import User
 from app.models.oauth_token import OAuthToken
+from app.models.user import User
 from app.schemas.base import BaseResponse
 
 # 로거 설정
@@ -193,9 +194,7 @@ async def logout(
                 else None,
                 "errors": error_details if error_details else None,
             },
-            message="로그아웃이 완료되었습니다"
-            if success
-            else "로그아웃이 완료되었습니다 (구글 세션 정리 실패)",
+            message="로그아웃이 완료되었습니다" if success else "로그아웃이 완료되었습니다 (구글 세션 정리 실패)",
         )
 
     except HTTPException:
