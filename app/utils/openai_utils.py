@@ -2,6 +2,7 @@
 OpenAI API 호출 유틸리티 함수
 """
 
+import asyncio
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -141,6 +142,51 @@ class OpenAIClient:
             logger.error(f"OpenAI chat completion 예상치 못한 오류: {str(e)}")
             raise
 
+    async def create_completion_async(self, **kwargs) -> Dict[str, Any]:
+        """
+        통합 비동기 완성 API 호출
+
+        Args:
+            **kwargs: OpenAI API 파라미터
+
+        Returns:
+            API 응답 데이터
+
+        Raises:
+            AIGenerationFailedException: OpenAI API 타임아웃 또는 기타 오류
+        """
+        try:
+            response = await self.async_client.chat.completions.create(**kwargs)
+            return {
+                "id": response.id,
+                "content": response.choices[0].message.content,
+                "model": response.model,
+                "created": response.created,
+                "usage": {
+                    "completion_tokens": response.usage.completion_tokens
+                    if response.usage
+                    else 0,
+                    "prompt_tokens": response.usage.prompt_tokens
+                    if response.usage
+                    else 0,
+                    "total_tokens": response.usage.total_tokens
+                    if response.usage
+                    else 0,
+                },
+                "finish_reason": response.choices[0].finish_reason,
+                "role": response.choices[0].message.role,
+            }
+        except asyncio.TimeoutError:
+            logger.error("OpenAI API 타임아웃 발생")
+            from app.exceptions.ai import AIGenerationFailedException
+
+            raise AIGenerationFailedException("OpenAI API 타임아웃")
+        except Exception as e:
+            logger.error(f"OpenAI API 오류: {e}")
+            from app.exceptions.ai import AIGenerationFailedException
+
+            raise AIGenerationFailedException(f"OpenAI API 오류: {str(e)}")
+
     async def async_chat_completion(
         self,
         messages: List[ChatCompletionMessageParam],
@@ -150,7 +196,7 @@ class OpenAIClient:
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        비동기 채팅 완성 API 호출
+        비동기 채팅 완성 API 호출 (타임아웃 처리 개선)
         """
         try:
             # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
@@ -190,6 +236,9 @@ class OpenAIClient:
                 "role": response.choices[0].message.role,
             }
 
+        except asyncio.TimeoutError:
+            logger.error("OpenAI API 타임아웃 발생")
+            raise APITimeoutError("OpenAI API 타임아웃")
         except RateLimitError as e:
             logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
             raise
@@ -275,7 +324,7 @@ class OpenAIClient:
         **kwargs,
     ):
         """
-        비동기 스트리밍 채팅 완성 API 호출
+        비동기 스트리밍 채팅 완성 API 호출 (타임아웃 처리 개선)
         """
         try:
             # gpt-5 모델은 temperature=1만 지원하므로 기본값일 때는 파라미터를 생략
@@ -304,6 +353,9 @@ class OpenAIClient:
                 ):
                     yield chunk.choices[0].delta.content
 
+        except asyncio.TimeoutError:
+            logger.error("OpenAI API 스트림 타임아웃 발생")
+            raise APITimeoutError("OpenAI API 타임아웃")
         except RateLimitError as e:
             logger.error(f"OpenAI API 요청 한도 초과: {str(e)}")
             raise
