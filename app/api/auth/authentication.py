@@ -30,6 +30,9 @@ from app.models.user import User
 from app.schemas.base import BaseResponse
 from app.utils.encryption import password_hasher
 
+# TODO: Implement standardized error handling
+# from app.utils.error_handlers import StandardHTTPException, unauthorized_exception
+
 router = APIRouter(tags=["authentication"])
 
 # 인증이 필요한 라우터

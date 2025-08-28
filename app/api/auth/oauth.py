@@ -15,6 +15,9 @@ from app.core.security import create_access_token, create_refresh_token
 from app.db.database import get_session
 from app.services.oauth import GoogleOAuthService
 
+# TODO: Implement standardized error handling
+# from app.utils.error_handlers import StandardHTTPException, unauthorized_exception
+
 router = APIRouter(prefix="/google", tags=["oauth"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
