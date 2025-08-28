@@ -1,25 +1,26 @@
 """
 회원가입 API 라우터
 """
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlmodel import Session, select
-from pydantic import BaseModel, EmailStr, validator
-import re
 import logging
-import jwt
-from jose.exceptions import JWTError
+import re
 from datetime import datetime, timedelta
+from typing import Any, Dict
+
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from jose.exceptions import JWTError
+from pydantic import BaseModel, EmailStr, validator
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.database import get_session
-from app.models.user import User
-from app.models.email_verification import EmailVerification
-from app.utils.encryption import password_hasher
-from app.schemas.base import BaseResponse
 from app.core.security import create_access_token, create_refresh_token
+from app.db.database import get_session
+from app.models.email_verification import EmailVerification
+from app.models.user import User
+from app.schemas.base import BaseResponse
 from app.utils.email_service import EmailService
-from app.core.deps import get_current_user
+from app.utils.encryption import password_hasher
 
 router = APIRouter(tags=["auth"])
 settings = get_settings()
@@ -117,7 +118,7 @@ async def signup(
         stmt = select(EmailVerification).where(
             EmailVerification.email == request.email,
             EmailVerification.verification_type == "signup",  # 회원가입용만
-            EmailVerification.is_used == True,
+            EmailVerification.is_used is True,
         )
         result = db.execute(stmt)
         email_verification = result.scalar_one_or_none()
@@ -286,14 +287,26 @@ async def login(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="이메일 또는 비밀번호가 올바르지 않습니다.",
             )
-        
+
         # 2. Soft Delete된 계정인지 확인
         if user.deleted_at is not None:
             # timezone을 일치시켜서 비교
-            current_time = datetime.now(user.deleted_at.tzinfo) if user.deleted_at.tzinfo else datetime.now()
-            deleted_time = user.deleted_at.replace(tzinfo=None) if user.deleted_at.tzinfo else user.deleted_at
-            current_time_naive = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
-            
+            current_time = (
+                datetime.now(user.deleted_at.tzinfo)
+                if user.deleted_at.tzinfo
+                else datetime.now()
+            )
+            deleted_time = (
+                user.deleted_at.replace(tzinfo=None)
+                if user.deleted_at.tzinfo
+                else user.deleted_at
+            )
+            current_time_naive = (
+                current_time.replace(tzinfo=None)
+                if current_time.tzinfo
+                else current_time
+            )
+
             # 30일 이내인지 확인
             if deleted_time >= current_time_naive - timedelta(days=30):
                 raise HTTPException(
@@ -303,8 +316,8 @@ async def login(
                         "message": "탈퇴된 계정입니다. 30일 이내에 복구할 수 있습니다.",
                         "deleted_at": user.deleted_at.isoformat(),
                         "restore_available": True,
-                        "days_remaining": 30 - (current_time_naive - deleted_time).days
-                    }
+                        "days_remaining": 30 - (current_time_naive - deleted_time).days,
+                    },
                 )
             else:
                 raise HTTPException(
@@ -313,35 +326,35 @@ async def login(
                         "error": "ACCOUNT_PERMANENTLY_DELETED",
                         "message": "탈퇴 후 30일이 경과되어 복구할 수 없습니다.",
                         "deleted_at": user.deleted_at.isoformat(),
-                        "restore_available": False
-                    }
+                        "restore_available": False,
+                    },
                 )
-        
+
         # 3. 이메일 회원가입 사용자인지 확인
         if user.account_type != "email":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="소셜 로그인으로 가입된 계정입니다.",
             )
-        
+
         # 4. 비밀번호 검증
         if not password_hasher.verify_password(request.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="이메일 또는 비밀번호가 올바르지 않습니다.",
             )
-        
+
         # 5. 계정 활성화 상태 확인
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="비활성화된 계정입니다.",
             )
-        
+
         # 6. JWT 토큰 생성
         access_token = create_access_token({"sub": str(user.id)})
         refresh_token = create_refresh_token({"sub": str(user.id)})
-        
+
         # 7. 응답 생성 (쿠키만 설정, 응답에는 토큰 제외)
         response_data = LoginResponse(
             user_id=str(user.id),
@@ -381,10 +394,7 @@ async def login(
             httponly=settings.cookie_httponly,
             secure=settings.cookie_secure,
             samesite=settings.cookie_samesite,
-            max_age=settings.jwt_refresh_token_expire_days
-            * 24
-            * 60
-            * 60,  # 일을 초로 변환
+            max_age=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,  # 일을 초로 변환
             path="/",
             domain=settings.cookie_domain,
         )
@@ -509,7 +519,7 @@ async def verify_email(
             EmailVerification.verification_code == request.verification_code,
             EmailVerification.verification_type == "signup",  # 회원가입용만
             EmailVerification.expires_at > datetime.now(),
-            EmailVerification.is_used == False,
+            EmailVerification.is_used is False,
         )
         result = db.execute(stmt)
         verification = result.scalar_one_or_none()
@@ -542,7 +552,7 @@ async def verify_email(
 
 
 @router.get("/me", response_model=BaseResponse[Dict[str, Any]])
-async def get_current_user(
+async def get_current_user_info(
     request: Request,
     db: Session = Depends(get_session),
 ) -> BaseResponse[Dict[str, Any]]:
@@ -619,9 +629,7 @@ async def get_current_user(
             else None,
         }
 
-        return BaseResponse(
-            data=user_data, message="현재 사용자 정보를 성공적으로 조회했습니다."
-        )
+        return BaseResponse(data=user_data, message="현재 사용자 정보를 성공적으로 조회했습니다.")
 
     except HTTPException:
         raise

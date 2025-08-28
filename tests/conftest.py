@@ -2,13 +2,16 @@
 테스트용 공통 설정 및 픽스처
 """
 
-import pytest
-from unittest.mock import Mock
-from sqlmodel import Session, create_engine
-from sqlmodel.pool import StaticPool
 from datetime import datetime, timezone
+from typing import List
+from unittest.mock import Mock
 
-from app.models.fcm import FCMToken, NotificationSettings, NotificationHistory
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+
+from app.models.fcm import FCMToken, NotificationHistory, NotificationSettings
 from app.models.user import User
 
 
@@ -111,4 +114,4 @@ def mock_env_vars(monkeypatch):
 
 
 # 마커 설정
-pytest_plugins = []
+pytest_plugins: List[str] = []

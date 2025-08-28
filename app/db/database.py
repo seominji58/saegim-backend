@@ -3,9 +3,11 @@
 """
 from contextlib import contextmanager
 from typing import Generator
+
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import QueuePool
-from sqlmodel import Session
+
 from app.core.config import get_settings
 from app.models.base import Base
 
@@ -24,8 +26,9 @@ engine = create_engine(
     connect_args={
         "sslmode": settings.database_ssl_mode,
         "connect_timeout": 10,
-    }
+    },
 )
+
 
 # 세션 팩토리 생성
 def SessionLocal():
