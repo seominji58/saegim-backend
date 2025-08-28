@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="saegim-backend",
@@ -8,7 +8,6 @@ setup(
         "fastapi==0.104.1",
         "uvicorn==0.24.0",
         "sqlalchemy>=2.0,<2.1",
-        "sqlmodel==0.0.14",
         "alembic==1.13.1",
         "asyncpg==0.29.0",
         "greenlet==3.0.3",

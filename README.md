@@ -12,7 +12,7 @@
 ## 🛠️ 기술 스택
 
 -   **Framework**: FastAPI 0.104+
--   **Database**: PostgreSQL 14+ (SQLModel + SQLAlchemy)
+-   **Database**: PostgreSQL 14+ (SQLAlchemy 2.0+)
 -   **Language**: Python 3.11+
 -   **Authentication**: JWT (준비 중)
 -   **Documentation**: OpenAPI/Swagger
@@ -276,7 +276,7 @@ app/
 ## 🔒 보안 기능
 
 -   **입력 검증**: HTML 태그 및 악성 콘텐츠 차단
--   **SQL 인젝션 방지**: SQLModel ORM 사용
+-   **SQL 인젝션 방지**: SQLAlchemy ORM 사용
 -   **데이터 검증**: Pydantic 스키마를 통한 엄격한 검증
 -   **소프트 삭제**: 데이터 완전 삭제 대신 삭제 표시
 

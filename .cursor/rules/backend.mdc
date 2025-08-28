@@ -1,5 +1,5 @@
 ---
-description: 새김(Saegim) 백엔드 개발 규칙 - FastAPI + SQLModel + PostgreSQL + Redis
+description: 새김(Saegim) 백엔드 개발 규칙 - FastAPI + SQLAlchemy 2.0+ + PostgreSQL + Redis
 globs:
     - "app/**/*.py"
     - "*.py"
@@ -26,7 +26,7 @@ alwaysApply: false
 ## 🎯 프로젝트 개요
 
 - **서비스명**: 새김(Saegim) - 감성 AI 다이어리
-- **기술 스택**: FastAPI 0.100+ + Python 3.11+ + SQLModel + PostgreSQL 14+ + Redis 7.x
+- **기술 스택**: FastAPI 0.100+ + Python 3.11+ + SQLAlchemy 2.0+ + PostgreSQL 14+ + Redis 7.x
 - **프론트엔드**: Next.js 15 (별도 서버)
 - **언어**: 한국어 기반, 영어 코드/문서
 - **아키텍처**: RESTful API, 마이크로서비스 준비
@@ -52,9 +52,9 @@ app/
 │   └── security.py     # JWT, 암호화 유틸리티
 ├── db/                 # 데이터베이스 관련
 │   ├── __init__.py
-│   ├── database.py     # SQLModel 엔진, 세션 관리
+│   ├── database.py     # SQLAlchemy 엔진, 세션 관리
 │   └── init_db.py      # 초기 데이터 생성
-├── models/             # SQLModel 데이터베이스 모델
+├── models/             # SQLAlchemy 데이터베이스 모델
 │   ├── __init__.py
 │   ├── base.py         # 기본 모델 클래스
 │   ├── user.py         # 사용자 모델
@@ -97,7 +97,7 @@ app/
 - **함수/변수**: `snake_case` (예: `get_current_user`, `diary_count`)
 - **상수**: `UPPER_SNAKE_CASE` (예: `DATABASE_URL`, `SECRET_KEY`)
 - **열거형**: `PascalCase` + 값은 `snake_case` (예: `EmotionType.happy`)
-- **SQLModel 모델**: `PascalCase` (예: `User`, `DiaryEntry`)
+- **SQLAlchemy 모델**: `PascalCase` (예: `User`, `DiaryEntry`)
 - **Pydantic 스키마**: `PascalCase` + 접미사 (예: `UserCreate`, `DiaryResponse`)
 
 ## ⚡ FastAPI 규칙
@@ -141,7 +141,7 @@ app = FastAPI()  # 메타데이터 누락
 ```python
 # ✅ 올바른 라우터 패턴
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_session
 from app.models.user import User
 from app.schemas.diary import DiaryCreate, DiaryResponse
@@ -173,7 +173,8 @@ def create_diary(data: dict):  # 타입 힌트 부족
 # ✅ 올바른 의존성 주입 패턴
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.core.database import get_session
 from app.models.user import User
 from app.core.security import decode_access_token
@@ -208,37 +209,38 @@ async def get_current_user(
         )
 ```
 
-## 🗄️ SQLModel 데이터베이스 규칙
+## 🗄️ SQLAlchemy 데이터베이스 규칙
 
 ### 모델 정의 패턴
 
 ```python
-# ✅ 올바른 SQLModel 모델 패턴
+# ✅ 올바른 SQLAlchemy 모델 패턴
 from typing import Optional, List
-from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, Boolean, Float, ForeignKey, Text
 from datetime import datetime
 from app.models.base import BaseModel
 
-class DiaryBase(SQLModel):
+class DiaryBase(BaseModel):
     """다이어리 기본 모델"""
-    title: str = Field(max_length=255, index=True)
-    content: str = Field()
-    user_emotion: Optional[str] = Field(max_length=20, index=True)
-    ai_emotion: Optional[str] = Field(max_length=20)
-    ai_emotion_confidence: Optional[float] = Field(ge=0.0, le=1.0)
+    title: Mapped[str] = mapped_column(String(255), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    user_emotion: Mapped[Optional[str]] = mapped_column(String(20), index=True)
+    ai_emotion: Mapped[Optional[str]] = mapped_column(String(20))
+    ai_emotion_confidence: Mapped[Optional[float]] = mapped_column(Float)
 
-class DiaryEntry(DiaryBase, BaseModel, table=True):
+class DiaryEntry(DiaryBase):
     """다이어리 테이블 모델"""
     __tablename__ = "diaries"
 
-    user_id: int = Field(foreign_key="users.id", index=True)
-    ai_generated_text: Optional[str] = Field()
-    is_public: bool = Field(default=False)
-    keywords: Optional[str] = Field()  # JSON 저장
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    ai_generated_text: Mapped[Optional[str]] = mapped_column(Text)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    keywords: Mapped[Optional[str]] = mapped_column(Text)  # JSON 저장
 
     # 관계 설정
-    user: "User" = Relationship(back_populates="diaries")
-    images: List["Image"] = Relationship(back_populates="diary")
+    user: Mapped["User"] = relationship("User", back_populates="diaries")
+    images: Mapped[List["Image"]] = relationship("Image", back_populates="diary")
 
 class DiaryCreate(DiaryBase):
     """다이어리 생성 스키마"""
@@ -251,8 +253,8 @@ class DiaryUpdate(DiaryBase):
     user_emotion: Optional[str] = None
 
 # ❌ 잘못된 패턴
-class Diary(SQLModel, table=True):
-    id: int  # Field() 사용 안함, primary_key 누락
+class Diary(BaseModel):
+    id: int  # mapped_column() 사용 안함, primary_key 누락
     title: str  # 길이 제한 없음
     content: str  # 인덱스 고려 없음
 ```
@@ -261,38 +263,41 @@ class Diary(SQLModel, table=True):
 
 ```python
 # ✅ 올바른 관계 설정
-from sqlmodel import Relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy import String, Integer, ForeignKey
 from typing import List, Optional
 
-class User(BaseModel, table=True):
+class User(BaseModel):
     __tablename__ = "users"
 
-    email: str = Field(unique=True, index=True, max_length=255)
-    provider: str = Field(max_length=20)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(20))
 
     # 관계: 사용자 -> 다이어리 (1:N)
-    diaries: List["DiaryEntry"] = Relationship(back_populates="user")
+    diaries: Mapped[List["DiaryEntry"]] = relationship("DiaryEntry", back_populates="user")
 
-class DiaryEntry(DiaryBase, BaseModel, table=True):
+class DiaryEntry(DiaryBase):
     __tablename__ = "diaries"
 
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
 
     # 관계: 다이어리 -> 사용자 (N:1)
-    user: "User" = Relationship(back_populates="diaries")
+    user: Mapped["User"] = relationship("User", back_populates="diaries")
     # 관계: 다이어리 -> 이미지 (1:N)
-    images: List["Image"] = Relationship(back_populates="diary")
+    images: Mapped[List["Image"]] = relationship("Image", back_populates="diary")
 
 # ❌ 잘못된 관계 설정
-class User(SQLModel, table=True):
-    diaries: List[DiaryEntry] = []  # Relationship() 사용 안함
+class User(BaseModel):
+    diaries: List[DiaryEntry] = []  # relationship() 사용 안함
 ```
 
 ### 데이터베이스 세션 관리
 
 ```python
 # ✅ 올바른 세션 관리 패턴
-from sqlmodel import create_engine, Session, SQLModel
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from app.models.base import Base
 from app.core.config import settings
 
 # 엔진 생성 (싱글톤)
@@ -305,7 +310,7 @@ engine = create_engine(
 
 def create_db_and_tables():
     """데이터베이스 테이블 생성"""
-    SQLModel.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 
 def get_session():
     """데이터베이스 세션 의존성"""
@@ -386,7 +391,9 @@ async def get_diaries(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ) -> BaseResponse[List[DiaryResponse]]:
-    diaries = session.exec(select(DiaryEntry).where(DiaryEntry.user_id == current_user.id)).all()
+    stmt = select(DiaryEntry).where(DiaryEntry.user_id == current_user.id)
+    result = session.execute(stmt)
+    diaries = result.scalars().all()
     diary_responses = [DiaryResponse.from_orm(diary) for diary in diaries]
     return BaseResponse(data=diary_responses, message="다이어리 목록 조회 성공")
 ```
@@ -661,8 +668,8 @@ async def get_user_diaries_optimized(
         .order_by(DiaryEntry.created_at.desc())
         .limit(limit)
     )
-    results = session.exec(statement)
-    return results.all()
+    result = session.execute(statement)
+    return result.scalars().all()
 
 # ✅ 캐싱 전략
 from functools import lru_cache
@@ -745,11 +752,12 @@ class DiaryService:
     def _get_today_diary_count(self, user_id: int) -> int:
         """오늘 작성한 다이어리 개수"""
         today = datetime.now().date()
-        return self.session.exec(
-            select(func.count(DiaryEntry.id))
-            .where(DiaryEntry.user_id == user_id)
-            .where(func.date(DiaryEntry.created_at) == today)
-        ).one()
+        stmt = select(func.count(DiaryEntry.id)).where(
+            DiaryEntry.user_id == user_id,
+            func.date(DiaryEntry.created_at) == today
+        )
+        result = self.session.execute(stmt)
+        return result.scalar_one()
 
 # ✅ 의존성 주입과 테스트 가능한 코드
 from abc import ABC, abstractmethod
@@ -1087,11 +1095,12 @@ class NotificationService:
             return False
 
         # 오늘 이미 작성했는지 확인
-        today_diary_count = session.exec(
-            select(func.count(DiaryEntry.id))
-            .where(DiaryEntry.user_id == user.id)
-            .where(func.date(DiaryEntry.created_at) == datetime.now().date())
-        ).one()
+        stmt = select(func.count(DiaryEntry.id)).where(
+            DiaryEntry.user_id == user.id,
+            func.date(DiaryEntry.created_at) == datetime.now().date()
+        )
+        result = session.execute(stmt)
+        today_diary_count = result.scalar_one()
 
         return today_diary_count == 0
 ```

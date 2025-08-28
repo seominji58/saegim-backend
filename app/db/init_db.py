@@ -33,9 +33,9 @@ def init_db():
 def create_sample_user(session: Session) -> User:
     """샘플 사용자 생성"""
     # 기존 사용자 확인
-    existing_user = session.exec(
-        select(User).where(User.email == "test@example.com")
-    ).first()
+    stmt = select(User).where(User.email == "test@example.com")
+    result = session.execute(stmt)
+    existing_user = result.scalar_one_or_none()
 
     if existing_user:
         return existing_user
@@ -53,9 +53,9 @@ def create_sample_user(session: Session) -> User:
 def create_sample_diaries(session: Session, user_id: int):
     """샘플 다이어리 생성"""
     # 기존 다이어리 확인
-    existing_diaries = session.exec(
-        select(DiaryEntry).where(DiaryEntry.user_id == user_id)
-    ).all()
+    stmt = select(DiaryEntry).where(DiaryEntry.user_id == user_id)
+    result = session.execute(stmt)
+    existing_diaries = result.scalars().all()
 
     if existing_diaries:
         print(f"기존 다이어리 {len(existing_diaries)}개 발견")
@@ -120,7 +120,9 @@ def create_sample_diaries(session: Session, user_id: int):
 def create_sample_images(session: Session, diaries: list):
     """샘플 이미지 생성"""
     # 기존 이미지 확인
-    existing_images = session.exec(select(Image)).all()
+    stmt = select(Image)
+    result = session.execute(stmt)
+    existing_images = result.scalars().all()
 
     if existing_images:
         print(f"기존 이미지 {len(existing_images)}개 발견")

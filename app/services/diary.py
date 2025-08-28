@@ -7,7 +7,8 @@ import random
 from datetime import date, datetime
 from typing import List, Optional, Tuple
 
-from sqlmodel import Session, func, select
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.constants import EmotionType, SortOrder
 from app.models.diary import DiaryEntry
@@ -81,14 +82,16 @@ class DiaryService(SyncBaseService):
                 DiaryEntry.user_id == user_id, DiaryEntry.deleted_at.is_(None)
             )
 
-        total_count = self.session.exec(count_statement).one()
+        result = self.session.execute(count_statement)
+        total_count = result.scalar_one()
 
         # 페이지네이션 적용
         offset = (page - 1) * page_size
         statement = statement.offset(offset).limit(page_size)
 
         # 결과 조회
-        diaries = self.session.exec(statement).all()
+        result = self.session.execute(statement)
+        diaries = result.scalars().all()
 
         return diaries, total_count
 
@@ -103,7 +106,8 @@ class DiaryService(SyncBaseService):
         if user_id is not None:
             statement = statement.where(DiaryEntry.user_id == user_id)
 
-        return self.session.exec(statement).first()
+        result = self.session.execute(statement)
+        return result.scalar_one_or_none()
 
     def get_diaries_by_date_range(
         self, user_id: str, start_date: date, end_date: date
@@ -111,7 +115,6 @@ class DiaryService(SyncBaseService):
         """특정 날짜 범위의 다이어리 조회 (캘린더용) - 이미지 정보 포함"""
         # 이미지 관계를 함께 로드하기 위해 selectinload 사용
         from sqlalchemy.orm import selectinload
-        from sqlmodel import func, select
 
         statement = (
             select(DiaryEntry)
@@ -125,7 +128,8 @@ class DiaryService(SyncBaseService):
             .order_by(DiaryEntry.created_at.desc())
         )
 
-        return self.session.exec(statement).all()
+        result = self.session.execute(statement)
+        return result.scalars().all()
 
     def create_diary(
         self, diary_create: DiaryCreateRequest, user_id: str

@@ -16,7 +16,8 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.constants import SortOrder
 from app.core.deps import get_current_user
@@ -272,9 +273,9 @@ async def delete_diary_image(
         )
 
     # 이미지 존재 여부 및 권한 확인
-    image = session.exec(
-        select(Image).where(Image.id == image_id, Image.diary_id == diary_id)
-    ).first()
+    stmt = select(Image).where(Image.id == image_id, Image.diary_id == diary_id)
+    result = session.execute(stmt)
+    image = result.scalar_one_or_none()
 
     if not image:
         raise HTTPException(
@@ -350,7 +351,9 @@ async def get_diary_images(
         )
 
     # 해당 다이어리의 이미지들 조회
-    images = session.exec(select(Image).where(Image.diary_id == diary_id)).all()
+    stmt = select(Image).where(Image.diary_id == diary_id)
+    result = session.execute(stmt)
+    images = result.scalars().all()
 
     # 이미지 정보 반환
     image_list = []

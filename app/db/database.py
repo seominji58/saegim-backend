@@ -32,7 +32,7 @@ engine = create_engine(
 
 # 세션 팩토리 생성
 def SessionLocal():
-    """SQLModel Session 팩토리"""
+    """SQLAlchemy Session 팩토리"""
     return Session(engine)
 
 

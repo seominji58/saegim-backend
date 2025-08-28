@@ -7,7 +7,7 @@ from abc import ABC
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
