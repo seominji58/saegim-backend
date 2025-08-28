@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_session
@@ -53,7 +53,8 @@ class DiaryReminderScheduler:
             # diary_reminder_days가 None이면 매일, 빈 배열이면 매일, 특정 요일이 있으면 해당 요일만
             day_condition = or_(
                 NotificationSettings.diary_reminder_days.is_(None),  # 매일 (기본값)
-                NotificationSettings.diary_reminder_days == [],  # 매일 (빈 배열)
+                func.jsonb_array_length(NotificationSettings.diary_reminder_days)
+                == 0,  # 매일 (빈 배열)
                 NotificationSettings.diary_reminder_days.contains([day]),  # 특정 요일
             )
 
