@@ -3,6 +3,7 @@
 JWT 토큰 생성/검증, 의존성 주입
 """
 
+import secrets
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -387,4 +388,20 @@ def decode_refresh_token(token: str) -> Dict[str, Any]:
     return security_service.jwt_handler.decode_token(token)
 
 
-# 중복 제거됨: 전역 보안 서비스 인스턴스는 위에서 이미 생성되었습니다 (236번 라인)
+# Timing Attack 방지 함수
+def verify_credentials(provided: str, expected: str) -> bool:
+    """
+    타이밍 공격 방지를 위한 안전한 문자열 비교 함수
+
+    Args:
+        provided: 제공된 값 (사용자 입력)
+        expected: 기대되는 값 (저장된 값)
+
+    Returns:
+        비교 결과 (True/False)
+
+    Note:
+        secrets.compare_digest()는 상수 시간 내에 비교를 수행하여
+        타이밍 공격을 방지합니다.
+    """
+    return secrets.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
