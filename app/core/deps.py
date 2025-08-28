@@ -79,7 +79,7 @@ async def _extract_user_id(request: Request) -> str | None:
         # 1. 쿠키에서 토큰 확인 (소셜 로그인)
         user_id = get_current_user_id_from_cookie(request)
         logger.info(f"쿠키에서 user_id 추출: {user_id}")
-        return user_id
+        return str(user_id)
     except HTTPException:
         pass
 

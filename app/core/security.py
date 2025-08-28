@@ -301,14 +301,7 @@ def get_current_user_id_from_cookie(
         )
 
     try:
-        payload = security_service.jwt_handler.decode_token(access_token)
-
-        if not security_service.jwt_handler.verify_token_type(payload, "access"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="액세스 토큰이 아닙니다.",
-            )
-
+        payload = decode_access_token(access_token)
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
@@ -318,20 +311,10 @@ def get_current_user_id_from_cookie(
 
         return UUID(user_id)
 
-    except jwt.ExpiredSignatureError:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="토큰이 만료되었습니다.",
-        )
-    except jwt.JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 토큰입니다.",
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 사용자 ID입니다.",
+            detail="토큰 검증에 실패했습니다.",
         )
 
 
