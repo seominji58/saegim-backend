@@ -19,10 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.constants import SortOrder
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user_id
 from app.db.database import get_session
 from app.models.image import Image
-from app.models.user import User
 from app.schemas.base import BaseResponse
 from app.schemas.diary import (
     DiaryCreateRequest,
@@ -37,7 +36,7 @@ from app.utils.minio_upload import (
 )
 from app.utils.validators import validate_image_file, validate_uuid
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user_id)])
 
 
 def _extract_object_key_from_url(url: str) -> str:
@@ -64,7 +63,7 @@ def _extract_object_key_from_url(url: str) -> str:
 async def get_my_diaries(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    user_id: str = Depends(get_current_user_id),
     page: int = Query(1, ge=1, description="페이지 번호"),
     page_size: int = Query(20, ge=1, le=100, description="페이지 크기"),
     searchTerm: Optional[str] = Query(None, description="제목/내용 통합 검색"),
@@ -81,7 +80,7 @@ async def get_my_diaries(
 
     diary_service = DiaryService(session)
     diaries, total_count = diary_service.get_diaries(
-        user_id=current_user.id,  # JWT에서 추출한 사용자 ID 사용
+        user_id=user_id,  # JWT에서 추출한 사용자 ID 사용
         page=page,
         page_size=page_size,
         searchTerm=searchTerm,
@@ -103,7 +102,7 @@ async def get_my_diaries(
 async def get_calendar_diaries(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    user_id: str = Depends(get_current_user_id),
     start_date: date = Query(..., description="시작 날짜 (YYYY-MM-DD)"),
     end_date: date = Query(..., description="종료 날짜 (YYYY-MM-DD)"),
 ) -> BaseResponse[List[DiaryListResponse]]:
@@ -111,7 +110,7 @@ async def get_calendar_diaries(
 
     diary_service = DiaryService(session)
     diaries = diary_service.get_diaries_by_date_range(
-        user_id=current_user.id,  # JWT에서 추출한 사용자 ID 사용
+        user_id=user_id,  # JWT에서 추출한 사용자 ID 사용
         start_date=start_date,
         end_date=end_date,
     )
@@ -129,7 +128,7 @@ async def get_calendar_diaries(
 async def get_diary(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    user_id: str = Depends(get_current_user_id),
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
 ) -> BaseResponse[DiaryResponse]:
     """JWT 인증된 사용자의 특정 다이어리 조회"""
@@ -138,7 +137,7 @@ async def get_diary(
     validate_uuid(diary_id, "다이어리 ID")
 
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=user_id)
 
     if not diary:
         raise HTTPException(
@@ -159,7 +158,7 @@ async def get_diary(
 async def upload_diary_image(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    user_id: str = Depends(get_current_user_id),
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     image: UploadFile = File(..., description="업로드할 이미지 파일"),
 ) -> BaseResponse[dict]:
@@ -170,7 +169,7 @@ async def upload_diary_image(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=user_id)
 
     if not diary:
         raise HTTPException(
@@ -224,7 +223,7 @@ async def upload_diary_image(
 async def delete_diary_image(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    user_id: str = Depends(get_current_user_id),
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     image_id: str = Path(..., description="이미지 ID (UUID)"),
 ) -> BaseResponse[dict]:
@@ -236,7 +235,7 @@ async def delete_diary_image(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=user_id)
 
     if not diary:
         raise HTTPException(
@@ -298,7 +297,7 @@ async def delete_diary_image(
 async def get_diary_images(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    user_id: str = Depends(get_current_user_id),
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
 ) -> BaseResponse[List[dict]]:
     """다이어리의 기존 이미지들 조회"""
@@ -308,7 +307,7 @@ async def get_diary_images(
 
     # 다이어리 존재 여부 및 권한 확인
     diary_service = DiaryService(session)
-    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=current_user.id)
+    diary = diary_service.get_diary_by_id(diary_id=diary_id, user_id=user_id)
 
     if not diary:
         raise HTTPException(
@@ -344,15 +343,15 @@ async def get_diary_images(
 async def create_diary(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    user_id: str = Depends(get_current_user_id),
     diary_create: DiaryCreateRequest,
 ) -> BaseResponse[DiaryResponse]:
     """JWT 인증된 사용자의 다이어리 생성"""
 
     diary_service = DiaryService(session)
 
-    # diary_id 변수 제거하고 diary_create와 current_user.id만 전달
-    created_diary = diary_service.create_diary(diary_create, current_user.id)
+    # diary_id 변수 제거하고 diary_create와 user_id만 전달
+    created_diary = diary_service.create_diary(diary_create, user_id)
 
     return BaseResponse(
         data=DiaryResponse.from_orm(created_diary), message="다이어리 생성 성공"
@@ -363,7 +362,7 @@ async def create_diary(
 async def update_diary(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),  # JWT에서 사용자 정보 추출
+    user_id: str = Depends(get_current_user_id),
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     diary_update: DiaryUpdateRequest,
 ) -> BaseResponse[DiaryResponse]:
@@ -382,7 +381,7 @@ async def update_diary(
         )
 
     # 본인의 다이어리만 수정 가능하도록 검증
-    if existing_diary.user_id != current_user.id:
+    if existing_diary.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="해당 다이어리를 수정할 권한이 없습니다"
         )

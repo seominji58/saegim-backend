@@ -60,8 +60,6 @@ async def get_current_user_id(request: Request, db: Session = Depends(get_db)) -
                 detail="인증 토큰이 필요합니다.",
             )
 
-        await _validate_user(user_id, db)
-        logger.info(f"인증 성공: {user_id}")
         return user_id
 
     except HTTPException:

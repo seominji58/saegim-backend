@@ -8,15 +8,18 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user_id
 from app.db.database import get_session
-from app.models.user import User
 from app.schemas.base import BaseResponse
 from app.schemas.create_diary import CreateDiaryRequest
 from app.services.ai_log import AIService
 from app.services.create_diary import diary_service
 
-router = APIRouter(prefix="/ai", tags=["AI"])
+router = APIRouter(
+    prefix="/ai",
+    tags=["AI"],
+    dependencies=[Depends(get_current_user_id)],
+)
 
 
 @router.post("/usage-log", response_model=BaseResponse[dict])
@@ -47,10 +50,10 @@ async def create_ai_usage_log(
 @router.post("/generate", response_model=BaseResponse[dict])
 async def generate_ai_text(
     data: CreateDiaryRequest,
-    current_user: User = Depends(get_current_user),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_session),
 ) -> BaseResponse[dict]:
     """AI 텍스트 생성"""
     ai_service = AIService(db)
-    result = await ai_service.generate_ai_text(current_user.id, data)
+    result = await ai_service.generate_ai_text(user_id, data)
     return BaseResponse(data=result, message="AI 텍스트가 생성되었습니다.")

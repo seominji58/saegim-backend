@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user_id_from_cookie
+from app.core.deps import get_current_user_id
 from app.db.database import get_session
 from app.models.fcm import NotificationHistory
 from app.models.notification import Notification
@@ -26,13 +26,17 @@ from app.schemas.notification import (
 )
 from app.services.notification_service import NotificationService
 
-router = APIRouter(tags=["Notifications"])
+# Public endpoints (no auth required)
+public_router = APIRouter(tags=["Notifications"])
+
+# Protected endpoints (auth required)
+router = APIRouter(tags=["Notifications"], dependencies=[Depends(get_current_user_id)])
 
 
 # ==================== FCM 토큰 관리 ====================
 
 
-@router.get(
+@public_router.get(
     "/health",
     response_model=BaseResponse[str],
     summary="알림 서비스 상태 확인",
@@ -52,13 +56,11 @@ async def notification_health_check():
 )
 def register_fcm_token(
     token_data: FCMTokenRegisterRequest,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """FCM 토큰 등록"""
-    token = NotificationService.register_token(
-        str(current_user_id), token_data, session
-    )
+    token = NotificationService.register_token(str(user_id), token_data, session)
     return BaseResponse(success=True, message="FCM 토큰이 성공적으로 등록되었습니다.", data=token)
 
 
@@ -69,11 +71,11 @@ def register_fcm_token(
     description="현재 사용자의 활성 FCM 토큰 목록을 조회합니다.",
 )
 def get_fcm_tokens(
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """FCM 토큰 목록 조회"""
-    tokens = NotificationService.get_user_tokens(str(current_user_id), session)
+    tokens = NotificationService.get_user_tokens(str(user_id), session)
     return BaseResponse(success=True, message="FCM 토큰 목록을 성공적으로 조회했습니다.", data=tokens)
 
 
@@ -85,11 +87,11 @@ def get_fcm_tokens(
 )
 def delete_fcm_token(
     token_id: str,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """FCM 토큰 삭제"""
-    success = NotificationService.delete_token(str(current_user_id), token_id, session)
+    success = NotificationService.delete_token(str(user_id), token_id, session)
     if success:
         return BaseResponse(
             success=True,
@@ -108,13 +110,11 @@ def delete_fcm_token(
     description="현재 사용자의 알림 설정을 조회합니다.",
 )
 def get_notification_settings(
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """알림 설정 조회"""
-    settings = NotificationService.get_notification_settings(
-        str(current_user_id), session
-    )
+    settings = NotificationService.get_notification_settings(str(user_id), session)
     return BaseResponse(success=True, message="알림 설정을 성공적으로 조회했습니다.", data=settings)
 
 
@@ -126,12 +126,12 @@ def get_notification_settings(
 )
 def update_notification_settings(
     settings_data: NotificationSettingsUpdate,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """알림 설정 업데이트"""
     updated_settings = NotificationService.update_notification_settings(
-        str(current_user_id), settings_data, session
+        str(user_id), settings_data, session
     )
     return BaseResponse(
         success=True,
@@ -169,7 +169,7 @@ async def send_notification(
     description="테스트 또는 관리 목적으로 현재 사용자에게 다이어리 작성 알림을 수동 전송합니다. 일반적으로는 개인화된 스케줄러에 의해 자동 발송됩니다.",
 )
 async def send_diary_reminder_manual(
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """다이어리 작성 알림 수동 전송 (관리자/테스트용)
@@ -178,9 +178,7 @@ async def send_diary_reminder_manual(
     실제 운영에서는 개인화된 스케줄러(diary_reminder_scheduler.py)에 의해
     사용자별 설정 시간에 맞춰 자동으로 알림이 발송됩니다.
     """
-    result = await NotificationService.send_diary_reminder(
-        str(current_user_id), session
-    )
+    result = await NotificationService.send_diary_reminder(str(user_id), session)
     return BaseResponse(
         success=True, message="다이어리 작성 알림이 수동으로 전송되었습니다. (테스트/관리용)", data=result
     )
@@ -194,7 +192,7 @@ async def send_diary_reminder_manual(
 )
 async def send_ai_content_ready_manual(
     diary_id: str,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """AI 콘텐츠 준비 완료 알림 수동 전송 (관리자/테스트용)
@@ -204,7 +202,7 @@ async def send_ai_content_ready_manual(
     자동으로 알림이 발송됩니다.
     """
     result = await NotificationService.send_ai_content_ready(
-        str(current_user_id), diary_id, session
+        str(user_id), diary_id, session
     )
     return BaseResponse(
         success=True, message="AI 콘텐츠 준비 완료 알림이 수동으로 전송되었습니다. (테스트/관리용)", data=result
@@ -223,12 +221,12 @@ async def send_ai_content_ready_manual(
 def get_notification_history(
     limit: int = Query(20, le=100, description="조회할 개수"),
     offset: int = Query(0, ge=0, description="건너뛸 개수"),
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """알림 이력 조회"""
     history = NotificationService.get_notification_history(
-        str(current_user_id), limit, offset, session
+        str(user_id), limit, offset, session
     )
     return BaseResponse(success=True, message="알림 이력을 성공적으로 조회했습니다.", data=history)
 
@@ -244,14 +242,14 @@ def get_notification_history(
 )
 async def mark_notification_as_read(
     notification_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """알림 읽음 처리 - 양쪽 테이블 동기화"""
     try:
         # 1. notification 테이블 업데이트
         notification_stmt = select(Notification).where(
-            Notification.id == notification_id, Notification.user_id == current_user_id
+            Notification.id == notification_id, Notification.user_id == user_id
         )
         notification = session.execute(notification_stmt).scalar_one_or_none()
 
@@ -307,7 +305,7 @@ async def mark_notification_as_read(
     description="사용자의 모든 읽지 않은 알림을 읽음으로 표시합니다.",
 )
 async def mark_all_notifications_as_read(
-    current_user_id: UUID = Depends(get_current_user_id_from_cookie),
+    user_id: str = Depends(get_current_user_id),
     session: Session = Depends(get_session),
 ):
     """모든 알림 읽음 처리"""
@@ -318,7 +316,7 @@ async def mark_all_notifications_as_read(
 
         # 1. 모든 읽지 않은 notification 조회
         unread_notifications_stmt = select(Notification).where(
-            Notification.user_id == current_user_id, not Notification.is_read
+            Notification.user_id == user_id, not Notification.is_read
         )
         unread_notifications = (
             session.execute(unread_notifications_stmt).scalars().all()

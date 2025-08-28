@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.constants import AccountType, OAuthProvider
 from app.core.config import get_settings
+from app.core.deps import get_current_user
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -30,6 +31,13 @@ from app.schemas.base import BaseResponse
 from app.utils.encryption import password_hasher
 
 router = APIRouter(tags=["authentication"])
+
+# 인증이 필요한 라우터
+authenticated_router = APIRouter(
+    tags=["authentication"],
+    dependencies=[Depends(get_current_user)],
+)
+
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
@@ -414,27 +422,13 @@ async def refresh_token(
         )
 
 
-@router.get("/me", response_model=BaseResponse[Dict[str, Any]])
+@authenticated_router.get("/me", response_model=BaseResponse[Dict[str, Any]])
 async def get_current_user_info(
-    request: Request,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> BaseResponse[Dict[str, Any]]:
-    """현재 로그인한 사용자 정보 조회 API (Bearer 토큰 또는 쿠키 기반)"""
+    """현재 로그인한 사용자 정보 조회 API"""
     try:
-        current_user = await _get_user_from_request(request, db)
-
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="인증이 필요합니다."
-            )
-
-        # 계정 활성화 상태 확인
-        if not current_user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="비활성화된 계정입니다.",
-            )
-
         user_data = {
             "user_id": str(current_user.id),
             "email": current_user.email,
