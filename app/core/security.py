@@ -5,15 +5,15 @@ JWT 토큰 생성/검증, 의존성 주입
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import jwt
-from fastapi import HTTPException, status, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import get_settings
-from app.utils import password_hasher, data_encryptor
+from app.utils import data_encryptor, password_hasher
 
 settings = get_settings()
 security = HTTPBearer()
@@ -293,16 +293,16 @@ def get_current_user_id_from_cookie(
     """
     # 쿠키에서 access_token 읽기
     access_token = request.cookies.get("access_token")
-    
+
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="액세스 토큰이 없습니다.",
         )
-    
+
     try:
         payload = security_service.jwt_handler.decode_token(access_token)
-        
+
         if not security_service.jwt_handler.verify_token_type(payload, "access"):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -317,7 +317,7 @@ def get_current_user_id_from_cookie(
             )
 
         return UUID(user_id)
-        
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -387,5 +387,4 @@ def decode_refresh_token(token: str) -> Dict[str, Any]:
     return security_service.jwt_handler.decode_token(token)
 
 
-# 전역 보안 서비스 인스턴스 (모든 클래스 정의 후에 생성)
-security_service = SecurityService()
+# 중복 제거됨: 전역 보안 서비스 인스턴스는 위에서 이미 생성되었습니다 (236번 라인)

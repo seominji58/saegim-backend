@@ -2,27 +2,17 @@
 구글 OAuth 라우트
 """
 
-from typing import Dict, Any
+import logging
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, Request, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session
-import uuid
-import time
-from uuid import UUID
 
 from app.core.config import get_settings
+from app.core.security import create_access_token, create_refresh_token
 from app.db.database import get_session
 from app.services.oauth import GoogleOAuthService
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    get_current_user_id_from_cookie,
-)
-from app.models.user import User
-from sqlmodel import select
-import logging
-from fastapi import status
 
 # 로거 설정
 
@@ -53,10 +43,13 @@ async def google_callback(
     code: str,
     db: Session = Depends(get_session),
 ) -> RedirectResponse:
-    # 디버깅: 설정값 확인
-    print(f"Debug - Frontend callback URL: {settings.frontend_callback_url}")
-    print(f"Debug - Frontend URL: {settings.frontend_url}")
-    print(f"Debug - Google client ID: {settings.google_client_id[:8]}...")
+    # 디버깅: 설정값 확인 (운영 환경에서는 로깅으로 대체)
+    if settings.is_development:
+        print(f"Debug - Frontend callback URL: {settings.frontend_callback_url}")
+        print(f"Debug - Frontend URL: {settings.frontend_url}")
+        print(f"Debug - Google client ID: {settings.google_client_id[:8]}...")
+    else:
+        logger.info("Google OAuth callback initiated")
     """구글 OAuth 콜백 처리
 
     Args:
@@ -97,19 +90,21 @@ async def google_callback(
             httponly=settings.cookie_httponly,
             secure=settings.cookie_secure,
             samesite=settings.cookie_samesite,
-            max_age=settings.jwt_refresh_token_expire_days
-            * 24
-            * 60
-            * 60,  # 일을 초로 변환
+            max_age=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,  # 일을 초로 변환
             path="/",
             domain=settings.cookie_domain,
         )
 
-        print(f"User logged in: {user.email}")
-        print(f"Redirecting to: {settings.frontend_callback_url}?success=true")
+        # 로그인 성공 로깅 (개인정보 보호)
+        if settings.is_development:
+            print(f"User logged in: {user.email}")
+            print(f"Redirecting to: {settings.frontend_callback_url}?success=true")
+        else:
+            logger.info(f"User authentication successful: user_id={user.id}")
+            logger.info("Redirecting to frontend callback")
 
         return response
-        
+
     except HTTPException as http_ex:
         # HTTPException 처리 (탈퇴된 계정 등)
         error_detail = http_ex.detail
@@ -123,15 +118,29 @@ async def google_callback(
                 error_url = f"{settings.frontend_callback_url}?error=login_failed&message={error_detail.get('message', str(http_ex))}"
         else:
             error_url = f"{settings.frontend_callback_url}?error=login_failed&message={str(error_detail)}"
-        
-        print(f"HTTPException - Error URL: {error_url}")
-        print(f"HTTPException - Detail: {error_detail}")
+
+        # 에러 로깅 (운영 환경에서는 상세 정보 숨김)
+        if settings.is_development:
+            print(f"HTTPException - Error URL: {error_url}")
+            print(f"HTTPException - Detail: {error_detail}")
+        else:
+            logger.warning(
+                f"Authentication error occurred: status={http_ex.status_code}"
+            )
+            logger.debug(f"Error detail: {error_detail}")
         return RedirectResponse(url=error_url)
-        
+
     except Exception as e:
         # 기타 에러 발생 시 프론트엔드 콜백 페이지로 리다이렉트 (에러 파라미터 포함)
-        error_url = f"{settings.frontend_callback_url}?error=login_failed&message={str(e)}"
-        print(f"Frontend callback URL (error): {settings.frontend_callback_url}")
-        print(f"Error URL: {error_url}")
-        print(f"OAuth Error: {e}")
+        error_url = (
+            f"{settings.frontend_callback_url}?error=login_failed&message={str(e)}"
+        )
+        # 일반 에러 로깅 (운영 환경에서는 민감 정보 제외)
+        if settings.is_development:
+            print(f"Frontend callback URL (error): {settings.frontend_callback_url}")
+            print(f"Error URL: {error_url}")
+            print(f"OAuth Error: {e}")
+        else:
+            logger.error(f"OAuth authentication failed: {type(e).__name__}")
+            logger.debug(f"OAuth error detail: {str(e)}")
         return RedirectResponse(url=error_url)

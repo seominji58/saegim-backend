@@ -1,7 +1,6 @@
 """애플리케이션 설정"""
 
 import os
-import secrets
 from functools import lru_cache
 from typing import List, Union
 
@@ -31,9 +30,9 @@ class Settings(BaseSettings):
     database_pool_recycle: int = int(os.getenv("DATABASE_POOL_RECYCLE", "3600"))
     database_ssl_mode: str = os.getenv("DATABASE_SSL_MODE", "prefer")
 
-    # 보안 설정 (환경변수에서 가져오거나 기본값 사용)
-    secret_key: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-    encryption_key: str = os.getenv("ENCRYPTION_KEY", secrets.token_urlsafe(32))
+    # 보안 설정 (환경변수에서 필수로 가져오기)
+    secret_key: str = os.getenv("SECRET_KEY", "")
+    encryption_key: str = os.getenv("ENCRYPTION_KEY", "")
 
     # JWT 설정
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
@@ -145,6 +144,19 @@ class Settings(BaseSettings):
         return self._parse_cors_origins(self.allowed_hosts)
 
     model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
+
+    def __post_init__(self):
+        """설정 초기화 후 필수 환경변수 검증"""
+        if not self.secret_key:
+            raise ValueError("SECRET_KEY 환경변수가 설정되지 않았습니다. " "보안을 위해 반드시 설정해야 합니다.")
+        if not self.encryption_key:
+            raise ValueError(
+                "ENCRYPTION_KEY 환경변수가 설정되지 않았습니다. " "데이터 암호화를 위해 반드시 설정해야 합니다."
+            )
+        if len(self.secret_key) < 32:
+            raise ValueError("SECRET_KEY는 보안을 위해 최소 32자 이상이어야 합니다.")
+        if len(self.encryption_key) < 32:
+            raise ValueError("ENCRYPTION_KEY는 보안을 위해 최소 32자 이상이어야 합니다.")
 
 
 @lru_cache()
