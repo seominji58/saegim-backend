@@ -4,9 +4,8 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -16,15 +15,8 @@ from fastapi.responses import JSONResponse
 
 from app.api import router as api_router
 from app.core.config import get_settings
-from app.core.deps import get_current_user
 from app.core.env_config import load_env_file
 from app.core.lifespan import lifespan
-from app.db.database import get_session
-from app.models.user import User
-from app.schemas.base import BaseResponse
-from app.schemas.create_diary import CreateDiaryRequest
-from app.services.ai_log import AIService
-from app.services.create_diary import diary_service
 
 # 환경 변수 먼저 로드
 load_env_file()
@@ -148,35 +140,6 @@ async def root():
     return {"message": "새김 API에 오신 것을 환영합니다!"}
 
 
-# 기존 auth 경로를 새로운 api/auth 경로로 리다이렉트
-@app.get("/auth/google/login", tags=["redirect"])
-async def redirect_google_login():
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url="/api/auth/google/login", status_code=307)
-
-
-@app.get("/auth/google/callback", tags=["redirect"])
-async def redirect_google_callback():
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url="/api/auth/google/callback", status_code=307)
-
-
-@app.get("/auth/google/token/{token_id}", tags=["redirect"])
-async def redirect_google_token(token_id: str):
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url=f"/api/auth/google/token/{token_id}", status_code=307)
-
-
-@app.post("/auth/logout", tags=["redirect"])
-async def redirect_logout():
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url="/api/auth/logout", status_code=307)
-
-
 # 상태 확인 라우트
 @app.get("/status", tags=["status"])
 async def status():
@@ -186,44 +149,6 @@ async def status():
         "version": settings.version,
         "environment": settings.environment,
     }
-
-
-# ai_log 생성 라우트
-@app.post("/api/ai-usage-log", tags=["ai"])
-async def create_ai_usage_log(
-    user_id: str,
-    api_type: str,
-    session_id: str,
-    regeneration_count: int = 1,
-    tokens_used: int = 0,
-    request_data: Optional[Dict[str, Any]] = None,
-    response_data: Optional[Dict[str, Any]] = None,
-    db=Depends(get_session),
-):
-    # AI 사용 로그 생성 로직
-    service = diary_service(db)
-    return await service.create_ai_usage_log(
-        user_id,
-        api_type,
-        session_id,
-        regeneration_count,
-        tokens_used,
-        request_data,
-        response_data,
-    )
-
-
-# AI 텍스트 생성 API
-@app.post("/api/ai-generate", tags=["ai"])
-async def generate_ai_text(
-    data: CreateDiaryRequest,
-    current_user: User = Depends(get_current_user),
-    db=Depends(get_session),
-):
-    ai_service = AIService(db)
-    result = await ai_service.generate_ai_text(current_user.id, data)
-    print("result", result)
-    return BaseResponse(data=result)
 
 
 # API 라우터 등록
