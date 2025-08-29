@@ -1,12 +1,23 @@
 """
 통일된 에러 응답 핸들러
+데이터베이스 트랜잭션 및 API 에러 처리를 위한 데코레이터와 컨텍스트 매니저
 """
 
+import logging
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, Optional
+from functools import wraps
+from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
+# 타입 힌팅을 위한 제네릭 타입들
+P = ParamSpec('P')
+T = TypeVar('T')
+
+logger = logging.getLogger(__name__)
 
 
 class StandardHTTPException(HTTPException):
@@ -119,3 +130,206 @@ def bad_request_exception(
         detail=message,
         error_code=error_code,
     )
+
+
+def handle_database_errors(
+    error_message: str = "작업 처리 중 오류가 발생했습니다",
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    log_message: str | None = None,
+    reraise_http_exceptions: bool = True
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
+    """
+    데이터베이스 트랜잭션 에러 처리 데코레이터
+
+    Args:
+        error_message: 사용자에게 표시할 에러 메시지
+        status_code: HTTP 상태 코드
+        log_message: 로그에 남길 메시지 템플릿 (None이면 기본 템플릿 사용)
+        reraise_http_exceptions: HTTPException을 그대로 재발생할지 여부
+
+    Returns:
+        데코레이터 함수
+    """
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            # 함수 매개변수에서 session 찾기
+            session = None
+            for arg in args:
+                if isinstance(arg, Session):
+                    session = arg
+                    break
+            for value in kwargs.values():
+                if isinstance(value, Session):
+                    session = value
+                    break
+
+            try:
+                return func(*args, **kwargs)
+
+            except HTTPException:
+                if session:
+                    session.rollback()
+                if reraise_http_exceptions:
+                    raise
+
+            except Exception as e:
+                if session:
+                    session.rollback()
+
+                # 로그 메시지 생성
+                if log_message is None:
+                    final_log_message = f"{func.__name__} 실패: {str(e)}"
+                else:
+                    final_log_message = log_message.format(error=str(e), function=func.__name__)
+
+                logger.error(final_log_message)
+
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=error_message,
+                ) from e
+
+        return wrapper
+    return decorator
+
+
+@contextmanager
+def database_transaction_handler(
+    session: Session,
+    error_message: str = "작업 처리 중 오류가 발생했습니다",
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    log_context: str = "Database operation"
+):
+    """
+    데이터베이스 트랜잭션 에러 처리 컨텍스트 매니저
+
+    Args:
+        session: SQLAlchemy 세션
+        error_message: 사용자에게 표시할 에러 메시지
+        status_code: HTTP 상태 코드
+        log_context: 로그 컨텍스트
+
+    Usage:
+        with database_transaction_handler(session, "다이어리 삭제 실패"):
+            # database operations
+            pass
+    """
+    try:
+        yield
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"{log_context} 실패: {str(e)}")
+        raise HTTPException(
+            status_code=status_code,
+            detail=error_message,
+        ) from e
+
+
+def safe_database_operation(
+    session: Session,
+    operation: Callable[[], T],
+    error_message: str = "작업 처리 중 오류가 발생했습니다",
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    log_context: str = "Database operation"
+) -> T:
+    """
+    안전한 데이터베이스 작업 실행 함수
+
+    Args:
+        session: SQLAlchemy 세션
+        operation: 실행할 작업 함수
+        error_message: 사용자에게 표시할 에러 메시지
+        status_code: HTTP 상태 코드
+        log_context: 로그 컨텍스트
+
+    Returns:
+        작업 결과
+
+    Usage:
+        result = safe_database_operation(
+            session,
+            lambda: session.add(new_item),
+            "아이템 생성 실패"
+        )
+    """
+    try:
+        return operation()
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"{log_context} 실패: {str(e)}")
+        raise HTTPException(
+            status_code=status_code,
+            detail=error_message,
+        ) from e
+
+
+def handle_service_errors(
+    error_message: str = "서비스 처리 중 오류가 발생했습니다",
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    log_prefix: str | None = None
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
+    """
+    서비스 레이어 에러 처리 데코레이터 (세션 없는 작업용)
+
+    Args:
+        error_message: 사용자에게 표시할 에러 메시지
+        status_code: HTTP 상태 코드
+        log_prefix: 로그 메시지 접두사
+
+    Returns:
+        데코레이터 함수
+    """
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            try:
+                return func(*args, **kwargs)
+            except HTTPException:
+                raise
+            except Exception as e:
+                if log_prefix:
+                    logger.error(f"{log_prefix} - {func.__name__} 실패: {str(e)}")
+                else:
+                    logger.error(f"{func.__name__} 실패: {str(e)}")
+
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=error_message,
+                ) from e
+
+        return wrapper
+    return decorator
+
+
+class ErrorPatterns:
+    """공통 에러 메시지 패턴 상수"""
+
+    # 다이어리 관련
+    DIARY_NOT_FOUND = "해당 다이어리를 찾을 수 없습니다"
+    DIARY_CREATE_FAILED = "다이어리 생성에 실패했습니다"
+    DIARY_UPDATE_FAILED = "다이어리 수정에 실패했습니다"
+    DIARY_DELETE_FAILED = "다이어리 삭제에 실패했습니다"
+
+    # 이미지 관련
+    IMAGE_NOT_FOUND = "해당 이미지를 찾을 수 없습니다"
+    IMAGE_UPLOAD_FAILED = "이미지 업로드에 실패했습니다"
+    IMAGE_DELETE_FAILED = "이미지 삭제에 실패했습니다"
+
+    # 알림 관련
+    NOTIFICATION_SEND_FAILED = "알림 전송에 실패했습니다"
+    NOTIFICATION_UPDATE_FAILED = "알림 설정 수정에 실패했습니다"
+
+    # 인증 관련
+    AUTH_FAILED = "인증에 실패했습니다"
+    TOKEN_INVALID = "유효하지 않은 토큰입니다"
+
+    # 일반적인 에러
+    INTERNAL_ERROR = "내부 서버 오류가 발생했습니다"
+    VALIDATION_ERROR = "입력 데이터 검증에 실패했습니다"

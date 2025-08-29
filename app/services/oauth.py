@@ -5,13 +5,14 @@ OAuth 인증 서비스
 import logging
 from datetime import UTC, datetime, timedelta
 
-import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.constants import AccountType, OAuthProvider
 from app.core.config import get_settings
+from app.core.errors import OAuthErrors
+from app.core.http_client import http_client
 from app.models.oauth_token import OAuthToken
 from app.models.user import User
 from app.schemas.oauth import GoogleOAuthResponse, OAuthUserInfo
@@ -58,27 +59,14 @@ class GoogleOAuthService(BaseService):
         logger.info(f"Requesting token with redirect_uri: {self.redirect_uri}")
         logger.info(f"Client ID configured: {self.client_id[:8]}...")
         logger.info(f"Token URL: {self.token_url}")
-        logger.info(f"Grant type: {data['grant_type']}")
-        logger.info(f"Code length: {len(code)}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self.token_url, data=data)
+        try:
+            response_data = await http_client.post_json(self.token_url, data)
+        except HTTPException as e:
+            logger.error(f"Failed to get access token: {e.detail}")
+            raise OAuthErrors.token_request_failed(str(e.detail))
 
-            if response.status_code != 200:
-                error_detail = (
-                    response.json()
-                    if response.content
-                    else "No error details available"
-                )
-                logger.error(
-                    f"Failed to get access token. Status: {response.status_code}, Details: {error_detail}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to get access token: {error_detail}",
-                )
-
-            return GoogleOAuthResponse(**response.json())
+            return GoogleOAuthResponse(**response_data)
 
     async def get_user_info(self, access_token: str) -> OAuthUserInfo:
         """액세스 토큰으로 사용자 정보 요청
@@ -94,16 +82,13 @@ class GoogleOAuthService(BaseService):
         """
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(self.userinfo_url, headers=headers)
+        try:
+            user_data = await http_client.get_json(self.userinfo_url, headers=headers)
+        except HTTPException:
+            logger.error("Failed to get user info from Google API")
+            raise OAuthErrors.userinfo_request_failed()
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to get user info",
-                )
-
-            user_data = response.json()
+            # user_data is already parsed from http_client.get_json()
             # 디버깅: 구글 API 응답 확인
             print(f"Google API Response: {user_data}")
 

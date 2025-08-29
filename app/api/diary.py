@@ -30,33 +30,18 @@ from app.schemas.diary import (
     DiaryUpdateRequest,
 )
 from app.services.diary import DiaryService
+from app.utils.error_handlers import ErrorPatterns, database_transaction_handler
 from app.utils.minio_upload import (
     get_minio_uploader,
     upload_image_with_thumbnail_to_minio,
 )
-from app.utils.validators import validate_image_file, validate_uuid
+from app.utils.validators import (
+    extract_minio_object_key,
+    validate_image_file,
+    validate_uuid,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_user_id)])
-
-
-def _extract_object_key_from_url(url: str) -> str:
-    """MinIO URL에서 객체 키 추출"""
-    try:
-        # URL에서 버킷 이름 이후의 경로를 객체 키로 추출
-        # 예: http://localhost:9000/saegim-images/images/2023/12/01/uuid.jpg -> images/2023/12/01/uuid.jpg
-        parts = url.split("/")
-        bucket_index = -1
-        for i, part in enumerate(parts):
-            if "saegim-images" in part or part == "saegim-images":
-                bucket_index = i
-                break
-
-        if bucket_index != -1 and bucket_index + 1 < len(parts):
-            return "/".join(parts[bucket_index + 1 :])
-
-        return ""
-    except Exception:
-        return ""
 
 
 @router.get("", response_model=BaseResponse[list[DiaryListResponse]])
@@ -184,7 +169,11 @@ async def upload_diary_image(
     # 이미지 파일 검증
     validate_image_file(image.content_type, image.size)
 
-    try:
+    with database_transaction_handler(
+        session,
+        ErrorPatterns.IMAGE_UPLOAD_FAILED,
+        log_context=f"이미지 업로드 - diary_id: {diary_id}",
+    ):
         # MinIO에 이미지와 썸네일 업로드
         _, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(
             image
@@ -214,13 +203,6 @@ async def upload_diary_image(
             },
             message="이미지 업로드 성공",
         )
-
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"이미지 업로드 실패: {str(e)}",
-        ) from e
 
 
 @router.delete("/{diary_id}/images/{image_id}")
@@ -258,19 +240,23 @@ async def delete_diary_image(
             detail="해당 이미지를 찾을 수 없습니다.",
         )
 
-    try:
+    with database_transaction_handler(
+        session,
+        ErrorPatterns.IMAGE_DELETE_FAILED,
+        log_context=f"이미지 삭제 - diary_id: {diary_id}, image_id: {image_id}",
+    ):
         # MinIO에서 실제 파일 삭제
         uploader = get_minio_uploader()
 
         # 원본 이미지 삭제
         if image.file_path:
-            original_object_key = _extract_object_key_from_url(image.file_path)
+            original_object_key = extract_minio_object_key(image.file_path)
             if original_object_key:
                 uploader.delete_image(original_object_key)
 
         # 썸네일 삭제
         if image.thumbnail_path:
-            thumbnail_object_key = _extract_object_key_from_url(image.thumbnail_path)
+            thumbnail_object_key = extract_minio_object_key(image.thumbnail_path)
             if thumbnail_object_key:
                 uploader.delete_image(thumbnail_object_key)
 
@@ -282,20 +268,6 @@ async def delete_diary_image(
             data={"message": "이미지 삭제 성공"},
             message="이미지가 성공적으로 삭제되었습니다.",
         )
-
-    except Exception as e:
-        session.rollback()
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.error(
-            f"이미지 삭제 실패 - diary_id: {diary_id}, image_id: {image_id}, error: {str(e)}"
-        )
-        logger.exception("상세 오류 정보:")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"이미지 삭제 실패: {str(e)}",
-        ) from e
 
 
 @router.get("/{diary_id}/images", response_model=BaseResponse[list[dict]])

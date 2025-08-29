@@ -2,11 +2,11 @@
 다이어리 API 스키마 (캘린더용)
 """
 
-import json
-import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+
+from app.utils.validators import convert_uuid_to_string, parse_keywords_from_json
 
 
 class ImageResponse(BaseModel):
@@ -21,9 +21,7 @@ class ImageResponse(BaseModel):
     @classmethod
     def validate_uuid(cls, v):
         """UUID를 문자열로 변환"""
-        if isinstance(v, uuid.UUID):
-            return str(v)
-        return v
+        return convert_uuid_to_string(v)
 
     class Config:
         from_attributes = True
@@ -50,22 +48,13 @@ class DiaryResponse(BaseModel):
     @classmethod
     def validate_uuid(cls, v):
         """UUID를 문자열로 변환"""
-        if isinstance(v, uuid.UUID):
-            return str(v)
-        return v
+        return convert_uuid_to_string(v)
 
     @field_validator("keywords", mode="before")
     @classmethod
     def parse_keywords(cls, v):
         """keywords를 JSON 문자열에서 리스트로 변환"""
-        if isinstance(v, str):
-            try:
-                return json.loads(v) if v else []
-            except json.JSONDecodeError:
-                return []
-        elif isinstance(v, list):
-            return v
-        return []
+        return parse_keywords_from_json(v)
 
     class Config:
         from_attributes = True
@@ -89,22 +78,13 @@ class DiaryListResponse(BaseModel):
     @classmethod
     def validate_uuid(cls, v):
         """UUID를 문자열로 변환"""
-        if isinstance(v, uuid.UUID):
-            return str(v)
-        return v
+        return convert_uuid_to_string(v)
 
     @field_validator("keywords", mode="before")
     @classmethod
     def parse_keywords(cls, v):
         """keywords를 JSON 문자열에서 리스트로 변환"""
-        if isinstance(v, str):
-            try:
-                return json.loads(v) if v else []
-            except json.JSONDecodeError:
-                return []
-        elif isinstance(v, list):
-            return v
-        return []
+        return parse_keywords_from_json(v)
 
     class Config:
         from_attributes = True
@@ -158,14 +138,7 @@ class DiaryUpdateRequest(BaseModel):
     @classmethod
     def parse_keywords(cls, v):
         """keywords를 JSON 문자열에서 리스트로 변환"""
-        if isinstance(v, str):
-            try:
-                return json.loads(v) if v else []
-            except json.JSONDecodeError:
-                return []
-        elif isinstance(v, list):
-            return v
-        return []
+        return parse_keywords_from_json(v)
 
     class Config:
         from_attributes = True

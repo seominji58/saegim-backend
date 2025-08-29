@@ -73,12 +73,12 @@ class AIUsageLogCreate(BaseModel):
     @classmethod
     def validate_uuid_format(cls, v):
         """UUID 형식 검증"""
-        import uuid
+        from app.utils.validators import validate_uuid
 
         try:
-            uuid.UUID(v)
+            validate_uuid(v, "UUID")
             return v
-        except ValueError as e:
+        except Exception as e:
             raise ValueError("유효하지 않은 UUID 형식입니다.") from e
 
     class Config:

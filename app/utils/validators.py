@@ -2,7 +2,7 @@
 공통 검증 유틸리티 함수들
 """
 
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -55,6 +55,76 @@ def validate_image_file(content_type: Optional[str], file_size: Optional[int]) -
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"파일 크기는 {FileConstants.MAX_FILE_SIZE_MB}MB 이하여야 합니다.",
         )
+
+
+def parse_keywords_from_json(keywords_data: Any) -> list[str]:
+    """
+    keywords를 JSON 문자열에서 리스트로 변환하는 공통 함수
+
+    Args:
+        keywords_data: JSON 문자열, 리스트, 또는 기타 타입
+
+    Returns:
+        파싱된 키워드 리스트
+    """
+    import json
+
+    if isinstance(keywords_data, str):
+        try:
+            return json.loads(keywords_data) if keywords_data else []
+        except json.JSONDecodeError:
+            return []
+    elif isinstance(keywords_data, list):
+        return keywords_data
+    return []
+
+
+def convert_uuid_to_string(uuid_value: Any) -> str:
+    """
+    UUID 객체를 문자열로 변환하는 공통 함수 (스키마용)
+
+    Args:
+        uuid_value: UUID 객체 또는 문자열
+
+    Returns:
+        UUID 문자열
+    """
+    import uuid
+
+    if isinstance(uuid_value, uuid.UUID):
+        return str(uuid_value)
+    return uuid_value
+
+
+def extract_minio_object_key(url: str) -> str:
+    """
+    MinIO URL에서 객체 키 추출하는 공통 함수
+
+    Args:
+        url: MinIO 객체 URL
+
+    Returns:
+        추출된 객체 키 (경로)
+
+    Examples:
+        extract_minio_object_key("http://localhost:9000/saegim-images/images/2023/12/01/uuid.jpg")
+        # Returns: "images/2023/12/01/uuid.jpg"
+    """
+    try:
+        # URL에서 버킷 이름 이후의 경로를 객체 키로 추출
+        parts = url.split("/")
+        bucket_index = -1
+        for i, part in enumerate(parts):
+            if "saegim-images" in part or part == "saegim-images":
+                bucket_index = i
+                break
+
+        if bucket_index != -1 and bucket_index + 1 < len(parts):
+            return "/".join(parts[bucket_index + 1:])
+
+        return ""
+    except Exception:
+        return ""
 
 
 def validate_emotion_type(emotion: str) -> str:

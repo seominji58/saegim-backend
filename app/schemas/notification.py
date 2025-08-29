@@ -12,6 +12,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.utils.validators import convert_uuid_to_string
+
 
 class DeviceType(str, Enum):
     """디바이스 타입"""
@@ -203,9 +205,7 @@ class NotificationHistoryResponse(BaseModel):
     @classmethod
     def validate_uuid(cls, v):
         """UUID를 문자열로 변환"""
-        if isinstance(v, UUID):
-            return str(v)
-        return v
+        return convert_uuid_to_string(v)
 
 
 class FCMTokenListResponse(BaseModel):
