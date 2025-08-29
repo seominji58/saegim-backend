@@ -225,6 +225,53 @@ class AIService:
             logger.error(f"재생성 상태 조회 실패: {str(e)}")
             raise SessionNotFoundException(session_id=session_id) from e
 
+    async def regenerate_by_session_id(
+        self, user_id: str, session_id: str
+    ) -> dict[str, Any]:
+        """세션 ID로 이전 요청 정보를 가져와서 재생성"""
+        try:
+            # 해당 세션의 가장 최근 로그 조회
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.user_id == user_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+                .order_by(AIUsageLog.created_at.desc())
+                .limit(1)
+            )
+
+            result = self.db.execute(statement)
+            last_log = result.scalar_one_or_none()
+
+            if not last_log:
+                raise SessionNotFoundException(session_id=session_id)
+
+            # 현재 세션의 총 재생성 횟수 확인 (5회 제한)
+            session_logs_count = self.db.execute(
+                select(func.count(AIUsageLog.id))
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+            ).scalar()
+
+            if session_logs_count >= 5:
+                raise RegenerationLimitExceededException(
+                    current_count=session_logs_count, max_count=5, session_id=session_id
+                )
+
+            # 이전 요청 데이터 복원
+            original_request = CreateDiaryRequest(**last_log.request_data)
+
+            # 재생성 횟수 증가
+            original_request.regeneration_count = session_logs_count + 1
+            original_request.session_id = session_id
+
+            # AI 텍스트 재생성
+            return await self.generate_ai_text(user_id, original_request)
+
+        except Exception as e:
+            logger.error(f"세션 기반 재생성 실패: {str(e)}")
+            raise
+
     def test_db_connection(self) -> dict[str, Any]:
         """
         DB 연결 상태 테스트
