@@ -42,8 +42,7 @@ class NotificationService(BaseService):
         """
         super().__init__(db)
 
-    @staticmethod
-    def _extract_error_message(result: dict) -> str:
+    def _extract_error_message(self, result: dict) -> str:
         """FCM 응답에서 에러 메시지를 안전하게 추출"""
         try:
             response = result.get("response")
@@ -53,17 +52,22 @@ class NotificationService(BaseService):
                     message = error.get("message")
                     if isinstance(message, str):
                         return message
-            return ""
+            return "알 수 없는 오류"
         except (AttributeError, TypeError):
-            return ""
+            return "알 수 없는 오류"
 
-    @staticmethod
     def register_token(
-        user_id: UUID, token_data: FCMTokenRegisterRequest, session: Session
+        self,
+        user_id: UUID,
+        token_data: FCMTokenRegisterRequest,
+        session: Session = None,
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트 (재시도 로직 개선)"""
         from psycopg2.errors import UniqueViolation
         from sqlalchemy.dialects.postgresql import insert
+
+        if session is None:
+            session = self.db
 
         settings = get_settings()
         MAX_RETRIES = settings.fcm_max_retries
@@ -127,9 +131,13 @@ class NotificationService(BaseService):
             detail="FCM 토큰 등록에 실패했습니다.",
         )
 
-    @staticmethod
-    def get_user_tokens(user_id: UUID, session: Session) -> list[FCMTokenResponse]:
+    def get_user_tokens(
+        self, user_id: UUID, session: Session = None
+    ) -> list[FCMTokenResponse]:
         """사용자의 활성 FCM 토큰 목록 조회"""
+        if session is None:
+            session = self.db
+
         try:
             stmt = select(FCMToken).where(
                 and_(FCMToken.user_id == user_id, FCMToken.is_active)
@@ -145,9 +153,13 @@ class NotificationService(BaseService):
                 detail="FCM 토큰 목록 조회에 실패했습니다.",
             ) from e
 
-    @staticmethod
-    def delete_token(user_id: UUID, token_id: str, session: Session) -> bool:
+    def delete_token(
+        self, user_id: UUID, token_id: str, session: Session = None
+    ) -> bool:
         """FCM 토큰 삭제 (비활성화)"""
+        if session is None:
+            session = self.db
+
         try:
             stmt = select(FCMToken).where(
                 and_(FCMToken.id == token_id, FCMToken.user_id == user_id)
@@ -155,10 +167,7 @@ class NotificationService(BaseService):
             token = session.execute(stmt).scalar_one_or_none()
 
             if not token:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="FCM 토큰을 찾을 수 없습니다.",
-                )
+                return False
 
             token.is_active = False
             token.updated_at = datetime.now(UTC)
@@ -178,11 +187,13 @@ class NotificationService(BaseService):
                 detail="FCM 토큰 삭제에 실패했습니다.",
             ) from e
 
-    @staticmethod
     def get_notification_settings(
-        user_id: UUID, session: Session
+        self, user_id: UUID, session: Session = None
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 조회"""
+        if session is None:
+            session = self.db
+
         try:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
@@ -222,11 +233,16 @@ class NotificationService(BaseService):
                 detail="알림 설정 조회에 실패했습니다.",
             ) from e
 
-    @staticmethod
     def update_notification_settings(
-        user_id: UUID, settings_data: NotificationSettingsUpdate, session: Session
+        self,
+        user_id: UUID,
+        settings_data: NotificationSettingsUpdate,
+        session: Session = None,
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 업데이트"""
+        if session is None:
+            session = self.db
+
         try:
             stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
@@ -285,12 +301,24 @@ class NotificationService(BaseService):
                 detail="알림 설정 업데이트에 실패했습니다.",
             ) from e
 
-    @staticmethod
     async def send_notification(
-        notification_data: NotificationSendRequest, session: Session
+        self, notification_data: NotificationSendRequest, session: Session = None
     ) -> NotificationSendResponse:
         """푸시 알림 전송"""
+        if session is None:
+            session = self.db
+
         try:
+            # 빈 사용자 목록 체크
+            if not notification_data.user_ids:
+                return NotificationSendResponse(
+                    success_count=0,
+                    failure_count=0,
+                    successful_tokens=[],
+                    failed_tokens=[],
+                    message="전송할 사용자가 없습니다.",
+                )
+
             fcm_service = get_fcm_service()
             if fcm_service is None:
                 logger.error("FCM 서비스가 초기화되지 않았습니다")
@@ -392,7 +420,7 @@ class NotificationService(BaseService):
                         },
                         sent_at=datetime.now(UTC) if result["success"] else None,
                         error_message=(
-                            NotificationService._extract_error_message(result)
+                            self._extract_error_message(result)
                             if (
                                 not result.get("success", False)
                                 and isinstance(result, dict)
@@ -444,11 +472,13 @@ class NotificationService(BaseService):
                 detail="알림 전송에 실패했습니다.",
             ) from e
 
-    @staticmethod
     async def send_diary_reminder(
-        user_id: UUID, session: Session
+        self, user_id: UUID, session: Session = None
     ) -> NotificationSendResponse:
         """다이어리 작성 알림 전송"""
+        if session is None:
+            session = self.db
+
         try:
             # 알림 설정 확인
             settings_stmt = select(NotificationSettings).where(
@@ -474,9 +504,7 @@ class NotificationService(BaseService):
                 data={"action": "write_diary"},
             )
 
-            return await NotificationService.send_notification(
-                notification_request, session
-            )
+            return await self.send_notification(notification_request, session)
 
         except HTTPException:
             raise
@@ -487,11 +515,13 @@ class NotificationService(BaseService):
                 detail="다이어리 알림 전송에 실패했습니다.",
             ) from e
 
-    @staticmethod
     async def send_ai_content_ready(
-        user_id: UUID, diary_id: str, session: Session
+        self, user_id: UUID, diary_id: str, session: Session = None
     ) -> NotificationSendResponse:
         """AI 콘텐츠 준비 완료 알림 전송"""
+        if session is None:
+            session = self.db
+
         try:
             # 다이어리 존재 확인
             diary_stmt = select(DiaryEntry).where(DiaryEntry.id == diary_id)
@@ -527,9 +557,7 @@ class NotificationService(BaseService):
                 data={"diary_id": diary_id, "action": "view_ai_content"},
             )
 
-            return await NotificationService.send_notification(
-                notification_request, session
-            )
+            return await self.send_notification(notification_request, session)
 
         except HTTPException:
             raise
@@ -540,11 +568,13 @@ class NotificationService(BaseService):
                 detail="AI 콘텐츠 알림 전송에 실패했습니다.",
             ) from e
 
-    @staticmethod
     def get_notification_history(
-        user_id: UUID, limit: int, offset: int, session: Session
+        self, user_id: UUID, limit: int, offset: int, session: Session = None
     ) -> list[NotificationHistoryResponse]:
         """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
+        if session is None:
+            session = self.db
+
         try:
             from app.models.notification import Notification
 
@@ -613,9 +643,11 @@ class NotificationService(BaseService):
                 detail="알림 기록 조회에 실패했습니다.",
             ) from e
 
-    @staticmethod
-    async def cleanup_invalid_tokens(session: Session) -> int:
+    async def cleanup_invalid_tokens(self, session: Session = None) -> int:
         """무효한 FCM 토큰들을 정리합니다"""
+        if session is None:
+            session = self.db
+
         try:
             fcm_service = get_fcm_service()
             if fcm_service is None:
@@ -666,15 +698,19 @@ class NotificationService(BaseService):
             logger.error(f"FCM 토큰 정리 중 오류: {str(e)}")
             return 0
 
-    @staticmethod
-    def get_active_token_count(user_id: UUID, session: Session) -> int:
+    def get_active_token_count(self, user_id: UUID, session: Session = None) -> int:
         """사용자의 활성 토큰 개수를 반환합니다"""
+        if session is None:
+            session = self.db
+
         try:
-            stmt = select(FCMToken).where(
+            from sqlalchemy import func
+
+            stmt = select(func.count(FCMToken.id)).where(
                 and_(FCMToken.user_id == user_id, FCMToken.is_active)
             )
-            count = len(session.execute(stmt).scalars().all())
-            return count
+            count = session.execute(stmt).scalar()
+            return count or 0
         except Exception as e:
             logger.error(f"활성 토큰 개수 조회 실패: {str(e)}")
             return 0

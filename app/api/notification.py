@@ -63,7 +63,8 @@ def register_fcm_token(
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 등록"""
-    token = NotificationService.register_token(user_id, token_data, session)
+    notification_service = NotificationService(session)
+    token = notification_service.register_token(user_id, token_data)
     return BaseResponse(
         success=True, message="FCM 토큰이 성공적으로 등록되었습니다.", data=token
     )
@@ -80,7 +81,8 @@ def get_fcm_tokens(
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 목록 조회"""
-    tokens = NotificationService.get_user_tokens(user_id, session)
+    notification_service = NotificationService(session)
+    tokens = notification_service.get_user_tokens(user_id)
     return BaseResponse(
         success=True, message="FCM 토큰 목록을 성공적으로 조회했습니다.", data=tokens
     )
@@ -98,7 +100,8 @@ def delete_fcm_token(
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 삭제"""
-    success = NotificationService.delete_token(user_id, token_id, session)
+    notification_service = NotificationService(session)
+    success = notification_service.delete_token(user_id, token_id)
     if success:
         return BaseResponse(
             success=True,
@@ -121,7 +124,8 @@ def get_notification_settings(
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 설정 조회"""
-    settings = NotificationService.get_notification_settings(user_id, session)
+    notification_service = NotificationService(session)
+    settings = notification_service.get_notification_settings(user_id)
     return BaseResponse(
         success=True, message="알림 설정을 성공적으로 조회했습니다.", data=settings
     )
@@ -139,8 +143,9 @@ def update_notification_settings(
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 설정 업데이트"""
-    updated_settings = NotificationService.update_notification_settings(
-        user_id, settings_data, session
+    notification_service = NotificationService(session)
+    updated_settings = notification_service.update_notification_settings(
+        user_id, settings_data
     )
     return BaseResponse(
         success=True,
@@ -163,7 +168,8 @@ async def send_notification(
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 전송"""
-    result = await NotificationService.send_notification(notification_data, session)
+    notification_service = NotificationService(session)
+    result = await notification_service.send_notification(notification_data)
     return BaseResponse(
         success=True,
         message=f"알림 전송 완료 (성공: {result.success_count}, 실패: {result.failure_count})",
@@ -187,7 +193,8 @@ async def send_diary_reminder_manual(
     실제 운영에서는 개인화된 스케줄러(diary_reminder_scheduler.py)에 의해
     사용자별 설정 시간에 맞춰 자동으로 알림이 발송됩니다.
     """
-    result = await NotificationService.send_diary_reminder(user_id, session)
+    notification_service = NotificationService(session)
+    result = await notification_service.send_diary_reminder(user_id)
     return BaseResponse(
         success=True,
         message="다이어리 작성 알림이 수동으로 전송되었습니다. (테스트/관리용)",
@@ -212,7 +219,8 @@ async def send_ai_content_ready_manual(
     실제 운영에서는 다이어리 생성 시(DiaryService.create_diary)에 의해
     자동으로 알림이 발송됩니다.
     """
-    result = await NotificationService.send_ai_content_ready(user_id, diary_id, session)
+    notification_service = NotificationService(session)
+    result = await notification_service.send_ai_content_ready(user_id, diary_id)
     return BaseResponse(
         success=True,
         message="AI 콘텐츠 준비 완료 알림이 수동으로 전송되었습니다. (테스트/관리용)",
@@ -236,9 +244,8 @@ def get_notification_history(
     offset: int = Query(0, ge=0, description="건너뛸 개수"),
 ):
     """알림 이력 조회"""
-    history = NotificationService.get_notification_history(
-        user_id, limit, offset, session
-    )
+    notification_service = NotificationService(session)
+    history = notification_service.get_notification_history(user_id, limit, offset)
     return BaseResponse(
         success=True, message="알림 이력을 성공적으로 조회했습니다.", data=history
     )
