@@ -397,3 +397,32 @@ async def update_diary(
     return BaseResponse(
         data=DiaryResponse.from_orm(updated_diary), message="다이어리 수정 성공"
     )
+
+
+@router.delete("/{diary_id}", response_model=BaseResponse[dict])
+async def delete_diary(
+    *,
+    session: Annotated[Session, Depends(get_session)],
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    diary_id: str = Path(..., description="다이어리 ID (UUID)"),
+) -> BaseResponse[dict]:
+    """JWT 인증된 사용자의 다이어리 삭제 (Soft Delete)"""
+
+    # UUID 형식 검증
+    validate_uuid(diary_id, "다이어리 ID")
+
+    diary_service = DiaryService(session)
+
+    # 다이어리 삭제 시도
+    success = diary_service.delete_diary(diary_id=diary_id, user_id=user_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 다이어리를 찾을 수 없습니다.",
+        )
+
+    return BaseResponse(
+        data={"message": "다이어리 삭제 성공"},
+        message="다이어리가 성공적으로 삭제되었습니다.",
+    )

@@ -195,3 +195,72 @@ class DiaryService(SyncBaseService):
         self.sync_refresh(diary)
 
         return diary
+
+    def delete_diary(self, diary_id: str, user_id: str) -> bool:
+        """다이어리 삭제 (Soft Delete) - 관련 이미지들도 MinIO에서 삭제"""
+        diary = self.get_diary_by_id(diary_id, user_id)
+
+        if not diary:
+            return False
+
+        try:
+            # 다이어리와 관련된 이미지들 조회
+            from app.models.image import Image
+            from app.utils.minio_upload import get_minio_uploader
+
+            stmt = select(Image).where(Image.diary_id == diary_id)
+            result = self.session.execute(stmt)
+            images = result.scalars().all()
+
+            # MinIO에서 이미지 파일들 삭제
+            if images:
+                uploader = get_minio_uploader()
+
+                def extract_object_key(url: str) -> str:
+                    """MinIO URL에서 객체 키 추출"""
+                    try:
+                        parts = url.split("/")
+                        bucket_index = -1
+                        for i, part in enumerate(parts):
+                            if "saegim-images" in part or part == "saegim-images":
+                                bucket_index = i
+                                break
+                        if bucket_index != -1 and bucket_index + 1 < len(parts):
+                            return "/".join(parts[bucket_index + 1 :])
+                        return ""
+                    except Exception:
+                        return ""
+
+                for image in images:
+                    # 원본 이미지 삭제
+                    if image.file_path:
+                        original_key = extract_object_key(image.file_path)
+                        if original_key:
+                            uploader.delete_image(original_key)
+
+                    # 썸네일 삭제
+                    if image.thumbnail_path:
+                        thumbnail_key = extract_object_key(image.thumbnail_path)
+                        if thumbnail_key:
+                            uploader.delete_image(thumbnail_key)
+
+                # 데이터베이스에서 이미지 레코드들 삭제
+                for image in images:
+                    self.session.delete(image)
+
+            # Soft Delete: deleted_at 필드를 현재 시간으로 설정
+            diary.deleted_at = datetime.utcnow()
+
+            # 데이터베이스에 저장
+            self.session.add(diary)
+            self.sync_commit()
+
+            return True
+
+        except Exception as e:
+            self.session.rollback()
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"다이어리 삭제 실패 - diary_id: {diary_id}, error: {str(e)}")
+            raise
