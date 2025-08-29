@@ -23,7 +23,7 @@ class CreateAIUsageLogService:
 
     async def create_ai_usage_log(
         self,
-        user_id: str,
+        user_id: UUID,
         api_type: str,
         session_id: str,
         regeneration_count: int = 1,
@@ -74,18 +74,11 @@ class CreateAIUsageLogService:
         )
         return ai_usage_log
 
-    async def _get_user_by_id(self, user_id: str) -> User | None:
+    async def _get_user_by_id(self, user_id: UUID) -> User | None:
         """사용자 ID로 사용자 정보를 조회합니다."""
         try:
-            # UUID 문자열을 UUID 객체로 변환
-            try:
-                user_uuid = UUID(user_id)
-            except ValueError:
-                logger.warning(f"유효하지 않은 사용자 ID 형식: {user_id}")
-                return None
-
             # 사용자 정보 조회
-            query = select(User).where(User.id == user_uuid)
+            query = select(User).where(User.id == user_id)
             result = await self.db.execute(query)
             user = result.scalar_one_or_none()
 

@@ -5,6 +5,7 @@ FCM 디바이스 토큰 관리, 푸시 알림 전송 및 인앱 알림 통합 �
 
 import logging
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, desc, select
@@ -56,7 +57,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     def register_token(
-        user_id: str, token_data: FCMTokenRegisterRequest, session: Session
+        user_id: UUID, token_data: FCMTokenRegisterRequest, session: Session
     ) -> FCMTokenResponse:
         """FCM 토큰 등록 또는 업데이트"""
         from psycopg2.errors import UniqueViolation
@@ -138,7 +139,7 @@ class NotificationService(BaseService):
                 ) from e
 
     @staticmethod
-    def get_user_tokens(user_id: str, session: Session) -> list[FCMTokenResponse]:
+    def get_user_tokens(user_id: UUID, session: Session) -> list[FCMTokenResponse]:
         """사용자의 활성 FCM 토큰 목록 조회"""
         try:
             stmt = select(FCMToken).where(
@@ -156,7 +157,7 @@ class NotificationService(BaseService):
             ) from e
 
     @staticmethod
-    def delete_token(user_id: str, token_id: str, session: Session) -> bool:
+    def delete_token(user_id: UUID, token_id: str, session: Session) -> bool:
         """FCM 토큰 삭제 (비활성화)"""
         try:
             stmt = select(FCMToken).where(
@@ -190,7 +191,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     def get_notification_settings(
-        user_id: str, session: Session
+        user_id: UUID, session: Session
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 조회"""
         try:
@@ -234,7 +235,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     def update_notification_settings(
-        user_id: str, settings_data: NotificationSettingsUpdate, session: Session
+        user_id: UUID, settings_data: NotificationSettingsUpdate, session: Session
     ) -> NotificationSettingsResponse:
         """사용자 알림 설정 업데이트"""
         try:
@@ -450,7 +451,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     async def send_diary_reminder(
-        user_id: str, session: Session
+        user_id: UUID, session: Session
     ) -> NotificationSendResponse:
         """다이어리 작성 알림 전송"""
         try:
@@ -493,7 +494,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     async def send_ai_content_ready(
-        user_id: str, diary_id: str, session: Session
+        user_id: UUID, diary_id: str, session: Session
     ) -> NotificationSendResponse:
         """AI 콘텐츠 준비 완료 알림 전송"""
         try:
@@ -546,7 +547,7 @@ class NotificationService(BaseService):
 
     @staticmethod
     def get_notification_history(
-        user_id: str, limit: int, offset: int, session: Session
+        user_id: UUID, limit: int, offset: int, session: Session
     ) -> list[NotificationHistoryResponse]:
         """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
         try:
@@ -671,7 +672,7 @@ class NotificationService(BaseService):
             return 0
 
     @staticmethod
-    def get_active_token_count(user_id: str, session: Session) -> int:
+    def get_active_token_count(user_id: UUID, session: Session) -> int:
         """사용자의 활성 토큰 개수를 반환합니다"""
         try:
             stmt = select(FCMToken).where(

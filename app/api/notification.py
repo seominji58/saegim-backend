@@ -30,7 +30,7 @@ from app.services.notification_service import NotificationService
 public_router = APIRouter(tags=["Notifications"])
 
 # Protected endpoints (auth required)
-router = APIRouter(tags=["Notifications"], dependencies=[Depends(get_current_user_id)])
+router = APIRouter(tags=["Notifications"])
 
 
 # ==================== FCM 토큰 관리 ====================
@@ -58,11 +58,11 @@ async def notification_health_check():
 )
 def register_fcm_token(
     token_data: FCMTokenRegisterRequest,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 등록"""
-    token = NotificationService.register_token(str(user_id), token_data, session)
+    token = NotificationService.register_token(user_id, token_data, session)
     return BaseResponse(
         success=True, message="FCM 토큰이 성공적으로 등록되었습니다.", data=token
     )
@@ -75,11 +75,11 @@ def register_fcm_token(
     description="현재 사용자의 활성 FCM 토큰 목록을 조회합니다.",
 )
 def get_fcm_tokens(
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 목록 조회"""
-    tokens = NotificationService.get_user_tokens(str(user_id), session)
+    tokens = NotificationService.get_user_tokens(user_id, session)
     return BaseResponse(
         success=True, message="FCM 토큰 목록을 성공적으로 조회했습니다.", data=tokens
     )
@@ -93,11 +93,11 @@ def get_fcm_tokens(
 )
 def delete_fcm_token(
     token_id: str,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """FCM 토큰 삭제"""
-    success = NotificationService.delete_token(str(user_id), token_id, session)
+    success = NotificationService.delete_token(user_id, token_id, session)
     if success:
         return BaseResponse(
             success=True,
@@ -116,11 +116,11 @@ def delete_fcm_token(
     description="현재 사용자의 알림 설정을 조회합니다.",
 )
 def get_notification_settings(
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 설정 조회"""
-    settings = NotificationService.get_notification_settings(str(user_id), session)
+    settings = NotificationService.get_notification_settings(user_id, session)
     return BaseResponse(
         success=True, message="알림 설정을 성공적으로 조회했습니다.", data=settings
     )
@@ -134,12 +134,12 @@ def get_notification_settings(
 )
 def update_notification_settings(
     settings_data: NotificationSettingsUpdate,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 설정 업데이트"""
     updated_settings = NotificationService.update_notification_settings(
-        str(user_id), settings_data, session
+        user_id, settings_data, session
     )
     return BaseResponse(
         success=True,
@@ -177,7 +177,7 @@ async def send_notification(
     description="테스트 또는 관리 목적으로 현재 사용자에게 다이어리 작성 알림을 수동 전송합니다. 일반적으로는 개인화된 스케줄러에 의해 자동 발송됩니다.",
 )
 async def send_diary_reminder_manual(
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """다이어리 작성 알림 수동 전송 (관리자/테스트용)
@@ -186,7 +186,7 @@ async def send_diary_reminder_manual(
     실제 운영에서는 개인화된 스케줄러(diary_reminder_scheduler.py)에 의해
     사용자별 설정 시간에 맞춰 자동으로 알림이 발송됩니다.
     """
-    result = await NotificationService.send_diary_reminder(str(user_id), session)
+    result = await NotificationService.send_diary_reminder(user_id, session)
     return BaseResponse(
         success=True,
         message="다이어리 작성 알림이 수동으로 전송되었습니다. (테스트/관리용)",
@@ -202,7 +202,7 @@ async def send_diary_reminder_manual(
 )
 async def send_ai_content_ready_manual(
     diary_id: str,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """AI 콘텐츠 준비 완료 알림 수동 전송 (관리자/테스트용)
@@ -211,9 +211,7 @@ async def send_ai_content_ready_manual(
     실제 운영에서는 다이어리 생성 시(DiaryService.create_diary)에 의해
     자동으로 알림이 발송됩니다.
     """
-    result = await NotificationService.send_ai_content_ready(
-        str(user_id), diary_id, session
-    )
+    result = await NotificationService.send_ai_content_ready(user_id, diary_id, session)
     return BaseResponse(
         success=True,
         message="AI 콘텐츠 준비 완료 알림이 수동으로 전송되었습니다. (테스트/관리용)",
@@ -231,14 +229,14 @@ async def send_ai_content_ready_manual(
     description="현재 사용자의 알림 전송 이력을 조회합니다.",
 )
 def get_notification_history(
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
     limit: int = Query(20, le=100, description="조회할 개수"),
     offset: int = Query(0, ge=0, description="건너뛸 개수"),
 ):
     """알림 이력 조회"""
     history = NotificationService.get_notification_history(
-        str(user_id), limit, offset, session
+        user_id, limit, offset, session
     )
     return BaseResponse(
         success=True, message="알림 이력을 성공적으로 조회했습니다.", data=history
@@ -256,7 +254,7 @@ def get_notification_history(
 )
 async def mark_notification_as_read(
     notification_id: UUID,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """알림 읽음 처리 - 양쪽 테이블 동기화"""
@@ -319,7 +317,7 @@ async def mark_notification_as_read(
     description="사용자의 모든 읽지 않은 알림을 읽음으로 표시합니다.",
 )
 async def mark_all_notifications_as_read(
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     session: Annotated[Session, Depends(get_session)],
 ):
     """모든 알림 읽음 처리"""

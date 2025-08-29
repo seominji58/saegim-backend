@@ -3,6 +3,7 @@
 """
 
 from datetime import date, datetime
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -24,7 +25,7 @@ class DiaryService(SyncBaseService):
 
     def get_diaries(
         self,
-        user_id: str | None = None,
+        user_id: UUID | None = None,
         page: int = 1,
         page_size: int = 20,
         searchTerm: str | None = None,
@@ -95,7 +96,7 @@ class DiaryService(SyncBaseService):
         return diaries, total_count
 
     def get_diary_by_id(
-        self, diary_id: str, user_id: str | None = None
+        self, diary_id: str, user_id: UUID | None = None
     ) -> DiaryEntry | None:
         """ID로 다이어리 조회 (Soft Delete 제외)"""
         statement = select(DiaryEntry).where(
@@ -109,7 +110,7 @@ class DiaryService(SyncBaseService):
         return result.scalar_one_or_none()
 
     def get_diaries_by_date_range(
-        self, user_id: str, start_date: date, end_date: date
+        self, user_id: UUID, start_date: date, end_date: date
     ) -> list[DiaryEntry]:
         """특정 날짜 범위의 다이어리 조회 (캘린더용) - 이미지 정보 포함"""
         # 이미지 관계를 함께 로드하기 위해 selectinload 사용
@@ -131,7 +132,7 @@ class DiaryService(SyncBaseService):
         return result.scalars().all()
 
     def create_diary(
-        self, diary_create: DiaryCreateRequest, user_id: str
+        self, diary_create: DiaryCreateRequest, user_id: UUID
     ) -> DiaryEntry:
         """새로운 다이어리 생성"""
 
@@ -152,8 +153,8 @@ class DiaryService(SyncBaseService):
 
         # 데이터베이스에 저장
         self.session.add(new_diary)
-        self.sync_commit()
-        self.sync_refresh(new_diary)
+        self.session.commit()
+        self.session.refresh(new_diary)
 
         return new_diary
 
@@ -179,12 +180,12 @@ class DiaryService(SyncBaseService):
 
         # 데이터베이스에 저장
         self.session.add(diary)
-        self.sync_commit()
-        self.sync_refresh(diary)
+        self.session.commit()
+        self.session.refresh(diary)
 
         return diary
 
-    def delete_diary(self, diary_id: str, user_id: str) -> bool:
+    def delete_diary(self, diary_id: str, user_id: UUID) -> bool:
         """다이어리 삭제 (Soft Delete) - 관련 이미지들도 MinIO에서 삭제"""
         diary = self.get_diary_by_id(diary_id, user_id)
 
@@ -230,6 +231,6 @@ class DiaryService(SyncBaseService):
 
             # 데이터베이스에 저장
             self.session.add(diary)
-            self.sync_commit()
+            self.session.commit()
 
             return True

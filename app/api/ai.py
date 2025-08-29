@@ -4,6 +4,7 @@ AI 텍스트 생성 및 사용 로그 관리
 """
 
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
@@ -18,13 +19,12 @@ from app.services.create_diary import diary_service
 router = APIRouter(
     prefix="/ai",
     tags=["AI"],
-    dependencies=[Depends(get_current_user_id)],
 )
 
 
 @router.post("/usage-log", response_model=BaseResponse[dict])
 async def create_ai_usage_log(
-    user_id: str,
+    user_id: UUID,
     api_type: str,
     session_id: str,
     db: Annotated[Session, Depends(get_session)],
@@ -50,7 +50,7 @@ async def create_ai_usage_log(
 @router.post("/generate", response_model=BaseResponse[dict])
 async def generate_ai_text(
     data: CreateDiaryRequest,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     db: Annotated[Session, Depends(get_session)],
 ) -> BaseResponse[dict]:
     """AI 텍스트 생성"""
@@ -62,7 +62,7 @@ async def generate_ai_text(
 @router.post("/regenerate/{session_id}", response_model=BaseResponse[dict])
 async def regenerate_ai_text(
     session_id: str,
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     db: Annotated[Session, Depends(get_session)],
 ) -> BaseResponse[dict]:
     """세션 ID 기반 AI 텍스트 재생성"""
@@ -75,7 +75,7 @@ async def regenerate_ai_text(
 async def get_original_user_input(
     *,
     session_id: str = Path(..., description="세션 ID"),
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     db: Annotated[Session, Depends(get_session)],
 ) -> BaseResponse[dict]:
     """세션ID로 원본 사용자 입력 조회"""

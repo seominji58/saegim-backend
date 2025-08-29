@@ -5,6 +5,7 @@
 
 import logging
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -71,7 +72,7 @@ class DiaryReminderScheduler:
             return []
 
     @staticmethod
-    async def should_send_reminder(user_id: str, session: Session) -> bool:
+    async def should_send_reminder(user_id: UUID, session: Session) -> bool:
         """
         중복 발송 방지를 위한 체크
         최근 24시간 내에 diary_reminder 타입의 알림을 보낸 적이 있는지 확인

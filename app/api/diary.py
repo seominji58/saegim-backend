@@ -4,6 +4,7 @@
 
 from datetime import date
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -41,14 +42,14 @@ from app.utils.validators import (
     validate_uuid,
 )
 
-router = APIRouter(dependencies=[Depends(get_current_user_id)])
+router = APIRouter()
 
 
 @router.get("", response_model=BaseResponse[list[DiaryListResponse]])
 async def get_my_diaries(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     page: Annotated[int, Query(ge=1, description="페이지 번호")] = 1,
     page_size: Annotated[int, Query(ge=1, le=100, description="페이지 크기")] = 20,
     searchTerm: Annotated[str | None, Query(description="제목/내용 통합 검색")] = None,
@@ -91,7 +92,7 @@ async def get_my_diaries(
 async def get_calendar_diaries(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     start_date: Annotated[date, Query(description="시작 날짜 (YYYY-MM-DD)")],
     end_date: Annotated[date, Query(description="종료 날짜 (YYYY-MM-DD)")],
 ) -> BaseResponse[list[DiaryListResponse]]:
@@ -117,7 +118,7 @@ async def get_calendar_diaries(
 async def get_diary(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
 ) -> BaseResponse[DiaryResponse]:
     """JWT 인증된 사용자의 특정 다이어리 조회"""
@@ -147,7 +148,7 @@ async def get_diary(
 async def upload_diary_image(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     image: Annotated[UploadFile, File(description="업로드할 이미지 파일")],
 ) -> BaseResponse[dict]:
@@ -209,7 +210,7 @@ async def upload_diary_image(
 async def delete_diary_image(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     image_id: str = Path(..., description="이미지 ID (UUID)"),
 ) -> BaseResponse[dict]:
@@ -274,7 +275,7 @@ async def delete_diary_image(
 async def get_diary_images(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
 ) -> BaseResponse[list[dict]]:
     """다이어리의 기존 이미지들 조회"""
@@ -320,7 +321,7 @@ async def get_diary_images(
 async def create_diary(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_create: DiaryCreateRequest,
 ) -> BaseResponse[DiaryResponse]:
     """JWT 인증된 사용자의 다이어리 생성"""
@@ -339,7 +340,7 @@ async def create_diary(
 async def update_diary(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
     diary_update: DiaryUpdateRequest,
 ) -> BaseResponse[DiaryResponse]:
@@ -375,7 +376,7 @@ async def update_diary(
 async def delete_diary(
     *,
     session: Annotated[Session, Depends(get_session)],
-    user_id: Annotated[str, Depends(get_current_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     diary_id: str = Path(..., description="다이어리 ID (UUID)"),
 ) -> BaseResponse[dict]:
     """JWT 인증된 사용자의 다이어리 삭제 (Soft Delete)"""

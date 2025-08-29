@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import func, select
 
@@ -57,7 +58,7 @@ class AIService:
 
     async def generate_ai_text(
         self,
-        user_id: str,
+        user_id: UUID,
         data: CreateDiaryRequest,
     ) -> dict[str, Any]:
         try:
@@ -226,7 +227,7 @@ class AIService:
             raise SessionNotFoundException(session_id=session_id) from e
 
     async def get_original_user_input(
-        self, user_id: str, session_id: str
+        self, user_id: UUID, session_id: str
     ) -> str | None:
         """세션ID로 원본 사용자 입력 조회"""
         try:
@@ -253,7 +254,7 @@ class AIService:
             return None
 
     async def regenerate_by_session_id(
-        self, user_id: str, session_id: str
+        self, user_id: UUID, session_id: str
     ) -> dict[str, Any]:
         """세션 ID로 이전 요청 정보를 가져와서 재생성"""
         try:
@@ -329,7 +330,7 @@ class AIService:
                 "timestamp": str(datetime.now()),
             }
 
-    def get_user_daily_stats(self, user_id: str) -> dict[str, Any]:
+    def get_user_daily_stats(self, user_id: UUID) -> dict[str, Any]:
         """
         사용자의 일일 AI 사용 통계 조회
 
