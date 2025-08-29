@@ -4,7 +4,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import jwt
@@ -207,7 +207,7 @@ class LogoutService:
 
             for oauth_token in oauth_tokens:
                 # 토큰 만료 시간을 현재 시간으로 설정하여 무효화
-                oauth_token.expires_at = datetime.utcnow()
+                oauth_token.expires_at = datetime.now(timezone.utc)
 
             self.db.commit()
             logger.info(
@@ -309,7 +309,7 @@ async def logout(
 
         return BaseResponse(
             data={
-                "logout_time": datetime.utcnow().isoformat(),
+                "logout_time": datetime.now(timezone.utc).isoformat(),
                 "user_id": str(current_user_id) if current_user_id else None,
                 "account_type": user.account_type if user else None,
                 "provider": user.provider
@@ -329,7 +329,7 @@ async def logout(
 
         return BaseResponse(
             data={
-                "logout_time": datetime.utcnow().isoformat(),
+                "logout_time": datetime.now(timezone.utc).isoformat(),
                 "user_id": str(current_user_id) if current_user_id else None,
                 "account_type": "unknown",
                 "provider": None,

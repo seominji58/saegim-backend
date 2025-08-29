@@ -3,6 +3,7 @@
 FCM 푸시 알림, 인앱 알림 관리 및 읽음 처리 통합 API
 """
 
+from datetime import UTC
 from typing import Annotated
 from uuid import UUID
 
@@ -274,7 +275,7 @@ async def mark_notification_as_read(
         from datetime import datetime
 
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(UTC)
 
         # 2. notification_history 테이블 업데이트
         history_stmt = select(NotificationHistory).where(
@@ -285,7 +286,7 @@ async def mark_notification_as_read(
         # history 레코드들의 opened_at 업데이트
         for history in histories:
             if not history.opened_at:
-                history.opened_at = datetime.utcnow()
+                history.opened_at = datetime.now(UTC)
 
         session.commit()
 
@@ -324,7 +325,7 @@ async def mark_all_notifications_as_read(
     try:
         from datetime import datetime
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # 1. 모든 읽지 않은 notification 조회
         unread_notifications_stmt = select(Notification).where(

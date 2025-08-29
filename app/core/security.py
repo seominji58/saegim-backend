@@ -4,7 +4,7 @@ JWT 토큰 생성/검증, 의존성 주입
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -40,16 +40,16 @@ class JWTHandler:
         to_encode = data.copy()
 
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(UTC) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(UTC) + timedelta(
                 minutes=settings.jwt_access_token_expire_minutes
             )
 
         to_encode.update(
             {
                 "exp": expire,
-                "iat": datetime.utcnow(),
+                "iat": datetime.now(UTC),
                 "jti": str(uuid.uuid4()),  # JWT ID
                 "type": AuthConstants.TOKEN_TYPE_ACCESS,
             }
@@ -76,16 +76,16 @@ class JWTHandler:
         to_encode = data.copy()
 
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(UTC) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(UTC) + timedelta(
                 days=settings.jwt_refresh_token_expire_days
             )
 
         to_encode.update(
             {
                 "exp": expire,
-                "iat": datetime.utcnow(),
+                "iat": datetime.now(UTC),
                 "jti": str(uuid.uuid4()),
                 "type": AuthConstants.TOKEN_TYPE_REFRESH,
             }

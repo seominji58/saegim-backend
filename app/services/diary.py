@@ -2,7 +2,7 @@
 다이어리 비즈니스 로직 서비스 (캘린더용)
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -147,8 +147,8 @@ class DiaryService(BaseService):
             ai_generated_text=diary_create.ai_generated_text,
             is_public=diary_create.is_public,
             keywords=diary_create.keywords,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         # 데이터베이스에 저장
@@ -176,7 +176,7 @@ class DiaryService(BaseService):
                 setattr(diary, field, value)
 
         # updated_at 필드 자동 업데이트
-        diary.updated_at = datetime.utcnow()
+        diary.updated_at = datetime.now(UTC)
 
         # 데이터베이스에 저장
         self.session.add(diary)
@@ -227,7 +227,7 @@ class DiaryService(BaseService):
                     self.session.delete(image)
 
             # Soft Delete: deleted_at 필드를 현재 시간으로 설정
-            diary.deleted_at = datetime.utcnow()
+            diary.deleted_at = datetime.now(UTC)
 
             # 데이터베이스에 저장
             self.session.add(diary)

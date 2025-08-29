@@ -8,7 +8,7 @@ import json
 from typing import Dict, Optional
 import httpx
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from app.core.config import get_settings
@@ -49,14 +49,14 @@ class FCMPushService:
                     .replace("-----BEGINPRIVATEKEY-----", "-----BEGIN PRIVATE KEY-----")  # Private key 시작 태그 수정
                     .replace("-----ENDPRIVATEKEY-----", "-----END PRIVATE KEY-----")  # Private key 종료 태그 수정
                 )
-                
+
                 # JSON 파싱 시도
                 self.service_account = json.loads(json_str)
-                
+
                 # 파싱 성공 후 private_key의 \n을 실제 개행으로 변환
                 if "private_key" in self.service_account:
                     self.service_account["private_key"] = self.service_account["private_key"].replace("\\n", "\n")
-                    
+
             except json.JSONDecodeError:
                 # 기본 파싱이 실패하면 기존 방식으로 시도
                 json_str = (
@@ -110,7 +110,7 @@ class FCMPushService:
 
     def _create_jwt_token(self) -> str:
         """JWT 토큰 생성"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         payload = {
             "iss": self.service_account["client_email"],
             "scope": "https://www.googleapis.com/auth/firebase.messaging",
@@ -129,7 +129,7 @@ class FCMPushService:
         if (
             self._access_token
             and self._token_expires_at
-            and datetime.utcnow() < self._token_expires_at
+            and datetime.now(timezone.utc) < self._token_expires_at
         ):
             return self._access_token
 
@@ -153,7 +153,7 @@ class FCMPushService:
                 token_data = response.json()
                 self._access_token = token_data["access_token"]
                 # 50분 후 만료로 설정 (실제는 1시간이지만 여유를 둠)
-                self._token_expires_at = datetime.utcnow() + timedelta(minutes=50)
+                self._token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=50)
 
                 return self._access_token
 
@@ -210,13 +210,13 @@ class FCMPushService:
                 else:
                     response_data = response.json() if response.content else {}
                     error_type = self._get_error_type(response.status_code, response_data)
-                    
+
                     logger.error(
                         f"FCM 알림 전송 실패: {response.status_code} - {response.text}"
                     )
-                    
+
                     return {
-                        "success": False, 
+                        "success": False,
                         "error_type": error_type,
                         "response": response_data
                     }
