@@ -127,6 +127,9 @@ class DiaryCreateRequest(BaseModel):
     )
     keywords: list[str] | None = Field(None, description="AI가 추출한 키워드")
     is_public: bool = Field(False, description="공개 여부")
+    uploaded_images: list[dict] | None = Field(
+        None, description="업로드된 이미지 정보 (AI 생성 시)"
+    )
 
     @field_validator("user_emotion", "ai_emotion")
     @classmethod
