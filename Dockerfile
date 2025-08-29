@@ -1,5 +1,5 @@
 # 새김(Saegim) 백엔드 Dockerfile
-# FastAPI + SQLModel + PostgreSQL + Redis
+# FastAPI + SQLAlchemy + PostgreSQL + Redis
 # 멀티스테이지 빌드로 이미지 크기 최적화
 
 # ==============================================================================
