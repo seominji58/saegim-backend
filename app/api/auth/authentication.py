@@ -266,9 +266,8 @@ async def logout(
                 result = db.execute(stmt)
                 user = result.scalar_one_or_none()
 
-                # TODO: Redis나 데이터베이스에 토큰 블랙리스트 추가
                 if jti:
-                    logger.info(f"Token blacklisted: {jti}")
+                    logger.info(f"Token logout requested: {jti}")
 
             except Exception as e:
                 logger.warning(f"Failed to decode token: {e}")

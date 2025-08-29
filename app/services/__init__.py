@@ -6,7 +6,6 @@ from .base import AsyncBaseService, BaseService, SyncBaseService
 from .diary import DiaryService
 from .notification_service import NotificationService
 from .oauth import GoogleOAuthService
-from .token_service import TokenBlacklistService
 
 __all__ = [
     "BaseService",
@@ -15,5 +14,4 @@ __all__ = [
     "DiaryService",
     "GoogleOAuthService",
     "NotificationService",
-    "TokenBlacklistService",
 ]

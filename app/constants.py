@@ -199,7 +199,6 @@ class ResponseMessages:
     # 인증 관련
     INVALID_CREDENTIALS = "잘못된 인증 정보입니다."
     TOKEN_EXPIRED = "토큰이 만료되었습니다."
-    TOKEN_BLACKLISTED = "블랙리스트에 등록된 토큰입니다."
     TOKEN_REQUIRED = "인증 토큰이 필요합니다."
     INVALID_TOKEN = "유효하지 않은 토큰입니다."
     TOKEN_NOT_ACCESS_TYPE = "액세스 토큰이 아닙니다."
