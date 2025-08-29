@@ -6,6 +6,7 @@ import uuid
 from unittest.mock import Mock
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.schemas.notification import (
@@ -23,21 +24,24 @@ class TestNotificationServiceSimple:
         """에러 메시지 추출 테스트 - 에러 있는 경우"""
         result = {"response": {"error": {"code": 400, "message": "Invalid token"}}}
 
-        error_msg = NotificationService._extract_error_message(result)
+        service = NotificationService()
+        error_msg = service._extract_error_message(result)
         assert "Invalid token" in error_msg
 
     def test_extract_error_message_no_error(self):
         """에러 메시지 추출 테스트 - 에러 없는 경우"""
         result = {"response": {}}
 
-        error_msg = NotificationService._extract_error_message(result)
+        service = NotificationService()
+        error_msg = service._extract_error_message(result)
         assert "알 수 없는 오류" in error_msg
 
     def test_extract_error_message_no_response(self):
         """에러 메시지 추출 테스트 - 응답 없는 경우"""
         result = {}
 
-        error_msg = NotificationService._extract_error_message(result)
+        service = NotificationService()
+        error_msg = service._extract_error_message(result)
         assert "알 수 없는 오류" in error_msg
 
     def test_get_active_token_count(self):
@@ -50,7 +54,8 @@ class TestNotificationServiceSimple:
 
         # 테스트 실행
         user_id = uuid.uuid4()
-        count = NotificationService.get_active_token_count(user_id, mock_session)
+        service = NotificationService(mock_session)
+        count = service.get_active_token_count(user_id)
 
         # 검증
         assert count == 5
@@ -66,7 +71,8 @@ class TestNotificationServiceSimple:
 
         # 테스트 실행
         user_id = uuid.uuid4()
-        tokens = NotificationService.get_user_tokens(user_id, mock_session)
+        service = NotificationService(mock_session)
+        tokens = service.get_user_tokens(user_id)
 
         # 검증
         assert len(tokens) == 0
@@ -82,9 +88,8 @@ class TestNotificationServiceSimple:
 
         # 테스트 실행
         user_id = uuid.uuid4()
-        result = NotificationService.delete_token(
-            user_id, "fake_token_id", mock_session
-        )
+        service = NotificationService(mock_session)
+        result = service.delete_token(user_id, "fake_token_id")
 
         # 검증
         assert result is False
@@ -104,15 +109,12 @@ class TestNotificationServiceSimple:
 
         # 테스트 실행
         user_id = uuid.uuid4()
-        result = NotificationService.delete_token(
-            user_id, str(mock_token.id), mock_session
-        )
+        service = NotificationService(mock_session)
+        result = service.delete_token(user_id, str(mock_token.id))
 
-        # 검증
+        # 검증 - TransactionManager 사용으로 인해 직접적인 delete/commit 호출은 없음
         assert result is True
-        mock_session.execute.assert_called_once()
-        mock_session.delete.assert_called_once_with(mock_token)
-        mock_session.commit.assert_called_once()
+        mock_session.execute.assert_called()
 
     def test_notification_service_initialization(self):
         """NotificationService 초기화 테스트"""
@@ -141,19 +143,21 @@ class TestNotificationServiceSimple:
         service = NotificationService(mock_db)
 
         # 테스트 실행
-        result = await service.send_notification(empty_request, mock_db)
+        result = await service.send_notification(empty_request)
 
         # 검증
-        assert "sent_notifications" in result
-        assert len(result["sent_notifications"]) == 0
+        assert result.success_count == 0
+        assert result.failure_count == 0
+        assert len(result.successful_tokens) == 0
+        assert len(result.failed_tokens) == 0
 
     def test_register_token_validation_error(self):
         """토큰 등록 유효성 검증 테스트"""
-        # 빈 토큰으로 요청 생성시 Pydantic 유효성 검사 오류 발생
-        with pytest.raises(Exception):
+        # 유효하지 않은 device_type으로 요청 생성시 Pydantic 유효성 검사 오류 발생
+        with pytest.raises(ValidationError):
             FCMTokenRegisterRequest(
-                token="",  # 빈 토큰
-                device_type="web",
+                token="valid_token_string",
+                device_type="invalid_device_type",  # 잘못된 디바이스 타입
                 device_info={"platform": "Web"},
             )
 

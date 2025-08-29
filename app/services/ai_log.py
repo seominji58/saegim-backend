@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.exceptions.ai import (
     AIGenerationFailedException,
@@ -21,6 +22,7 @@ from app.exceptions.ai import (
 )
 from app.models.ai_usage_log import AIUsageLog
 from app.schemas.create_diary import CreateDiaryRequest
+from app.services.base import BaseService
 from app.services.notification_service import NotificationService
 from app.utils.openai_utils import get_openai_client
 
@@ -52,9 +54,20 @@ class ContentLength(str, Enum):
     LONG = "long"  # 장문 (6-10문장)
 
 
-class AIService:
-    def __init__(self, db):
-        self.db = db
+class AIService(BaseService):
+    def __init__(self, db: Session):
+        super().__init__(db)
+        if not self.db:
+            raise ValueError("Database session is required for AIService")
+        # 타입 체커를 위한 명시적 어서션
+        assert isinstance(self.db, Session), "AIService requires a Session instance"
+
+    @property
+    def session(self) -> Session:
+        """타입 안전한 세션 접근"""
+        if not self.db or not isinstance(self.db, Session):
+            raise ValueError("Database session is required for AIService")
+        return self.db
 
     async def generate_ai_text(
         self,
@@ -96,7 +109,7 @@ class AIService:
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
 
-            existing_logs = self.db.execute(statement).scalars().all()
+            existing_logs = self.session.execute(statement).scalars().all()
             regeneration_count = len(existing_logs) + 1
 
             # 재생성 횟수 제한 체크 (5회까지만 허용)
@@ -125,10 +138,10 @@ class AIService:
                 tokens_used=ai_response.get("tokens_used", 0),
                 regeneration_count=regeneration_count,
             )
-            self.db.add(ai_usage_log)
+            self.session.add(ai_usage_log)
 
             # 데이터베이스 커밋
-            self.db.commit()
+            self.session.commit()
             logger.info(
                 f"통합 AI 분석 로그 저장 완료 - ID: {ai_usage_log.id}, 토큰 사용량: {ai_response.get('tokens_used', 0)}"
             )
@@ -142,9 +155,10 @@ class AIService:
                     f"AI 텍스트 생성 시간이 {processing_time:.2f}초로 임계값({NOTIFICATION_THRESHOLD_SECONDS}초) 초과, 알림 발송"
                 )
                 try:
+                    notification_service = NotificationService(self.session)
                     notification_result = (
-                        await NotificationService.send_ai_content_ready(
-                            user_id, session_id, self.db
+                        await notification_service.send_ai_content_ready(
+                            user_id, session_id
                         )
                     )
                     if notification_result.success_count > 0:
@@ -210,7 +224,7 @@ class AIService:
                 .where(AIUsageLog.api_type == "integrated_analysis")
             )
 
-            existing_logs = self.db.execute(statement).scalars().all()
+            existing_logs = self.session.execute(statement).scalars().all()
             current_count = len(existing_logs)
 
             return {
@@ -240,7 +254,7 @@ class AIService:
                 .limit(1)
             )
 
-            result = self.db.execute(statement).scalar_one_or_none()
+            result = self.session.execute(statement).scalar_one_or_none()
             if result and result.request_data:
                 import json
 
@@ -268,14 +282,14 @@ class AIService:
                 .limit(1)
             )
 
-            result = self.db.execute(statement)
+            result = self.session.execute(statement)
             last_log = result.scalar_one_or_none()
 
             if not last_log:
                 raise SessionNotFoundException(session_id=session_id)
 
             # 현재 세션의 총 재생성 횟수 확인 (5회 제한)
-            session_logs_count = self.db.execute(
+            session_logs_count = self.session.execute(
                 select(func.count(AIUsageLog.id))
                 .where(AIUsageLog.session_id == session_id)
                 .where(AIUsageLog.api_type == "integrated_analysis")
@@ -310,13 +324,13 @@ class AIService:
         try:
             # 간단한 쿼리 실행
             statement = select(func.count()).select_from(AIUsageLog)
-            result = self.db.execute(statement).scalar()
+            result = self.session.execute(statement).scalar()
 
             return {
                 "status": "success",
                 "message": "DB 연결 정상",
                 "total_logs": result,
-                "db_session": str(type(self.db)),
+                "db_session": str(type(self.session)),
                 "timestamp": str(datetime.now()),
             }
 
@@ -353,7 +367,7 @@ class AIService:
                 .where(func.date(AIUsageLog.created_at) == today)
             )
 
-            logs = self.db.execute(statement).scalars().all()
+            logs = self.session.execute(statement).scalars().all()
 
             # 세션별 통계
             session_stats = {}

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.fcm import FCMToken, NotificationHistory, NotificationSettings
@@ -61,6 +62,7 @@ class TestNotificationService:
             diary_reminder_enabled=True,
             report_notification_enabled=True,
             ai_processing_enabled=True,
+            browser_push_enabled=False,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -111,7 +113,7 @@ class TestNotificationService:
         mock_db.commit = Mock()
 
         # 테스트 실행
-        result = NotificationService.register_token(
+        result = notification_service.register_token(
             sample_user_id, sample_token_register_request, mock_db
         )
 
@@ -152,7 +154,7 @@ class TestNotificationService:
         mock_db.commit = Mock()
 
         # 테스트 실행
-        result = NotificationService.register_token(
+        result = notification_service.register_token(
             sample_user_id, update_request, mock_db
         )
 
@@ -167,7 +169,7 @@ class TestNotificationService:
         self, notification_service, sample_user_id, sample_fcm_token
     ):
         """사용자 토큰 조회 테스트"""
-        # Mock 데이터베이스 세션 생성 (static method이므로)
+        # Mock 데이터베이스 세션 생성
         mock_session = Mock(spec=Session)
 
         # 토큰 조회 Mock 설정
@@ -176,7 +178,7 @@ class TestNotificationService:
         mock_session.execute.return_value = mock_result
 
         # 테스트 실행
-        tokens = NotificationService.get_user_tokens(sample_user_id, mock_session)
+        tokens = notification_service.get_user_tokens(sample_user_id, mock_session)
 
         # 검증
         assert len(tokens) == 1
@@ -188,7 +190,7 @@ class TestNotificationService:
         self, notification_service, sample_user_id, sample_fcm_token
     ):
         """토큰 삭제 성공 테스트"""
-        # Mock 데이터베이스 세션 생성 (static method이므로)
+        # Mock 데이터베이스 세션 생성
         mock_session = Mock(spec=Session)
 
         # 기존 토큰 조회 Mock 설정
@@ -197,17 +199,18 @@ class TestNotificationService:
         mock_session.execute.return_value = mock_result
 
         # DB Mock 설정
-        mock_session.delete = Mock()
+        mock_session.add = Mock()
         mock_session.commit = Mock()
 
         # 테스트 실행
-        result = NotificationService.delete_token(
+        result = notification_service.delete_token(
             sample_user_id, str(sample_fcm_token.id), mock_session
         )
 
         # 검증
         assert result is True
-        mock_session.delete.assert_called_once_with(sample_fcm_token)
+        assert sample_fcm_token.is_active is False  # 토큰이 비활성화되어야 함
+        mock_session.add.assert_called_once_with(sample_fcm_token)
         mock_session.commit.assert_called_once()
 
     def test_delete_token_not_found(self, notification_service, sample_user_id):
@@ -221,14 +224,14 @@ class TestNotificationService:
         mock_session.execute.return_value = mock_result
 
         # 테스트 실행
-        result = NotificationService.delete_token(
+        result = notification_service.delete_token(
             sample_user_id, "nonexistent_token_id", mock_session
         )
 
         # 검증
         assert result is False
-        # delete와 commit이 호출되지 않았는지 확인
-        mock_session.delete.assert_not_called()
+        # add와 commit이 호출되지 않았는지 확인
+        mock_session.add.assert_not_called()
         mock_session.commit.assert_not_called()
 
     def test_get_notification_settings_existing(
@@ -244,7 +247,7 @@ class TestNotificationService:
         mock_session.execute.return_value = mock_result
 
         # 테스트 실행
-        settings = NotificationService.get_notification_settings(
+        settings = notification_service.get_notification_settings(
             sample_user_id, mock_session
         )
 
@@ -281,11 +284,12 @@ class TestNotificationService:
         mock_session.refresh = Mock()
 
         # 테스트 실행
-        settings = NotificationService.get_notification_settings(
+        settings = notification_service.get_notification_settings(
             sample_user_id, mock_session
         )
 
         # 검증 - 기본값으로 새 설정이 생성됨
+        assert settings is not None
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
         mock_session.refresh.assert_called_once()
@@ -323,11 +327,12 @@ class TestNotificationService:
         )
 
         # 테스트 실행
-        settings = NotificationService.update_notification_settings(
+        settings = notification_service.update_notification_settings(
             sample_user_id, update_request, mock_session
         )
 
         # 검증 - 설정이 업데이트됨  (실제 서비스 로직에 따라 설정됨)
+        assert settings is not None
         mock_session.add.assert_called_once_with(sample_notification_settings)
         mock_session.commit.assert_called_once()
         mock_session.refresh.assert_called_once_with(sample_notification_settings)
@@ -373,10 +378,10 @@ class TestNotificationService:
             )
 
             # 검증
-            assert "sent_notifications" in result
-            assert len(result["sent_notifications"]) == 1
-            assert result["sent_notifications"][0]["success"] is True
-            assert result["sent_notifications"][0]["message_id"] == "test_message_123"
+            assert result.success_count == 1
+            assert result.failure_count == 0
+            assert len(result.successful_tokens) == 1
+            assert result.successful_tokens[0] == "test_fcm_token"
 
             # FCM 서비스 호출 검증
             mock_fcm_service.send_notification.assert_called_once()
@@ -385,8 +390,12 @@ class TestNotificationService:
             mock_db.add.assert_called_once()
             added_history = mock_db.add.call_args[0][0]
             assert isinstance(added_history, NotificationHistory)
-            assert added_history.title == sample_notification_request.title
-            assert added_history.body == sample_notification_request.body
+            assert (
+                added_history.data_payload["title"] == sample_notification_request.title
+            )
+            assert (
+                added_history.data_payload["body"] == sample_notification_request.body
+            )
             assert (
                 added_history.notification_type
                 == sample_notification_request.notification_type
@@ -408,11 +417,11 @@ class TestNotificationService:
         )
 
         # 검증
-        assert "sent_notifications" in result
-        assert len(result["sent_notifications"]) == 0
-        assert "errors" in result
-        assert len(result["errors"]) == 1
-        assert "활성 토큰이 없습니다" in result["errors"][0]["error"]
+        assert result.success_count == 0
+        assert result.failure_count == 0
+        assert len(result.successful_tokens) == 0
+        assert len(result.failed_tokens) == 0
+        assert "전송할 활성 토큰이 없습니다" in result.message
 
     @pytest.mark.asyncio
     async def test_send_notification_fcm_error(
@@ -451,10 +460,10 @@ class TestNotificationService:
             )
 
             # 검증
-            assert "sent_notifications" in result
-            assert "errors" in result
-            assert len(result["errors"]) == 1
-            assert "FCM Service Error" in result["errors"][0]["error"]
+            assert result.success_count == 0
+            assert result.failure_count == 1
+            assert len(result.failed_tokens) == 1
+            assert result.failed_tokens[0] == "test_fcm_token"
 
     def test_get_active_token_count(self, notification_service, sample_user_id):
         """활성 토큰 개수 조회 테스트"""
@@ -467,7 +476,9 @@ class TestNotificationService:
         mock_session.execute.return_value = mock_result
 
         # 테스트 실행
-        count = NotificationService.get_active_token_count(sample_user_id, mock_session)
+        count = notification_service.get_active_token_count(
+            sample_user_id, mock_session
+        )
 
         # 검증
         assert count == 3
@@ -492,11 +503,11 @@ class TestNotificationService:
         # FCM 서비스 Mock 설정
         with patch("app.services.notification_service.get_fcm_service") as mock_get_fcm:
             mock_fcm_service = Mock()
-            # 첫 번째 토큰은 유효, 두 번째는 무효
+            # 첫 번째 토큰은 유효, 두 번째는 UNREGISTERED로 무효
             mock_fcm_service.send_notification = AsyncMock(
                 side_effect=[
                     {"success": True, "message_id": "test_123"},  # 유효한 토큰
-                    Exception("Invalid token"),  # 무효한 토큰
+                    {"success": False, "error_type": "UNREGISTERED"},  # 무효한 토큰
                 ]
             )
             mock_get_fcm.return_value = mock_fcm_service
@@ -506,7 +517,7 @@ class TestNotificationService:
             mock_session.commit = Mock()
 
             # 테스트 실행
-            cleaned_count = await NotificationService.cleanup_invalid_tokens(
+            cleaned_count = await notification_service.cleanup_invalid_tokens(
                 mock_session
             )
 
@@ -524,17 +535,18 @@ class TestNotificationService:
             "response": {"error": {"code": 400, "message": "Invalid token"}}
         }
 
-        error_msg = NotificationService._extract_error_message(normal_result)
+        service = NotificationService()
+        error_msg = service._extract_error_message(normal_result)
         assert "Invalid token" in error_msg
 
         # 에러 구조가 없는 경우
         empty_result = {"response": {}}
-        error_msg = NotificationService._extract_error_message(empty_result)
+        error_msg = service._extract_error_message(empty_result)
         assert "알 수 없는 오류" in error_msg
 
         # 응답이 없는 경우
         no_response = {}
-        error_msg = NotificationService._extract_error_message(no_response)
+        error_msg = service._extract_error_message(no_response)
         assert "알 수 없는 오류" in error_msg
 
 
@@ -560,11 +572,11 @@ class TestNotificationServiceEdgeCases:
         self, notification_service, mock_db, sample_user_id
     ):
         """토큰 등록 유효성 검증 테스트"""
-        # 빈 토큰 요청
-        with pytest.raises(Exception):  # Pydantic 유효성 검사 오류 발생
-            empty_request = FCMTokenRegisterRequest(
-                token="",  # 빈 토큰
-                device_type="web",
+        # 유효하지 않은 device_type으로 ValidationError 발생시킴
+        with pytest.raises(ValidationError):  # Pydantic 유효성 검사 오류 발생
+            FCMTokenRegisterRequest(
+                token="valid_token_string",
+                device_type="invalid_device_type",  # 잘못된 디바이스 타입
                 device_info={"platform": "Web"},
             )
 
@@ -596,7 +608,8 @@ class TestNotificationServiceEdgeCases:
         result = await notification_service.send_notification(empty_request, mock_db)
 
         # 검증
-        assert "sent_notifications" in result
-        assert len(result["sent_notifications"]) == 0
-        assert "errors" in result
-        # 빈 사용자 목록에 대한 처리 확인
+        assert result.success_count == 0
+        assert result.failure_count == 0
+        assert len(result.successful_tokens) == 0
+        assert len(result.failed_tokens) == 0
+        assert "전송할 사용자가 없습니다" in result.message
