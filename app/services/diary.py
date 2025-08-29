@@ -11,12 +11,12 @@ from sqlalchemy.orm import Session
 from app.constants import SortOrder
 from app.models.diary import DiaryEntry
 from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
-from app.services.base import SyncBaseService
+from app.services.base import BaseService
 from app.utils.error_handlers import ErrorPatterns, database_transaction_handler
 from app.utils.validators import extract_minio_object_key
 
 
-class DiaryService(SyncBaseService):
+class DiaryService(BaseService):
     """다이어리 비즈니스 로직 (캘린더용)"""
 
     def __init__(self, session: Session):

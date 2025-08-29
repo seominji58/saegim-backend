@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Union
+from collections.abc import Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class BaseService:
     """모든 서비스의 기본 클래스"""
 
-    def __init__(self, db: Union[AsyncSession, Session, None] = None):
+    def __init__(self, db: AsyncSession | Session | None = None):
         """
         서비스 초기화
 
@@ -50,7 +50,7 @@ class BaseService:
         else:
             return TransactionManager.transaction(self.db)
 
-    def safe_execute(self, operation: callable, *args, **kwargs):
+    def safe_execute(self, operation: Callable, *args, **kwargs):
         """트랜잭션 안전 실행
 
         Args:
@@ -81,8 +81,3 @@ class BaseService:
             return self.db.refresh(instance)
         else:
             self.db.refresh(instance)
-
-
-# 레거시 호환성을 위한 별칭 (향후 제거 예정)
-AsyncBaseService = BaseService
-SyncBaseService = BaseService
