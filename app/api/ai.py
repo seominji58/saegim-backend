@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
@@ -22,27 +23,31 @@ router = APIRouter(
 )
 
 
+class AIUsageLogRequest(BaseModel):
+    api_type: str
+    session_id: str
+    regeneration_count: int = 1
+    tokens_used: int = 0
+    request_data: dict[str, Any] | None = None
+    response_data: dict[str, Any] | None = None
+
+
 @router.post("/usage-log", response_model=BaseResponse[dict])
 async def create_ai_usage_log(
-    user_id: UUID,
-    api_type: str,
-    session_id: str,
+    usage_log_data: AIUsageLogRequest,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
     db: Annotated[Session, Depends(get_session)],
-    regeneration_count: int = 1,
-    tokens_used: int = 0,
-    request_data: dict[str, Any] | None = None,
-    response_data: dict[str, Any] | None = None,
 ) -> BaseResponse[dict]:
     """AI 사용 로그 생성"""
     service = diary_service(db)
     result = await service.create_ai_usage_log(
         user_id,
-        api_type,
-        session_id,
-        regeneration_count,
-        tokens_used,
-        request_data,
-        response_data,
+        usage_log_data.api_type,
+        usage_log_data.session_id,
+        usage_log_data.regeneration_count,
+        usage_log_data.tokens_used,
+        usage_log_data.request_data,
+        usage_log_data.response_data,
     )
     return BaseResponse(data=result, message="AI 사용 로그가 생성되었습니다.")
 
