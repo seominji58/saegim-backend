@@ -14,6 +14,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from app.api import router as api_router
+from app.constants import HTTPHeaders
 from app.core.config import get_settings
 from app.core.env_config import load_env_file
 from app.core.lifespan import lifespan
@@ -99,13 +100,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Authorization",
-        "Content-Type",
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
+        HTTPHeaders.AUTHORIZATION,
+        HTTPHeaders.CONTENT_TYPE,
+        HTTPHeaders.X_REQUESTED_WITH,
+        HTTPHeaders.ACCEPT,
+        HTTPHeaders.ORIGIN,
+        HTTPHeaders.ACCESS_CONTROL_REQUEST_METHOD,
+        HTTPHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
     ],  # 보안 강화: 구체적 헤더만 허용
 )
 

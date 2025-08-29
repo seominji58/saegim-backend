@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.security import decode_access_token, get_current_user_id_from_cookie
+from app.constants import AuthConstants, ResponseMessages
 from app.db.database import get_session
 from app.models.user import User
 
@@ -57,7 +58,7 @@ async def get_current_user_id(request: Request) -> str:
             logger.error("인증 토큰을 찾을 수 없음")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="인증 토큰이 필요합니다.",
+                detail=ResponseMessages.TOKEN_REQUIRED,
             )
 
         return user_id
@@ -67,7 +68,7 @@ async def get_current_user_id(request: Request) -> str:
     except Exception as e:
         logger.error(f"인증 중 예외 발생: {e}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="인증에 실패했습니다."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=ResponseMessages.AUTH_FAILED
         )
 
 
@@ -89,7 +90,7 @@ async def _extract_user_id(request: Request) -> str | None:
 
     # 2. Authorization 헤더에서 토큰 확인 (이메일 로그인)
     auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
+    if auth_header and auth_header.startswith(AuthConstants.BEARER_PREFIX):
         token = auth_header.split(" ")[1]
         payload = decode_access_token(token)
         user_id = payload.get("sub")
@@ -110,7 +111,7 @@ async def _validate_user(user_id: str, db: Session) -> User:
         logger.error(f"UUID 변환 실패: {user_id}, 오류: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 사용자 ID 형식입니다.",
+            detail=ResponseMessages.INVALID_USER_ID_FORMAT,
         )
 
     stmt = select(User).where(User.id == user_uuid, User.deleted_at.is_(None))
@@ -123,13 +124,13 @@ async def _validate_user(user_id: str, db: Session) -> User:
         logger.error(f"사용자를 찾을 수 없음: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="사용자를 찾을 수 없습니다.",
+            detail=ResponseMessages.USER_NOT_FOUND,
         )
 
     if not user.is_active:
         logger.error(f"비활성화된 계정: {user_id}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="비활성화된 계정입니다."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=ResponseMessages.ACCOUNT_INACTIVE
         )
 
     return user
@@ -159,7 +160,7 @@ async def get_current_user(
             logger.error("인증 토큰을 찾을 수 없음")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="인증 토큰이 필요합니다.",
+                detail=ResponseMessages.TOKEN_REQUIRED,
             )
 
         user = await _validate_user(user_id, db)
@@ -171,5 +172,5 @@ async def get_current_user(
     except Exception as e:
         logger.error(f"인증 중 예외 발생: {e}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="인증에 실패했습니다."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=ResponseMessages.AUTH_FAILED
         )

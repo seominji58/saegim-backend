@@ -15,6 +15,7 @@ from fastapi import HTTPException, UploadFile, status
 from PIL import Image
 
 from app.core.config import get_settings
+from app.constants import FileConstants
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ class MinIOUploader:
         """
         return self._generate_image_url(object_key)
 
-    def _create_thumbnail(self, image_data: bytes, size: Tuple[int, int] = (150, 150), quality: int = 85) -> bytes:
+    def _create_thumbnail(self, image_data: bytes, size: Tuple[int, int] = FileConstants.THUMBNAIL_SIZE, quality: int = FileConstants.THUMBNAIL_QUALITY) -> bytes:
         """
         이미지 데이터로부터 썸네일 생성
 
@@ -161,17 +162,17 @@ class MinIOUploader:
                 # RGB 모드로 변환 (RGBA 등 다른 모드 지원)
                 if img.mode in ('RGBA', 'LA', 'P'):
                     img = img.convert('RGB')
-                
+
                 # 원본 비율 유지하면서 리사이즈
                 img.thumbnail(size, Image.Resampling.LANCZOS)
-                
+
                 # 썸네일 데이터를 BytesIO로 저장
                 thumbnail_buffer = io.BytesIO()
-                img.save(thumbnail_buffer, 'JPEG', quality=quality, optimize=True)
+                img.save(thumbnail_buffer, FileConstants.THUMBNAIL_FORMAT, quality=quality, optimize=True)
                 thumbnail_buffer.seek(0)
-                
+
                 return thumbnail_buffer.getvalue()
-                
+
         except Exception as e:
             logger.error(f"썸네일 생성 실패: {e}")
             raise HTTPException(
@@ -179,7 +180,7 @@ class MinIOUploader:
                 detail=f"썸네일 생성 중 오류가 발생했습니다: {str(e)}",
             )
 
-    async def upload_image_with_thumbnail(self, file: UploadFile, thumbnail_size: Tuple[int, int] = (150, 150)) -> Tuple[str, str, str]:
+    async def upload_image_with_thumbnail(self, file: UploadFile, thumbnail_size: Tuple[int, int] = FileConstants.THUMBNAIL_SIZE) -> Tuple[str, str, str]:
         """
         이미지를 MinIO에 업로드하고 썸네일도 생성하여 업로드
 
@@ -220,7 +221,7 @@ class MinIOUploader:
                 object_name=thumbnail_object_key,
                 data=io.BytesIO(thumbnail_data),
                 length=len(thumbnail_data),
-                content_type="image/jpeg",
+                content_type=f"image/{FileConstants.THUMBNAIL_FORMAT.lower()}",
             )
 
             # URL 생성
@@ -241,26 +242,18 @@ class MinIOUploader:
 
     def _validate_file(self, file: UploadFile) -> None:
         """파일 검증"""
-        # 파일 크기 확인 (최대 15MB)
-        if file.size and file.size > 15 * 1024 * 1024:
+        # 파일 크기 확인 (상수 사용)
+        if file.size and file.size > FileConstants.MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="파일 크기가 15MB를 초과합니다.",
+                detail=f"파일 크기가 {FileConstants.MAX_FILE_SIZE_MB}MB를 초과합니다.",
             )
 
-        # MIME 타입 확인
-        allowed_types = [
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/gif",
-            "image/webp",
-            "image/bmp",
-        ]
-        if file.content_type not in allowed_types:
+        # MIME 타입 확인 (상수 사용)
+        if file.content_type not in FileConstants.ALLOWED_IMAGE_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"허용되지 않는 파일 형식입니다. 허용된 형식: {', '.join(allowed_types)}",
+                detail=f"허용되지 않는 파일 형식입니다. 허용된 형식: {', '.join(FileConstants.ALLOWED_IMAGE_TYPES)}",
             )
 
     def _generate_object_key(self, file_id: str, original_filename: str) -> str:
@@ -309,7 +302,7 @@ async def upload_image_to_minio(file: UploadFile) -> Tuple[str, str]:
     return await uploader.upload_image(file)
 
 
-async def upload_image_with_thumbnail_to_minio(file: UploadFile, thumbnail_size: Tuple[int, int] = (150, 150)) -> Tuple[str, str, str]:
+async def upload_image_with_thumbnail_to_minio(file: UploadFile, thumbnail_size: Tuple[int, int] = FileConstants.THUMBNAIL_SIZE) -> Tuple[str, str, str]:
     """
     이미지와 썸네일을 MinIO에 업로드하는 편의 함수
 

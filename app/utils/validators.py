@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from app.constants import FileConstants, ResponseMessages
 
 
 def validate_uuid(uuid_str: str, field_name: str = "ID") -> UUID:
@@ -48,12 +49,11 @@ def validate_image_file(content_type: Optional[str], file_size: Optional[int]) -
             detail="이미지 파일만 업로드할 수 있습니다.",
         )
 
-    # 10MB 제한
-    max_size = 10 * 1024 * 1024
-    if file_size and file_size > max_size:
+    # 파일 크기 제한 (상수 사용)
+    if file_size and file_size > FileConstants.MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="파일 크기는 10MB 이하여야 합니다.",
+            detail=f"파일 크기는 {FileConstants.MAX_FILE_SIZE_MB}MB 이하여야 합니다.",
         )
 
 

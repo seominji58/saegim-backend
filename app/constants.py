@@ -76,6 +76,85 @@ class HttpMethod(str, Enum):
 
 
 # 시스템 상수
+# 파일 업로드 상수
+class FileConstants:
+    """파일 업로드 관련 상수"""
+
+    # 파일 크기 제한 (15MB로 통일)
+    MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB (bytes)
+    MAX_FILE_SIZE_MB = 15  # MB 단위
+
+    # 이미지 관련
+    ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+    ALLOWED_IMAGE_TYPES = {
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/bmp",
+    }
+
+    # 썸네일 설정
+    THUMBNAIL_SIZE = (150, 150)
+    THUMBNAIL_QUALITY = 85
+    THUMBNAIL_FORMAT = "JPEG"
+
+
+# 인증 관련 상수
+class AuthConstants:
+    """인증 및 JWT 관련 상수"""
+
+    # 토큰 타입
+    TOKEN_TYPE_ACCESS = "access"
+    TOKEN_TYPE_REFRESH = "refresh"
+    TOKEN_TYPE_BEARER = "bearer"
+
+    # 헤더 및 쿠키
+    BEARER_PREFIX = "Bearer "
+    COOKIE_ACCESS_TOKEN = "access_token"
+    COOKIE_REFRESH_TOKEN = "refresh_token"
+    COOKIE_SESSION = "session"
+
+    # HTTP 헤더
+    HEADER_AUTHORIZATION = "Authorization"
+    HEADER_WWW_AUTHENTICATE = "WWW-Authenticate"
+
+
+# HTTP 헤더 상수
+class HTTPHeaders:
+    """HTTP 헤더 관련 상수"""
+
+    # 표준 헤더
+    AUTHORIZATION = "Authorization"
+    CONTENT_TYPE = "Content-Type"
+    X_REQUESTED_WITH = "X-Requested-With"
+    ACCEPT = "Accept"
+    ORIGIN = "Origin"
+
+    # CORS 헤더
+    ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method"
+    ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers"
+
+    # 인증 헤더
+    WWW_AUTHENTICATE = "WWW-Authenticate"
+
+
+# 시간 관련 상수
+class TimeConstants:
+    """시간 계산 관련 상수"""
+
+    SECONDS_PER_MINUTE = 60
+    MINUTES_PER_HOUR = 60
+    HOURS_PER_DAY = 24
+    SECONDS_PER_DAY = 24 * 60 * 60
+
+    # 타임아웃
+    DEFAULT_TIMEOUT_SECONDS = 30
+    DATABASE_TIMEOUT_SECONDS = 30
+    REQUEST_TIMEOUT_SECONDS = 10.0
+
+
 class SystemConstants:
     """시스템 전반에서 사용되는 상수들"""
 
@@ -84,12 +163,12 @@ class SystemConstants:
     MAX_PAGE_SIZE = 100
     MIN_PAGE_SIZE = 1
 
-    # 인증
+    # 인증 (deprecated - AuthConstants 사용 권장)
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
     REFRESH_TOKEN_EXPIRE_DAYS = 30
 
-    # 파일 업로드
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    # 파일 업로드 (deprecated - FileConstants 사용 권장)
+    MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB (FileConstants와 통일)
     ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
     # AI 모델
@@ -121,6 +200,15 @@ class ResponseMessages:
     INVALID_CREDENTIALS = "잘못된 인증 정보입니다."
     TOKEN_EXPIRED = "토큰이 만료되었습니다."
     TOKEN_BLACKLISTED = "블랙리스트에 등록된 토큰입니다."
+    TOKEN_REQUIRED = "인증 토큰이 필요합니다."
+    INVALID_TOKEN = "유효하지 않은 토큰입니다."
+    TOKEN_NOT_ACCESS_TYPE = "액세스 토큰이 아닙니다."
+    TOKEN_NOT_REFRESH_TYPE = "리프레시 토큰이 아닙니다."
+    INVALID_USER_ID_FORMAT = "유효하지 않은 사용자 ID 형식입니다."
+    USER_NOT_FOUND = "사용자를 찾을 수 없습니다."
+    ACCOUNT_INACTIVE = "비활성화된 계정입니다."
+    AUTH_FAILED = "인증에 실패했습니다."
+    TOKEN_VERIFICATION_FAILED = "토큰 검증에 실패했습니다."
 
     # 계정 관련
     ACCOUNT_DELETED = "탈퇴된 계정입니다."

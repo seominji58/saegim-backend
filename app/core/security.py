@@ -12,6 +12,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.constants import AuthConstants, ResponseMessages
 from app.core.config import get_settings
 from app.utils import data_encryptor, password_hasher
 
@@ -50,7 +51,7 @@ class JWTHandler:
                 "exp": expire,
                 "iat": datetime.utcnow(),
                 "jti": str(uuid.uuid4()),  # JWT ID
-                "type": "access",
+                "type": AuthConstants.TOKEN_TYPE_ACCESS,
             }
         )
 
@@ -86,7 +87,7 @@ class JWTHandler:
                 "exp": expire,
                 "iat": datetime.utcnow(),
                 "jti": str(uuid.uuid4()),
-                "type": "refresh",
+                "type": AuthConstants.TOKEN_TYPE_REFRESH,
             }
         )
 
@@ -117,14 +118,18 @@ class JWTHandler:
         except jwt.ExpiredSignatureError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="토큰이 만료되었습니다.",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail=ResponseMessages.TOKEN_EXPIRED,
+                headers={
+                    AuthConstants.HEADER_WWW_AUTHENTICATE: AuthConstants.TOKEN_TYPE_BEARER
+                },
             ) from e
         except jwt.JWTError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="유효하지 않은 토큰입니다.",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail=ResponseMessages.INVALID_TOKEN,
+                headers={
+                    AuthConstants.HEADER_WWW_AUTHENTICATE: AuthConstants.TOKEN_TYPE_BEARER
+                },
             ) from e
 
     @staticmethod
@@ -168,7 +173,7 @@ class SecurityService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer",
+            "token_type": AuthConstants.TOKEN_TYPE_BEARER,
         }
 
     def refresh_access_token(self, refresh_token: str) -> str:
@@ -186,10 +191,12 @@ class SecurityService:
         """
         payload = self.jwt_handler.decode_token(refresh_token)
 
-        if not self.jwt_handler.verify_token_type(payload, "refresh"):
+        if not self.jwt_handler.verify_token_type(
+            payload, AuthConstants.TOKEN_TYPE_REFRESH
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="리프레시 토큰이 아닙니다.",
+                detail=ResponseMessages.TOKEN_NOT_REFRESH_TYPE,
             )
 
         user_id = payload.get("sub")
