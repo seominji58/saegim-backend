@@ -5,7 +5,7 @@ AI 텍스트 생성 및 사용 로그 관리
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
@@ -69,3 +69,26 @@ async def regenerate_ai_text(
     ai_service = AIService(db)
     result = await ai_service.regenerate_by_session_id(user_id, session_id)
     return BaseResponse(data=result, message="AI 텍스트가 재생성되었습니다.")
+
+
+@router.get("/session/{session_id}/original-input", response_model=BaseResponse[dict])
+async def get_original_user_input(
+    *,
+    session_id: str = Path(..., description="세션 ID"),
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    db: Annotated[Session, Depends(get_session)],
+) -> BaseResponse[dict]:
+    """세션ID로 원본 사용자 입력 조회"""
+
+    ai_service = AIService(db)
+    original_input = await ai_service.get_original_user_input(user_id, session_id)
+
+    if not original_input:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 세션의 원본 입력을 찾을 수 없습니다.",
+        )
+
+    return BaseResponse(
+        data={"original_input": original_input}, message="원본 사용자 입력 조회 성공"
+    )

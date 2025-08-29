@@ -225,6 +225,33 @@ class AIService:
             logger.error(f"재생성 상태 조회 실패: {str(e)}")
             raise SessionNotFoundException(session_id=session_id) from e
 
+    async def get_original_user_input(
+        self, user_id: str, session_id: str
+    ) -> str | None:
+        """세션ID로 원본 사용자 입력 조회"""
+        try:
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.user_id == user_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+                .order_by(AIUsageLog.created_at.asc())
+                .limit(1)
+            )
+
+            result = self.db.execute(statement).scalar_one_or_none()
+            if result and result.request_data:
+                import json
+
+                request_data = json.loads(result.request_data)
+                return request_data.get("prompt")
+
+            return None
+
+        except Exception as e:
+            logger.error(f"원본 사용자 입력 조회 실패: {str(e)}")
+            return None
+
     async def regenerate_by_session_id(
         self, user_id: str, session_id: str
     ) -> dict[str, Any]:

@@ -33,7 +33,7 @@ class DiaryResponse(BaseModel):
     """다이어리 응답 스키마"""
 
     id: str
-    title: str
+    title: str | None
     content: str
     user_emotion: str | None = None
     ai_emotion: str | None = None
@@ -75,7 +75,7 @@ class DiaryListResponse(BaseModel):
     """다이어리 목록 응답 스키마 (캘린더용)"""
 
     id: str
-    title: str
+    title: str | None
     content: str  # 수정된 본문 내용을 표시하기 위해 content 필드 추가
     ai_generated_text: str | None = None  # ai_generated_text 필드 추가
     user_emotion: str | None = None
