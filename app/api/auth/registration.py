@@ -23,8 +23,7 @@ from app.schemas.base import BaseResponse
 from app.utils.email_service import EmailService
 from app.utils.encryption import password_hasher
 
-# TODO: Implement standardized error handling
-# from app.utils.error_handlers import StandardHTTPException, bad_request_exception
+from app.utils.error_handlers import StandardHTTPException, bad_request_exception
 
 router = APIRouter(tags=["registration"])
 settings = get_settings()
