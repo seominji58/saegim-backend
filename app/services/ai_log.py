@@ -470,6 +470,7 @@ JSON 형식으로만 답해주세요."""
             # JSON 파싱 (json_repair 라이브러리 사용으로 LLM 응답 특화 처리)
             try:
                 result_json = response["content"].strip()
+                result = None
 
                 try:
                     # json_repair를 사용한 견고한 파싱
@@ -490,6 +491,10 @@ JSON 형식으로만 답해주세요."""
                     )
                     result = json.loads(result_json)
 
+                # result가 성공적으로 파싱되었는지 확인
+                if result is None or not isinstance(result, dict):
+                    raise ValueError("파싱된 결과가 유효한 딕셔너리가 아닙니다")
+
                 return {
                     "emotion": result.get("emotion", "평온"),
                     "keywords": result.get("keywords", [])[:5],
@@ -498,7 +503,7 @@ JSON 형식으로만 답해주세요."""
                     "tokens_used": response["usage"]["total_tokens"],
                 }
 
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, ValueError) as e:
                 logger.error(f"JSON 파싱 실패: {result_json}, 오류: {str(e)}")
                 # 파싱 실패 시 예외 발생
                 raise AIGenerationFailedException(

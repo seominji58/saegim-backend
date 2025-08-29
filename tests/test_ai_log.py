@@ -103,149 +103,61 @@ class TestAIService:
             assert mock_db.commit.called
 
     @pytest.mark.asyncio
-    async def test_analyze_emotion_professional(self, ai_service, mock_openai_response):
-        """전문적인 감정 분석 테스트"""
-        with patch("app.services.ai_log.get_openai_client") as mock_get_client:
-            mock_client = Mock()
+    async def test_generate_complete_analysis(self, ai_service, mock_openai_response):
+        """통합 AI 분석 테스트"""
+        with patch("app.utils.openai_utils.get_openai_client") as mock_get_client:
+            mock_client = AsyncMock()
             mock_get_client.return_value = mock_client
 
+            # 올바른 JSON 응답 모킹
             emotion_response = mock_openai_response.copy()
-            emotion_response["content"] = "행복"
+            emotion_response[
+                "content"
+            ] = '{"emotion": "행복", "keywords": ["좋음", "하루"], "generated_text": "오늘은 정말 좋은 하루였습니다."}'
             mock_client.async_chat_completion = AsyncMock(return_value=emotion_response)
 
-            result = await ai_service._analyze_emotion_professional("좋은 하루였다")
+            result = await ai_service._generate_complete_analysis(
+                "오늘은 정말 좋은 하루였습니다.", "happy"
+            )
 
             assert result["emotion"] == "행복"
             assert result["confidence"] == 0.9
+            assert result["keywords"] == ["좋음", "하루"]
+            assert result["generated_text"] == "오늘은 정말 좋은 하루였습니다."
             assert result["tokens_used"] == 80
 
-            # 시스템 메시지 확인
-            call_args = mock_client.async_chat_completion.call_args[1]
-            assert "전문 심리 상담사" in call_args["messages"][0]["content"]
-
-    @pytest.mark.asyncio
+    @pytest.mark.skip(reason="메서드가 존재하지 않음 - 통합 테스트로 대체")
     async def test_extract_keywords_professional(
         self, ai_service, mock_openai_response
     ):
-        """전문적인 키워드 추출 테스트"""
-        with patch("app.services.ai_log.get_openai_client") as mock_get_client:
-            mock_client = Mock()
-            mock_get_client.return_value = mock_client
+        """전문적인 키워드 추출 테스트 - 스킵됨"""
+        pass
 
-            keywords_response = mock_openai_response.copy()
-            keywords_response["content"] = '["카페", "커피", "시간", "여유", "일상"]'
-            mock_client.async_chat_completion = AsyncMock(
-                return_value=keywords_response
-            )
-
-            result = await ai_service._extract_keywords_professional(
-                "카페에서 커피를 마시며 여유로운 시간을 보냈다", "행복"
-            )
-
-            assert len(result) == 5
-            assert "카페" in result
-            assert "커피" in result
-
-            # 감정 단어 제외 확인
-            call_args = mock_client.async_chat_completion.call_args[1]
-            system_message = call_args["messages"][0]["content"]
-            assert "행복" in system_message
-            assert "감정 단어는 제외" in system_message
-
-    @pytest.mark.asyncio
+    @pytest.mark.skip(reason="메서드가 존재하지 않음 - 통합 테스트로 대체")
     async def test_extract_keywords_json_parse_error(
         self, ai_service, mock_openai_response
     ):
-        """키워드 추출 JSON 파싱 오류 테스트"""
-        with patch("app.services.ai_log.get_openai_client") as mock_get_client:
-            mock_client = Mock()
-            mock_get_client.return_value = mock_client
+        """키워드 추출 JSON 파싱 오류 테스트 - 스킵됨"""
+        pass
 
-            keywords_response = mock_openai_response.copy()
-            keywords_response[
-                "content"
-            ] = "카페, 커피, 시간, 여유, 일상"  # JSON이 아닌 형태
-            mock_client.async_chat_completion = AsyncMock(
-                return_value=keywords_response
-            )
-
-            result = await ai_service._extract_keywords_professional(
-                "카페에서 커피 한잔", "행복"
-            )
-
-            assert len(result) <= 5
-            assert len(result) >= 1
-            # 기본 파싱으로 처리된 결과 확인
-
-    @pytest.mark.asyncio
+    @pytest.mark.skip(reason="메서드가 존재하지 않음 - 통합 테스트로 대체")
     async def test_generate_quote_professional_poem_style(
         self, ai_service, mock_openai_response
     ):
-        """시 스타일 글귀 생성 테스트"""
-        with patch("app.services.ai_log.get_openai_client") as mock_get_client:
-            mock_client = Mock()
-            mock_get_client.return_value = mock_client
+        """시 스타일 글귀 생성 테스트 - 스킵됨"""
+        pass
 
-            quote_response = mock_openai_response.copy()
-            quote_response[
-                "content"
-            ] = "카페 한 구석 작은 테이블에서\n따뜻한 커피 향이 마음을 적신다"
-            mock_client.async_chat_completion = AsyncMock(return_value=quote_response)
-
-            result = await ai_service._generate_quote_professional(
-                "카페에서 좋은 시간", "행복", ["카페", "커피"], "poem", "short"
-            )
-
-            assert (
-                result["text"]
-                == "카페 한 구석 작은 테이블에서\n따뜻한 커피 향이 마음을 적신다"
-            )
-            assert result["tokens_used"] == 80
-
-            # 시스템 메시지에 시적 표현 포함 확인
-            call_args = mock_client.async_chat_completion.call_args[1]
-            system_message = call_args["messages"][0]["content"]
-            assert "시" in system_message
-            assert "은유와 상징" in system_message
-
-    @pytest.mark.asyncio
+    @pytest.mark.skip(reason="메서드가 존재하지 않음 - 통합 테스트로 대체")
     async def test_generate_quote_professional_short_story_style(
         self, ai_service, mock_openai_response
     ):
-        """단편글 스타일 글귀 생성 테스트"""
-        with patch("app.services.ai_log.get_openai_client") as mock_get_client:
-            mock_client = Mock()
-            mock_get_client.return_value = mock_client
+        """단편글 스타일 글귀 생성 테스트 - 스킵됨"""
+        pass
 
-            quote_response = mock_openai_response.copy()
-            quote_response[
-                "content"
-            ] = "오늘 카페에서 보낸 시간이 참 소중했다. 따뜻한 커피 한 잔과 함께 여유로운 오후를 즐겼다."
-            mock_client.async_chat_completion = AsyncMock(return_value=quote_response)
-
-            result = await ai_service._generate_quote_professional(
-                "카페에서 좋은 시간", "행복", ["카페", "커피"], "short_story", "medium"
-            )
-
-            assert "카페에서 보낸 시간" in result["text"]
-            assert result["tokens_used"] == 80
-
-            # 시스템 메시지에 자연스러운 문체 포함 확인
-            call_args = mock_client.async_chat_completion.call_args[1]
-            system_message = call_args["messages"][0]["content"]
-            assert "단편글" in system_message
-            assert "이야기하듯" in system_message
-
+    @pytest.mark.skip(reason="메서드가 존재하지 않음")
     def test_extract_keywords_fallback(self, ai_service):
-        """폴백 키워드 추출 테스트"""
-        prompt = "카페에서 커피를 마시며, 좋은 책을 읽고 음악을 들었다"
-        result = ai_service._extract_keywords_fallback(prompt)
-
-        assert len(result) <= 5
-        assert len(result) >= 1
-        # 2글자 이상만 포함되는지 확인
-        for keyword in result:
-            assert len(keyword) >= 2
+        """폴백 키워드 추출 테스트 - 스킵됨"""
+        pass
 
     @pytest.mark.asyncio
     async def test_openai_api_error_handling(self, ai_service, mock_db, sample_request):

@@ -62,11 +62,10 @@ class GoogleOAuthService(BaseService):
 
         try:
             response_data = await http_client.post_json(self.token_url, data)
+            return GoogleOAuthResponse(**response_data)
         except HTTPException as e:
             logger.error(f"Failed to get access token: {e.detail}")
             raise OAuthErrors.token_request_failed(str(e.detail))
-
-            return GoogleOAuthResponse(**response_data)
 
     async def get_user_info(self, access_token: str) -> OAuthUserInfo:
         """액세스 토큰으로 사용자 정보 요청
@@ -84,9 +83,6 @@ class GoogleOAuthService(BaseService):
 
         try:
             user_data = await http_client.get_json(self.userinfo_url, headers=headers)
-        except HTTPException:
-            logger.error("Failed to get user info from Google API")
-            raise OAuthErrors.userinfo_request_failed()
 
             # user_data is already parsed from http_client.get_json()
             # 디버깅: 구글 API 응답 확인
@@ -103,6 +99,9 @@ class GoogleOAuthService(BaseService):
                 name=user_data.get("name", ""),
                 picture=user_data.get("picture"),
             )
+        except HTTPException:
+            logger.error("Failed to get user info from Google API")
+            raise OAuthErrors.userinfo_request_failed()
 
     async def process_oauth_callback(
         self, code: str, db: Session
