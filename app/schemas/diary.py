@@ -113,12 +113,22 @@ class DiaryListResponse(BaseModel):
 class DiaryCreateRequest(BaseModel):
     """다이어리 생성 요청 스키마"""
 
-    title: str = Field(..., min_length=1, max_length=255, description="다이어리 제목")
-    content: str = Field(..., min_length=1, description="다이어리 내용")
-    user_emotion: str | None = Field(None, description="사용자 감정")
+    title: str | None = Field(
+        None, max_length=255, description="다이어리 제목 (선택사항)"
+    )
+    content: str = Field(
+        ..., min_length=1, description="다이어리 내용 (사용자 원본 프롬프트)"
+    )
+    user_emotion: str | None = Field(None, description="사용자가 선택한 감정")
+    ai_generated_text: str | None = Field(None, description="AI가 생성한 텍스트")
+    ai_emotion: str | None = Field(None, description="AI가 분석한 감정")
+    ai_emotion_confidence: float | None = Field(
+        None, ge=0.0, le=1.0, description="AI 감정 분석 신뢰도"
+    )
+    keywords: list[str] | None = Field(None, description="AI가 추출한 키워드")
     is_public: bool = Field(False, description="공개 여부")
 
-    @field_validator("user_emotion")
+    @field_validator("user_emotion", "ai_emotion")
     @classmethod
     def validate_emotion(cls, v):
         """감정 값 검증"""

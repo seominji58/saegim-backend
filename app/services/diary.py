@@ -2,13 +2,12 @@
 다이어리 비즈니스 로직 서비스 (캘린더용)
 """
 
-import random
 from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.constants import EmotionType, SortOrder
+from app.constants import SortOrder
 from app.models.diary import DiaryEntry
 from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
 from app.services.base import SyncBaseService
@@ -134,30 +133,17 @@ class DiaryService(SyncBaseService):
     ) -> DiaryEntry:
         """새로운 다이어리 생성"""
 
-        # 임시 AI 다이어리 생성 결과 생성
-        emotions = [emotion.value for emotion in EmotionType]
-        ai_emotion = random.choice(emotions)
-        ai_emotion_confidence = round(random.uniform(0.1, 0.9), 2)
-        ai_generated_text = f"AI가 생성한 {ai_emotion}한 감정의 텍스트입니다."
-
-        # 키워드를 리스트로 직접 처리 (JSONB 타입이므로)
-        mock_keywords = (
-            ["일기"]
-            if not diary_create.content or len(diary_create.content.strip()) < 2
-            else [diary_create.content.strip()[:2]]
-        )
-
-        # 새 다이어리 엔트리 생성
+        # 새 다이어리 엔트리 생성 (실제 AI 데이터 사용)
         new_diary = DiaryEntry(
             user_id=user_id,
             title=diary_create.title,
             content=diary_create.content,
             user_emotion=diary_create.user_emotion,
-            ai_emotion=ai_emotion,
-            ai_emotion_confidence=ai_emotion_confidence,
-            ai_generated_text=ai_generated_text,
+            ai_emotion=diary_create.ai_emotion,
+            ai_emotion_confidence=diary_create.ai_emotion_confidence,
+            ai_generated_text=diary_create.ai_generated_text,
             is_public=diary_create.is_public,
-            keywords=mock_keywords,
+            keywords=diary_create.keywords,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
