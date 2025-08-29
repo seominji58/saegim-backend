@@ -316,14 +316,13 @@ class NotificationService(BaseService):
             successful_tokens = []
             failed_tokens = []
 
-            # 대상 사용자들의 활성 토큰 조회
-            all_tokens = []
-            for user_id in notification_data.user_ids:
-                stmt = select(FCMToken).where(
-                    and_(FCMToken.user_id == user_id, FCMToken.is_active)
+            # 대상 사용자들의 활성 토큰 조회 (N+1 쿼리 최적화)
+            stmt = select(FCMToken).where(
+                and_(
+                    FCMToken.user_id.in_(notification_data.user_ids), FCMToken.is_active
                 )
-                user_tokens = session.execute(stmt).scalars().all()
-                all_tokens.extend(user_tokens)
+            )
+            all_tokens = session.execute(stmt).scalars().all()
 
             if not all_tokens:
                 return NotificationSendResponse(
@@ -339,17 +338,24 @@ class NotificationService(BaseService):
 
             created_notifications = {}
 
-            for user_id in notification_data.user_ids:
-                notification = Notification(
+            # 대량 insert 최적화: 여러 알림을 한 번에 생성
+            notifications_to_create = [
+                Notification(
                     user_id=user_id,
                     type=notification_data.notification_type,
                     title=notification_data.title,
                     message=notification_data.body,
                     data=notification_data.data,
                 )
-                session.add(notification)
-                session.flush()  # ID를 얻기 위해 flush
-                created_notifications[user_id] = notification.id
+                for user_id in notification_data.user_ids
+            ]
+
+            session.add_all(notifications_to_create)
+            session.flush()  # ID를 얻기 위해 flush
+
+            # 사용자 ID와 알림 ID 매핑
+            for notification in notifications_to_create:
+                created_notifications[notification.user_id] = notification.id
 
             # 각 토큰에 대해 알림 전송
             for token_model in all_tokens:

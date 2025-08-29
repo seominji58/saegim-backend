@@ -351,19 +351,15 @@ async def update_diary(
 
     diary_service = DiaryService(session)
 
-    # 먼저 다이어리가 존재하고 본인의 것인지 확인
-    existing_diary = diary_service.get_diary_by_id(diary_id)
+    # 다이어리 존재 여부 및 권한을 한 번에 확인 (보안 강화)
+    existing_diary = diary_service.get_diary_by_id(diary_id, user_id)
     if not existing_diary:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="다이어리를 찾을 수 없습니다"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="다이어리를 찾을 수 없거나 접근 권한이 없습니다",
         )
 
-    # 본인의 다이어리만 수정 가능하도록 검증
-    if existing_diary.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="해당 다이어리를 수정할 권한이 없습니다",
-        )
+    # 권한 검증은 이미 get_diary_by_id에서 완료됨
 
     updated_diary = diary_service.update_diary(diary_id, diary_update)
 

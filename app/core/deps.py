@@ -48,9 +48,9 @@ async def get_current_user_id(request: Request) -> UUID:
     """
 
     try:
-        # 디버깅: 쿠키 확인
-        cookies = request.cookies
-        logger.info(f"쿠키 확인: {list(cookies.keys())}")
+        # 쿠키 존재 여부만 확인 (보안상 키 목록은 로깅하지 않음)
+        has_cookies = bool(request.cookies)
+        logger.debug(f"쿠키 존재 여부: {has_cookies}")
 
         user_id = await _extract_user_id(request)
 
@@ -74,16 +74,16 @@ async def get_current_user_id(request: Request) -> UUID:
 
 async def _extract_user_id(request: Request) -> UUID | None:
     """쿠키 또는 Bearer 토큰에서 사용자 ID 추출"""
-    logger.info("사용자 ID 추출 시작")
+    logger.debug("사용자 ID 추출 시작")
 
     try:
         # 1. 쿠키에서 토큰 확인 (소셜 로그인)
-        logger.info("쿠키에서 토큰 추출 시도")
+        logger.debug("쿠키에서 토큰 추출 시도")
         user_id = get_current_user_id_from_cookie(request)
-        logger.info(f"쿠키에서 user_id 추출: {user_id}")
+        logger.debug("쿠키에서 user_id 추출 성공")
         return user_id
     except HTTPException as e:
-        logger.info(f"쿠키 인증 실패: {e.detail}")
+        logger.debug("쿠키 인증 실패")
     except Exception as e:
         logger.error(f"쿠키 인증 중 예상치 못한 오류: {e}")
         pass
@@ -94,7 +94,7 @@ async def _extract_user_id(request: Request) -> UUID | None:
         token = auth_header.split(" ")[1]
         payload = decode_access_token(token)
         user_id = payload.get("sub")
-        logger.info(f"Bearer 토큰에서 user_id 추출: {user_id}")
+        logger.debug("Bearer 토큰에서 user_id 추출 성공")
         return UUID(user_id)
 
     return None
@@ -102,7 +102,7 @@ async def _extract_user_id(request: Request) -> UUID | None:
 
 async def _validate_user(user_id: UUID, db: Session) -> User:
     """사용자 존재 여부 및 활성 상태 확인"""
-    logger.info(f"사용자 검증 시작: {user_id}")
+    logger.debug("사용자 검증 시작")
 
     stmt = select(User).where(User.id == user_id, User.deleted_at.is_(None))
     result = db.execute(stmt)
