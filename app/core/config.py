@@ -103,6 +103,17 @@ class Settings(BaseSettings):
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_default_model: str = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4")
 
+    # AI 서비스 설정
+    ai_max_regeneration_count: int = int(os.getenv("AI_MAX_REGENERATION_COUNT", "5"))
+    ai_max_keywords: int = int(os.getenv("AI_MAX_KEYWORDS", "5"))
+    ai_notification_threshold_seconds: int = int(
+        os.getenv("AI_NOTIFICATION_THRESHOLD_SECONDS", "3")
+    )
+
+    # FCM 재시도 설정
+    fcm_max_retries: int = int(os.getenv("FCM_MAX_RETRIES", "3"))
+    fcm_retry_delay: float = float(os.getenv("FCM_RETRY_DELAY", "0.1"))
+
     # 쿠키 설정
     cookie_domain: str = os.getenv("COOKIE_DOMAIN", "localhost")
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"

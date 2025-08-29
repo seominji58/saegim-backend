@@ -67,8 +67,6 @@ class DiaryService(BaseService):
         if end_date:
             statement = statement.where(func.date(DiaryEntry.created_at) <= end_date)
 
-        # # 정렬 (최신순) old
-        # statement = statement.order_by(DiaryEntry.created_at.desc())
         # 정렬 적용
         if sort_order.lower() == SortOrder.DESC.value:
             statement = statement.order_by(DiaryEntry.created_at.desc())

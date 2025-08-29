@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.ai_usage_log import AIUsageLog
 from app.models.user import User
 from app.services.base import BaseService
@@ -99,6 +100,8 @@ class CreateAIUsageLogService(BaseService):
 
     def _validate_log_data(self, api_type: str, regeneration_count: int) -> None:
         """로그 데이터를 검증합니다."""
+        settings = get_settings()
+
         # API 타입 검증
         if api_type not in ["generate", "keywords"]:
             raise ValueError(
@@ -106,8 +109,10 @@ class CreateAIUsageLogService(BaseService):
             )
 
         # 재생성 횟수 검증
-        if not (1 <= regeneration_count <= 5):
-            raise ValueError("재생성 횟수는 1-5 범위 내여야 합니다.")
+        if not (1 <= regeneration_count <= settings.ai_max_regeneration_count):
+            raise ValueError(
+                f"재생성 횟수는 1-{settings.ai_max_regeneration_count} 범위 내여야 합니다."
+            )
 
     async def _create_ai_usage_log_entry(
         self,
