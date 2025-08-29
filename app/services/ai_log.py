@@ -392,10 +392,28 @@ JSON 형식으로만 답해주세요."""
             )
             logger.info(f"OpenAI API 응답: {response}")
 
-            # JSON 파싱
+            # JSON 파싱 (json_repair 라이브러리 사용으로 LLM 응답 특화 처리)
             try:
                 result_json = response["content"].strip()
-                result = json.loads(result_json)
+
+                try:
+                    # json_repair를 사용한 견고한 파싱
+                    from json_repair import repair_json
+
+                    result = repair_json(result_json, return_objects=True)
+                except ImportError:
+                    # json_repair가 없는 경우 기존 방식 사용
+                    logger.warning(
+                        "json_repair 라이브러리를 찾을 수 없어 기본 방식을 사용합니다"
+                    )
+                    import re
+
+                    result_json = re.sub(
+                        r"[\x00-\x1f\x7f-\x9f\u200b-\u200d\ufeff\u00a0\u2000-\u200a\u2028\u2029]",
+                        "",
+                        result_json,
+                    )
+                    result = json.loads(result_json)
 
                 return {
                     "emotion": result.get("emotion", "평온"),
