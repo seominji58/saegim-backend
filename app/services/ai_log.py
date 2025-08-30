@@ -207,6 +207,180 @@ class AIService(BaseService):
                 error_type="GENERATION_ERROR",
             ) from e
 
+    async def stream_ai_text(
+        self,
+        user_id: UUID,
+        data: CreateDiaryRequest,
+    ):
+        """AI 텍스트 실시간 스트리밍 생성"""
+        try:
+            logger.info(f"AI 텍스트 스트리밍 시작: {data.prompt[:50]}...")
+
+            # 세션 ID 생성/확인
+            session_id = (
+                getattr(data, "sessionId", None) or data.session_id or str(uuid.uuid4())
+            )
+
+            # 재생성 횟수 확인
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+            )
+            existing_logs = self.session.execute(statement).scalars().all()
+            regeneration_count = len(existing_logs) + 1
+
+            if regeneration_count > 5:
+                error_data = {
+                    "error": "재생성 횟수가 5회를 초과했습니다.",
+                    "session_id": session_id,
+                    "current_count": regeneration_count,
+                }
+                yield json.dumps(error_data, ensure_ascii=False)
+                return
+
+            # 초기 메타데이터 전송
+            initial_data = {
+                "type": "start",
+                "session_id": session_id,
+                "regeneration_count": regeneration_count,
+            }
+            yield json.dumps(initial_data, ensure_ascii=False)
+
+            # 스트리밍으로 텍스트 생성
+            collected_text = ""
+            total_tokens = 0
+
+            async for text_chunk in self._stream_complete_analysis(
+                data.prompt, data.style, data.length
+            ):
+                if isinstance(text_chunk, dict) and "tokens_used" in text_chunk:
+                    total_tokens = text_chunk["tokens_used"]
+                    continue
+
+                collected_text += text_chunk
+                chunk_data = {
+                    "type": "content",
+                    "content": text_chunk,
+                    "accumulated": collected_text,
+                }
+                yield json.dumps(chunk_data, ensure_ascii=False)
+
+            # 완료 후 분석 결과 처리 (평문 텍스트)
+            generated_text = collected_text.strip()
+
+            # 생성된 텍스트에 대해 별도로 감정 분석과 키워드 추출
+            try:
+                # 간단한 감정 분석 (기본값 사용)
+                emotion = "평온"  # 기본 감정으로 설정
+                # 간단한 키워드 추출 (원본 프롬프트에서)
+                keywords = data.prompt.split()[:5] if data.prompt else []
+
+            except Exception as e:
+                logger.warning(f"스트리밍 후 분석 실패: {str(e)}")
+                emotion = "평온"
+                keywords = []
+
+            # 스트리밍 로그 저장
+            ai_usage_log = AIUsageLog(
+                user_id=user_id,
+                api_type="integrated_analysis",
+                session_id=session_id,
+                request_data=data.model_dump(),
+                response_data={
+                    "ai_generated_text": generated_text,
+                    "emotion": emotion,
+                    "keywords": keywords,
+                    "style": data.style,
+                    "length": data.length,
+                },
+                tokens_used=total_tokens,
+                regeneration_count=regeneration_count,
+            )
+            self.session.add(ai_usage_log)
+            self.session.commit()
+
+            # 완료 메타데이터 전송
+            final_data = {
+                "type": "complete",
+                "emotion": emotion,
+                "keywords": keywords,
+                "generated_text": generated_text,
+                "tokens_used": total_tokens,
+                "session_id": session_id,
+            }
+            yield json.dumps(final_data, ensure_ascii=False)
+
+        except Exception as e:
+            logger.error(f"AI 텍스트 스트리밍 실패: {str(e)}")
+            error_data = {
+                "type": "error",
+                "error": f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
+            }
+            yield json.dumps(error_data, ensure_ascii=False)
+
+    async def _stream_complete_analysis(self, prompt: str, style: str, length: str):
+        """스트리밍으로 통합 분석 수행"""
+        try:
+            # 스타일 및 길이 매핑
+            style_info = {
+                "poem": {
+                    "name": "시",
+                    "desc": "시적이고 운율이 있는 표현으로, 은유와 상징을 사용",
+                },
+                "short_story": {
+                    "name": "단편글",
+                    "desc": "자연스럽고 따뜻한 문체로, 이야기하듯 편안하게",
+                },
+            }
+
+            length_info = {
+                "short": {"name": "단문", "desc": "1-2문장, 최대 50자 이내"},
+                "medium": {"name": "중문", "desc": "3-5문장, 최대 150자 이내"},
+                "long": {"name": "장문", "desc": "6-10문장, 최대 300자 이내"},
+            }
+
+            style_guide = style_info.get(
+                style, {"name": "단편글", "desc": "자연스럽고 따뜻한 문체로"}
+            )
+            length_guide = length_info.get(length, {"name": "중문", "desc": "3-5문장"})
+
+            system_message = f"""당신은 감성적이고 위로가 되는 글을 쓰는 전문 작가입니다.
+
+주어진 키워드나 텍스트를 바탕으로 감성적인 글귀를 생성해주세요:
+
+- 문체: {style_guide["name"]} ({style_guide["desc"]})
+- 길이: {length_guide["name"]} ({length_guide["desc"]}) - 반드시 이 길이를 지켜주세요
+- 따뜻하고 위로가 되는 톤
+- 중요: 글귀는 반드시 요청된 길이 제한 내에서 생성해야 합니다
+
+생성된 글귀만 답해주세요. 다른 설명이나 JSON 형식은 사용하지 마세요."""
+
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"사용자 입력: {prompt}"},
+            ]
+
+            # 스트리밍으로 응답 생성 (OpenAI stream=True 사용)
+            from openai import AsyncOpenAI
+
+            openai_client = AsyncOpenAI()
+
+            stream = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_completion_tokens=500,
+                stream=True,
+            )
+
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.error(f"스트리밍 AI 분석 실패: {str(e)}")
+            raise
+
     def get_regeneration_status(self, session_id: str) -> dict[str, Any]:
         """
         특정 세션의 재생성 횟수 정보 조회

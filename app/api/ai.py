@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -96,4 +97,37 @@ async def get_original_user_input(
 
     return BaseResponse(
         data={"original_input": original_input}, message="원본 사용자 입력 조회 성공"
+    )
+
+
+@router.post("/generate/stream")
+async def stream_ai_text(
+    data: CreateDiaryRequest,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    db: Annotated[Session, Depends(get_session)],
+) -> StreamingResponse:
+    """AI 텍스트 실시간 스트리밍 생성"""
+    ai_service = AIService(db)
+
+    async def generate_stream():
+        try:
+            async for chunk in ai_service.stream_ai_text(user_id, data):
+                yield f"data: {chunk}\n\n"
+        except Exception as e:
+            error_message = (
+                f'{{"error": "AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}"}}'
+            )
+            yield f"data: {error_message}\n\n"
+            yield "event: error\n"
+            yield f"data: {error_message}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
     )
