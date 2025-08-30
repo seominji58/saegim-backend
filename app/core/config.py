@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
     allowed_hosts: list[str] | str = os.getenv(
         "ALLOWED_HOSTS",
-        "http://localhost:3000,http://localhost:8080",
+        "http://localhost:3000,http://localhost:3001,http://localhost:8080",
     )
 
     # FCM 설정
