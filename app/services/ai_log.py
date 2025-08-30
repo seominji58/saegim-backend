@@ -362,9 +362,11 @@ class AIService(BaseService):
             ]
 
             # 스트리밍으로 응답 생성 (OpenAI stream=True 사용)
+            import os
+
             from openai import AsyncOpenAI
 
-            openai_client = AsyncOpenAI()
+            openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
             stream = await openai_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -595,8 +597,6 @@ class AIService(BaseService):
         한 번의 API 호출로 감정 분석, 키워드 추출, 글귀 생성을 모두 처리
         """
         try:
-            client = get_openai_client()
-
             # 스타일 및 길이 매핑
             style_info = {
                 "poem": {
@@ -650,6 +650,7 @@ JSON 형식으로만 답해주세요."""
                 {"role": "user", "content": f"사용자 입력: {prompt}"},
             ]
 
+            client = get_openai_client()
             response = await client.async_chat_completion(
                 messages=messages, max_completion_tokens=500
             )
