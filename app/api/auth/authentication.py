@@ -11,7 +11,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from jose.exceptions import JWTError
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -54,6 +54,10 @@ class LoginResponse(BaseModel):
     email: str
     nickname: str
     message: str
+
+
+class ProfileUpdateRequest(BaseModel):
+    nickname: str = Field(min_length=1, max_length=50)
 
 
 @router.post("/login", response_model=BaseResponse[LoginResponse])
@@ -451,6 +455,73 @@ async def get_current_user_info(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="사용자 정보 조회 중 오류가 발생했습니다.",
+        )
+
+
+@authenticated_router.get("/profile", response_model=BaseResponse[Dict[str, Any]])
+async def get_user_profile(
+    current_user: User = Depends(get_current_user),
+) -> BaseResponse[Dict[str, Any]]:
+    """사용자 프로필 정보 조회 API (deprecated: /me 사용 권장)"""
+    try:
+        user_data = {
+            "user_id": str(current_user.id),
+            "email": current_user.email,
+            "nickname": current_user.nickname,
+            "account_type": current_user.account_type,
+            "provider": current_user.provider,
+            "is_active": current_user.is_active,
+            "created_at": current_user.created_at.isoformat()
+            if current_user.created_at
+            else None,
+        }
+
+        return BaseResponse(data=user_data, message="프로필 정보를 성공적으로 조회했습니다.")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"프로필 정보 조회 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="프로필 정보 조회 중 오류가 발생했습니다.",
+        )
+
+
+@authenticated_router.put("/profile", response_model=BaseResponse[Dict[str, Any]])
+async def update_user_profile(
+    request: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+) -> BaseResponse[Dict[str, Any]]:
+    """사용자 프로필 업데이트 API"""
+    try:
+        # 닉네임 업데이트
+        current_user.nickname = request.nickname
+        current_user.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(current_user)
+
+        logger.info(f"프로필 업데이트 성공: {current_user.email} -> {request.nickname}")
+
+        return BaseResponse(
+            data={
+                "user_id": str(current_user.id),
+                "nickname": current_user.nickname,
+                "updated_at": current_user.updated_at.isoformat(),
+            },
+            message="프로필이 성공적으로 업데이트되었습니다.",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"프로필 업데이트 실패: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="프로필 업데이트 중 오류가 발생했습니다.",
         )
 
 

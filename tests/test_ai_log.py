@@ -30,6 +30,22 @@ class TestAIService:
         return AIService(mock_db)
 
     @pytest.fixture
+    def mock_openai_client(self):
+        """Mock OpenAI 클라이언트"""
+        mock = Mock()
+        mock.chat.completions.create.return_value = Mock(
+            choices=[
+                Mock(
+                    message=Mock(
+                        content='{"emotion": "기쁨", "confidence": 0.85, "keywords": ["행복", "즐거움"], "text": "테스트 AI 생성 텍스트"}'
+                    )
+                )
+            ],
+            usage=Mock(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+        )
+        return mock
+
+    @pytest.fixture
     def sample_request(self):
         """테스트용 요청 데이터"""
         return CreateDiaryRequest(

@@ -110,6 +110,38 @@ def mock_env_vars(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("FIREBASE_PROJECT_ID", "test-project")
     monkeypatch.setenv("FIREBASE_CREDENTIALS_PATH", "/test/path/credentials.json")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("MINIO_ENDPOINT", "localhost:9000")
+    monkeypatch.setenv("MINIO_ACCESS_KEY", "test-access-key")
+    monkeypatch.setenv("MINIO_SECRET_KEY", "test-secret-key")
+
+
+@pytest.fixture
+def mock_openai_service():
+    """Mock OpenAI 서비스"""
+    mock = Mock()
+    mock.chat.completions.create.return_value = Mock(
+        choices=[
+            Mock(
+                message=Mock(
+                    content='{"emotion": "기쁨", "confidence": 0.85, "keywords": ["행복", "즐거움"], "text": "테스트 AI 생성 텍스트"}'
+                )
+            )
+        ],
+        usage=Mock(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+    )
+    return mock
+
+
+@pytest.fixture
+def mock_minio_client():
+    """Mock MinIO 클라이언트"""
+    mock = Mock()
+    mock.bucket_exists.return_value = True
+    mock.put_object.return_value = Mock(etag="test-etag")
+    mock.remove_object.return_value = None
+    mock.presigned_get_object.return_value = "http://test-minio/test-image.jpg"
+    return mock
 
 
 # 마커 설정
