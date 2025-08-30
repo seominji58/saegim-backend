@@ -19,6 +19,7 @@ class CreateDiaryRequest(BaseModel):
     sessionId: str | None = Field(
         None, description="재생성 세션 ID (카멜케이스, 프론트엔드 호환)"
     )
+    uploaded_images: list[dict] | None = Field(None, description="업로드된 이미지 정보")
 
     @field_validator("prompt")
     @classmethod

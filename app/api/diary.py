@@ -2,6 +2,7 @@
 다이어리 API 라우터 (JWT 인증 기반)
 """
 
+import logging
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -41,6 +42,8 @@ from app.utils.validators import (
     validate_image_file,
     validate_uuid,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -314,6 +317,60 @@ async def get_diary_images(
 
     return BaseResponse(
         data=image_list, message=f"다이어리 이미지 조회 성공 (총 {len(image_list)}개)"
+    )
+
+
+@router.post("/images/upload", response_model=BaseResponse[list[dict]])
+async def upload_temporary_images(
+    *,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    images: Annotated[list[UploadFile], File(description="업로드할 이미지 파일들")],
+) -> BaseResponse[list[dict]]:
+    """AI 글 생성용 임시 이미지 업로드 (다이어리 저장 시 연결됨)"""
+
+    if len(images) > 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="최대 3개의 이미지만 업로드할 수 있습니다.",
+        )
+
+    uploaded_images = []
+
+    for image in images:
+        try:
+            # 이미지 파일 검증
+            validate_image_file(image, image.size or 0)
+
+            # MinIO에 이미지 업로드 (썸네일 포함)
+            (
+                file_id,
+                original_url,
+                thumbnail_url,
+            ) = await upload_image_with_thumbnail_to_minio(image)
+
+            # 업로드된 이미지 정보 저장
+            image_info = {
+                "file_id": file_id,
+                "original_url": original_url,
+                "thumbnail_url": thumbnail_url,
+                "mime_type": image.content_type,
+                "file_size": image.size,
+                "filename": image.filename,
+            }
+            uploaded_images.append(image_info)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"이미지 업로드 실패: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"이미지 업로드 중 오류가 발생했습니다: {str(e)}",
+            ) from e
+
+    return BaseResponse(
+        data=uploaded_images,
+        message=f"이미지 업로드 성공 (총 {len(uploaded_images)}개)",
     )
 
 
