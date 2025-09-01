@@ -250,6 +250,7 @@ class AIService(BaseService):
             # 스트리밍으로 텍스트 생성
             collected_text = ""
             total_tokens = 0
+            chunk_index = 0
 
             async for text_chunk in self._stream_complete_analysis(
                 data.prompt, data.style, data.length
@@ -263,7 +264,10 @@ class AIService(BaseService):
                     "type": "content",
                     "content": text_chunk,
                     "accumulated": collected_text,
+                    "timestamp": int(time.time() * 1000),  # 서버 타임스탬프 추가
+                    "chunk_index": chunk_index,  # 청크 순서 보장
                 }
+                chunk_index += 1
                 yield json.dumps(chunk_data, ensure_ascii=False)
 
             # 완료 후 분석 결과 처리 (평문 텍스트)
