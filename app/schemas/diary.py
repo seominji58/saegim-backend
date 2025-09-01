@@ -93,9 +93,6 @@ class DiaryListResponse(BaseModel):
 class DiaryCreateRequest(BaseModel):
     """다이어리 생성 요청 스키마"""
 
-    title: str | None = Field(
-        None, max_length=255, description="다이어리 제목 (선택사항)"
-    )
     content: str = Field(
         ..., min_length=1, description="다이어리 내용 (사용자 원본 프롬프트)"
     )
@@ -106,7 +103,6 @@ class DiaryCreateRequest(BaseModel):
         None, ge=0.0, le=1.0, description="AI 감정 분석 신뢰도"
     )
     keywords: list[str] | None = Field(None, description="AI가 추출한 키워드")
-    is_public: bool = Field(False, description="공개 여부")
     uploaded_images: list[dict] | None = Field(
         None, description="업로드된 이미지 정보 (AI 생성 시)"
     )
@@ -131,7 +127,6 @@ class DiaryUpdateRequest(BaseModel):
     title: str | None = None
     content: str | None = None
     user_emotion: str | None = None
-    is_public: bool | None = None
     keywords: list[str] | None = None
 
     @field_validator("keywords", mode="before")

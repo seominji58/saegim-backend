@@ -35,7 +35,7 @@ class DiaryEntry(Base):
     id: Mapped[UUID] = mapped_column(
         primary_key=True, server_default=text("gen_random_uuid()")
     )
-    title: Mapped[str] = mapped_column(String(255), index=True)
+    title: Mapped[str | None] = mapped_column(String(255), index=True)
     content: Mapped[str] = mapped_column()
     user_emotion: Mapped[str | None] = mapped_column(String(20), index=True)
     ai_emotion: Mapped[str | None] = mapped_column(String(20))

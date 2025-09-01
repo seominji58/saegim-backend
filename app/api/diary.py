@@ -109,7 +109,7 @@ async def get_calendar_diaries(
     )
 
     # 응답 데이터 변환
-    diary_responses = [DiaryListResponse.from_orm(diary) for diary in diaries]
+    diary_responses = [DiaryListResponse.model_validate(diary) for diary in diaries]
 
     return BaseResponse(
         data=diary_responses,
@@ -389,7 +389,7 @@ async def create_diary(
     created_diary = diary_service.create_diary(diary_create, user_id)
 
     return BaseResponse(
-        data=DiaryResponse.from_orm(created_diary), message="다이어리 생성 성공"
+        data=DiaryResponse.model_validate(created_diary), message="다이어리 생성 성공"
     )
 
 
