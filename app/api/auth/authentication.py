@@ -717,14 +717,14 @@ async def verify_email_change_token(
                 EmailVerification.verification_code == token,
                 EmailVerification.verification_type == "change",
                 EmailVerification.expires_at > datetime.now(),
-                EmailVerification.is_used is False,
+                EmailVerification.is_used.is_(False),
             )
         else:
             stmt = select(EmailVerification).where(
                 EmailVerification.verification_code == token,
                 EmailVerification.verification_type == "change",
                 EmailVerification.expires_at > datetime.now(),
-                EmailVerification.is_used is False,
+                EmailVerification.is_used.is_(False),
             )
 
         result = db.execute(stmt)
@@ -778,7 +778,7 @@ async def verify_password_and_change_email(
             EmailVerification.verification_code == request.token,
             EmailVerification.verification_type == "change",
             EmailVerification.expires_at > datetime.now(),
-            EmailVerification.is_used is False,
+            EmailVerification.is_used.is_(False),
         )
         result = db.execute(stmt)
         verification = result.scalar_one_or_none()
