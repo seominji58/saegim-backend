@@ -2,6 +2,7 @@
 다이어리 비즈니스 로직 서비스 (캘린더용)
 """
 
+import logging
 from datetime import UTC, date, datetime
 from uuid import UUID
 
@@ -14,6 +15,8 @@ from app.schemas.diary import DiaryCreateRequest, DiaryUpdateRequest
 from app.services.base import BaseService
 from app.utils.error_handlers import ErrorPatterns, database_transaction_handler
 from app.utils.validators import extract_minio_object_key
+
+logger = logging.getLogger(__name__)
 
 
 class DiaryService(BaseService):
@@ -37,8 +40,11 @@ class DiaryService(BaseService):
     ) -> tuple[list[DiaryEntry], int]:
         """다이어리 목록 조회 (페이지네이션 포함)"""
 
-        # 기본 쿼리 구성
-        statement = select(DiaryEntry)
+        # 이미지 관계를 함께 로드하기 위해 selectinload 사용
+        from sqlalchemy.orm import selectinload
+
+        # 기본 쿼리 구성 - 이미지 관계 포함
+        statement = select(DiaryEntry).options(selectinload(DiaryEntry.images))
 
         # 사용자별 필터링 (Soft Delete 제외)
         if user_id is not None:
@@ -134,27 +140,53 @@ class DiaryService(BaseService):
     ) -> DiaryEntry:
         """새로운 다이어리 생성"""
 
-        # 새 다이어리 엔트리 생성 (실제 AI 데이터 사용)
-        new_diary = DiaryEntry(
-            user_id=user_id,
-            title=diary_create.title,
-            content=diary_create.content,
-            user_emotion=diary_create.user_emotion,
-            ai_emotion=diary_create.ai_emotion,
-            ai_emotion_confidence=diary_create.ai_emotion_confidence,
-            ai_generated_text=diary_create.ai_generated_text,
-            is_public=diary_create.is_public,
-            keywords=diary_create.keywords,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
+        try:
+            # 새 다이어리 엔트리 생성 (실제 AI 데이터 사용)
+            new_diary = DiaryEntry(
+                user_id=user_id,
+                title=diary_create.title,
+                content=diary_create.content,
+                user_emotion=diary_create.user_emotion,
+                ai_emotion=diary_create.ai_emotion,
+                ai_emotion_confidence=diary_create.ai_emotion_confidence,
+                ai_generated_text=diary_create.ai_generated_text,
+                is_public=diary_create.is_public,
+                keywords=diary_create.keywords,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
 
-        # 데이터베이스에 저장
-        self.session.add(new_diary)
-        self.session.commit()
-        self.session.refresh(new_diary)
+            # 데이터베이스에 저장
+            self.session.add(new_diary)
+            self.session.commit()
+            self.session.refresh(new_diary)
 
-        return new_diary
+            # 업로드된 이미지가 있다면 Image 레코드 생성
+            if diary_create.uploaded_images:
+                from app.models.image import Image
+
+                for image_data in diary_create.uploaded_images:
+                    # uploaded_images의 각 항목을 Image 모델로 변환
+                    new_image = Image(
+                        diary_id=new_diary.id,
+                        file_path=image_data.get("original_url"),
+                        thumbnail_path=image_data.get("thumbnail_url"),
+                        mime_type=image_data.get("mime_type"),
+                        file_size=image_data.get("file_size"),
+                        exif_removed=True,  # 이미 처리된 이미지이므로 True
+                        created_at=datetime.now(UTC),
+                    )
+                    self.session.add(new_image)
+
+                # 이미지 레코드들 저장
+                self.session.commit()
+
+            return new_diary
+
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"다이어리 생성 실패 - user_id: {user_id}, error: {e}")
+            raise
 
     def update_diary(
         self, diary_id: str, diary_update: DiaryUpdateRequest

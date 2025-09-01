@@ -339,7 +339,7 @@ async def upload_temporary_images(
     for image in images:
         try:
             # 이미지 파일 검증
-            validate_image_file(image, image.size or 0)
+            validate_image_file(image.content_type, image.size or 0)
 
             # MinIO에 이미지 업로드 (썸네일 포함)
             (

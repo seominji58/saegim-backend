@@ -96,7 +96,9 @@ app.openapi = custom_openapi
 # 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,  # .env에서 설정된 origins 사용
+    allow_origins=["*"]
+    if settings.is_development
+    else settings.cors_origins,  # 개발환경에서는 모든 origin 허용
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
