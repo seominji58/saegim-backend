@@ -269,6 +269,10 @@ class AIService(BaseService):
                 }
                 chunk_index += 1
                 yield json.dumps(chunk_data, ensure_ascii=False)
+                # 실시간 스트리밍을 위한 강제 flush
+                import asyncio
+
+                await asyncio.sleep(0)  # 이벤트 루프에 제어권 양보하여 즉시 전송
 
             # 완료 후 분석 결과 처리 (평문 텍스트)
             generated_text = collected_text.strip()
@@ -379,9 +383,31 @@ class AIService(BaseService):
                 stream=True,
             )
 
+            chunk_count = 0
+            total_content = ""
+
             async for chunk in stream:
+                chunk_count += 1
                 if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    content = chunk.choices[0].delta.content
+                    total_content += content
+                    logger.info(
+                        f"📦 OpenAI 청크 #{chunk_count}: '{content[:50]}...' (길이: {len(content)})"
+                    )
+
+                    # 더 작은 단위로 나누어 전송 (실시간 스트리밍 효과)
+                    for char in content:
+                        yield char
+                        # 실시간 스트리밍을 위한 강제 flush
+                        import asyncio
+
+                        await asyncio.sleep(0.05)  # 50ms 지연으로 더 확실한 실시간 효과
+                else:
+                    logger.debug(f"⚪ OpenAI 빈 청크 #{chunk_count}")
+
+            logger.info(
+                f"🏁 OpenAI 스트리밍 완료: 총 {chunk_count}개 청크, {len(total_content)}자"
+            )
 
         except Exception as e:
             logger.error(f"스트리밍 AI 분석 실패: {str(e)}")

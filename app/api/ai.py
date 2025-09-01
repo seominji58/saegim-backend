@@ -113,6 +113,10 @@ async def stream_ai_text(
         try:
             async for chunk in ai_service.stream_ai_text(user_id, data):
                 yield f"data: {chunk}\n\n"
+                # 실시간 스트리밍을 위한 강제 flush
+                import asyncio
+
+                await asyncio.sleep(0)  # 이벤트 루프에 제어권 양보하여 즉시 전송
         except Exception as e:
             error_message = (
                 f'{{"error": "AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}"}}'
@@ -125,10 +129,12 @@ async def stream_ai_text(
         generate_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
+            "X-Accel-Buffering": "no",  # nginx 버퍼링 비활성화
+            "Transfer-Encoding": "chunked",  # 청크 전송 강제
         },
     )
 
@@ -148,6 +154,10 @@ async def stream_regenerate_ai_text(
                 user_id, session_id
             ):
                 yield f"data: {chunk}\n\n"
+                # 실시간 스트리밍을 위한 강제 flush
+                import asyncio
+
+                await asyncio.sleep(0)  # 이벤트 루프에 제어권 양보하여 즉시 전송
         except Exception as e:
             error_message = (
                 f'{{"error": "AI 텍스트 재생성 중 오류가 발생했습니다: {str(e)}"}}'
@@ -160,9 +170,11 @@ async def stream_regenerate_ai_text(
         regenerate_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
+            "X-Accel-Buffering": "no",  # nginx 버퍼링 비활성화
+            "Transfer-Encoding": "chunked",  # 청크 전송 강제
         },
     )
