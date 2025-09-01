@@ -99,7 +99,7 @@ async def signup(
         stmt = select(EmailVerification).where(
             EmailVerification.email == request.email,
             EmailVerification.verification_type == "signup",
-            EmailVerification.is_used is True,
+            EmailVerification.is_used.is_(True),
         )
         result = db.execute(stmt)
         email_verification = result.scalar_one_or_none()
@@ -312,7 +312,7 @@ async def verify_email(
             EmailVerification.verification_code == request.verification_code,
             EmailVerification.verification_type == "signup",
             EmailVerification.expires_at > datetime.now(),
-            EmailVerification.is_used is False,
+            EmailVerification.is_used.is_(False),
         )
         result = db.execute(stmt)
         verification = result.scalar_one_or_none()
