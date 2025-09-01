@@ -131,3 +131,38 @@ async def stream_ai_text(
             "Access-Control-Allow-Headers": "Cache-Control",
         },
     )
+
+
+@router.post("/regenerate/{session_id}/stream")
+async def stream_regenerate_ai_text(
+    session_id: str,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    db: Annotated[Session, Depends(get_session)],
+) -> StreamingResponse:
+    """세션 ID 기반 AI 텍스트 실시간 스트리밍 재생성"""
+    ai_service = AIService(db)
+
+    async def regenerate_stream():
+        try:
+            async for chunk in ai_service.stream_regenerate_by_session_id(
+                user_id, session_id
+            ):
+                yield f"data: {chunk}\n\n"
+        except Exception as e:
+            error_message = (
+                f'{{"error": "AI 텍스트 재생성 중 오류가 발생했습니다: {str(e)}"}}'
+            )
+            yield f"data: {error_message}\n\n"
+            yield "event: error\n"
+            yield f"data: {error_message}\n\n"
+
+    return StreamingResponse(
+        regenerate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
+    )

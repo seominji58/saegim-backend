@@ -738,3 +738,155 @@ JSON 형식으로만 답해주세요."""
                     detail=f"AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}",
                     error_type="GENERATION_ERROR",
                 ) from e
+
+    async def stream_regenerate_by_session_id(self, user_id: UUID, session_id: str):
+        """세션 ID로 이전 요청 정보를 가져와서 스트리밍 재생성"""
+        try:
+            logger.info(
+                f"재생성 스트리밍 시작: session_id={session_id}, user_id={user_id}"
+            )
+
+            # 해당 세션의 가장 최근 로그 조회
+            statement = (
+                select(AIUsageLog)
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.user_id == user_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+                .order_by(AIUsageLog.created_at.desc())
+                .limit(1)
+            )
+
+            result = self.session.execute(statement)
+            last_log = result.scalar_one_or_none()
+
+            if not last_log:
+                error_data = {
+                    "type": "error",
+                    "error": f"세션 ID {session_id}에 해당하는 로그를 찾을 수 없습니다.",
+                }
+                yield json.dumps(error_data, ensure_ascii=False)
+                return
+
+            # 현재 세션의 총 재생성 횟수 확인 (5회 제한)
+            session_logs_count = self.session.execute(
+                select(func.count(AIUsageLog.id))
+                .where(AIUsageLog.session_id == session_id)
+                .where(AIUsageLog.api_type == "integrated_analysis")
+            ).scalar()
+
+            if session_logs_count >= 5:
+                error_data = {
+                    "type": "error",
+                    "error": "재생성 횟수가 5회를 초과했습니다.",
+                    "session_id": session_id,
+                    "current_count": session_logs_count,
+                }
+                yield json.dumps(error_data, ensure_ascii=False)
+                return
+
+            # 이전 요청 데이터 복원
+            import json as json_lib
+
+            original_request_data = (
+                json_lib.loads(last_log.request_data)
+                if isinstance(last_log.request_data, str)
+                else last_log.request_data
+            )
+            original_request = CreateDiaryRequest(**original_request_data)
+
+            # 새로운 재생성 횟수로 설정
+            new_regeneration_count = session_logs_count + 1
+
+            # 초기 메타데이터 전송
+            initial_data = {
+                "type": "start",
+                "session_id": session_id,
+                "regeneration_count": new_regeneration_count,
+            }
+            yield json.dumps(initial_data, ensure_ascii=False)
+
+            # 스트리밍으로 텍스트 생성 (기존 stream_ai_text와 동일한 로직)
+            collected_text = ""
+            total_tokens = 0
+            chunk_index = 0
+
+            async for text_chunk in self._stream_complete_analysis(
+                original_request.prompt, original_request.style, original_request.length
+            ):
+                if isinstance(text_chunk, dict) and "tokens_used" in text_chunk:
+                    total_tokens = text_chunk["tokens_used"]
+                    continue
+
+                collected_text += text_chunk
+                chunk_data = {
+                    "type": "content",
+                    "content": text_chunk,
+                    "accumulated": collected_text,
+                    "timestamp": int(time.time() * 1000),
+                    "chunk_index": chunk_index,
+                }
+                chunk_index += 1
+                yield json.dumps(chunk_data, ensure_ascii=False)
+
+            # 완료 후 분석 결과 처리
+            generated_text = collected_text.strip()
+
+            # 생성된 텍스트에 대해 별도로 감정 분석과 키워드 추출
+            try:
+                # 간단한 감정 분석 (기본값 사용)
+                emotion = "평온"
+                # 간단한 키워드 추출 (원본 프롬프트에서)
+                keywords = (
+                    original_request.prompt.split()[:5]
+                    if original_request.prompt
+                    else []
+                )
+            except Exception as e:
+                logger.warning(f"재생성 스트리밍 후 분석 실패: {str(e)}")
+                emotion = "평온"
+                keywords = []
+
+            # 재생성 스트리밍 로그 저장
+            ai_usage_log = AIUsageLog(
+                user_id=user_id,
+                api_type="integrated_analysis",
+                session_id=session_id,
+                request_data=original_request_data,
+                response_data={
+                    "ai_generated_text": generated_text,
+                    "emotion": emotion,
+                    "keywords": keywords,
+                    "style": original_request.style,
+                    "length": original_request.length,
+                },
+                tokens_used=total_tokens,
+                regeneration_count=new_regeneration_count,
+            )
+            self.session.add(ai_usage_log)
+            self.session.commit()
+
+            # 완료 메타데이터 전송
+            final_data = {
+                "type": "complete",
+                "emotion": emotion,
+                "keywords": keywords,
+                "generated_text": generated_text,
+                "tokens_used": total_tokens,
+                "session_id": session_id,
+                "regeneration_count": new_regeneration_count,
+            }
+            yield json.dumps(final_data, ensure_ascii=False)
+
+            logger.info(
+                f"재생성 스트리밍 완료: session_id={session_id}, tokens={total_tokens}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"재생성 스트리밍 실패: session_id={session_id}, error={str(e)}"
+            )
+            error_data = {
+                "type": "error",
+                "error": f"재생성 중 오류가 발생했습니다: {str(e)}",
+            }
+            yield json.dumps(error_data, ensure_ascii=False)
