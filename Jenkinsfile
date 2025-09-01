@@ -196,7 +196,7 @@ pipeline {
                     def currentBranch = env.GIT_BRANCH ?: 'develop'
                     def deployEnv = currentBranch.contains('main') ? 'production' : 'development'
                     def containerName = "${CONTAINER_NAME}-${deployEnv}"
-                    def dockerNetwork = 'demo-net'
+                    def dockerNetwork = 'saegim-net'
 
                     echo "🚀 배포 시작: ${deployEnv} 환경"
                     echo "📦 컨테이너: ${containerName}"
