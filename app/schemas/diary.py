@@ -2,7 +2,7 @@
 다이어리 API 스키마 (캘린더용)
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -40,6 +40,7 @@ class DiaryResponse(BaseModel):
     ai_generated_text: str | None = None
     is_public: bool
     keywords: list[str] | None = None  # keywords를 리스트 타입으로 수정
+    diary_date: date | None = None  # 다이어리 작성 날짜
     created_at: datetime
     updated_at: datetime | None = None
     images: list[ImageResponse] | None = None  # 이미지 정보 추가
@@ -70,6 +71,7 @@ class DiaryListResponse(BaseModel):
     user_emotion: str | None = None
     ai_emotion: str | None = None
     keywords: list[str] | None = None  # keywords를 리스트 타입으로 수정
+    diary_date: date | None = None  # 다이어리 작성 날짜
     created_at: datetime
     is_public: bool
     images: list[ImageResponse] | None = None  # 이미지 정보 추가
@@ -103,6 +105,7 @@ class DiaryCreateRequest(BaseModel):
         None, ge=0.0, le=1.0, description="AI 감정 분석 신뢰도"
     )
     keywords: list[str] | None = Field(None, description="AI가 추출한 키워드")
+    diary_date: date | None = Field(None, description="다이어리 작성 날짜 (사용자가 선택한 날짜)")
     uploaded_images: list[dict] | None = Field(
         None, description="업로드된 이미지 정보 (AI 생성 시)"
     )

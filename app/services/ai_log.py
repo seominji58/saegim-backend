@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
+import asyncio
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -376,23 +377,45 @@ class AIService(BaseService):
                 {"role": "user", "content": f"사용자 입력: {prompt}"},
             ]
 
-            stream = await self._openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_completion_tokens=500,
-                stream=True,
-            )
+            # 재시도 로직 추가
+            max_retries = 3
+            retry_delay = 1  # 초기 지연 시간 (초)
 
-            chunk_count = 0
-            total_content = ""
+            for attempt in range(max_retries):
+                try:
+                    stream = await self._openai_client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        max_completion_tokens=500,
+                        stream=True,
+                    )
 
-            async for chunk in stream:
-                chunk_count += 1
-                if chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    total_content += content
+                    chunk_count = 0
+                    total_content = ""
 
-                    yield content
+                    async for chunk in stream:
+                        chunk_count += 1
+                        if chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            total_content += content
+
+                            yield content
+
+                    # 성공적으로 완료되면 루프 종료
+                    break
+
+                except Exception as e:
+                    error_message = str(e)
+                    logger.warning(f"OpenAI API 호출 실패 (시도 {attempt + 1}/{max_retries}): {error_message}")
+
+                    # 마지막 시도이거나 재시도할 수 없는 오류인 경우
+                    if attempt == max_retries - 1 or "rate limit" not in error_message.lower():
+                        logger.error(f"스트리밍 AI 분석 실패: {error_message}")
+                        raise
+
+                    # 재시도 가능한 오류인 경우 지연 후 재시도
+                    await asyncio.sleep(retry_delay * (2 ** attempt))  # 지수 백오프
+                    logger.info(f"재시도 중... ({retry_delay * (2 ** attempt)}초 후)")
 
         except Exception as e:
             logger.error(f"스트리밍 AI 분석 실패: {str(e)}")
@@ -667,13 +690,35 @@ class AIService(BaseService):
                 {"role": "user", "content": f"사용자 입력: {prompt}"},
             ]
 
-            client = get_openai_client()
-            response = await client.async_chat_completion(
-                messages=messages, max_completion_tokens=500
-            )
-            logger.info(f"OpenAI API 응답: {response}")
-            logger.info(f"원본 프롬프트: {prompt}")
-            logger.info(f"AI 응답 내용: {response.get('content', '')}")
+            # 재시도 로직 추가
+            max_retries = 3
+            retry_delay = 1  # 초기 지연 시간 (초)
+
+            for attempt in range(max_retries):
+                try:
+                    client = get_openai_client()
+                    response = await client.async_chat_completion(
+                        messages=messages, max_completion_tokens=500
+                    )
+                    logger.info(f"OpenAI API 응답: {response}")
+                    logger.info(f"원본 프롬프트: {prompt}")
+                    logger.info(f"AI 응답 내용: {response.get('content', '')}")
+
+                    # 성공적으로 완료되면 루프 종료
+                    break
+
+                except Exception as e:
+                    error_message = str(e)
+                    logger.warning(f"OpenAI API 호출 실패 (시도 {attempt + 1}/{max_retries}): {error_message}")
+
+                    # 마지막 시도이거나 재시도할 수 없는 오류인 경우
+                    if attempt == max_retries - 1:
+                        logger.error(f"통합 AI 분석 실패: {error_message}")
+                        raise
+
+                    # 재시도 가능한 오류인 경우 지연 후 재시도
+                    await asyncio.sleep(retry_delay * (2 ** attempt))  # 지수 백오프
+                    logger.info(f"재시도 중... ({retry_delay * (2 ** attempt)}초 후)")
 
             # JSON 파싱 (json_repair 라이브러리 사용으로 LLM 응답 특화 처리)
             try:

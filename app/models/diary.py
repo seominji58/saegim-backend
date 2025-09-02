@@ -4,13 +4,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -46,6 +47,9 @@ class DiaryEntry(Base):
     keywords: Mapped[list[str] | None] = mapped_column(
         JSONB, nullable=True
     )  # JSONB 타입으로 변경
+    diary_date: Mapped[date | None] = mapped_column(
+        Date, nullable=True, index=True
+    )  # 다이어리 작성 날짜 (사용자가 선택한 날짜)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -67,17 +67,25 @@ class DiaryService(BaseService):
         if is_public is not None:
             statement = statement.where(DiaryEntry.is_public == is_public)
 
-        # 날짜 범위 필터링
+        # 날짜 범위 필터링 (diary_date 우선, 없으면 created_at 사용)
         if start_date:
-            statement = statement.where(func.date(DiaryEntry.created_at) >= start_date)
+            statement = statement.where(
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)) >= start_date
+            )
         if end_date:
-            statement = statement.where(func.date(DiaryEntry.created_at) <= end_date)
+            statement = statement.where(
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)) <= end_date
+            )
 
-        # 정렬 적용
+        # 정렬 적용 (diary_date 우선, 없으면 created_at 사용)
         if sort_order.lower() == SortOrder.DESC.value:
-            statement = statement.order_by(DiaryEntry.created_at.desc())
+            statement = statement.order_by(
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).desc()
+            )
         else:
-            statement = statement.order_by(DiaryEntry.created_at.asc())
+            statement = statement.order_by(
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).asc()
+            )
 
         # 전체 개수 조회 (user_id 필터 적용, Soft Delete 제외)
         count_statement = select(func.count(DiaryEntry.id))
@@ -126,10 +134,12 @@ class DiaryService(BaseService):
             .where(
                 DiaryEntry.user_id == user_id,
                 DiaryEntry.deleted_at.is_(None),
-                func.date(DiaryEntry.created_at) >= start_date,
-                func.date(DiaryEntry.created_at) <= end_date,
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)) >= start_date,
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)) <= end_date,
             )
-            .order_by(DiaryEntry.created_at.desc())
+            .order_by(
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).desc()
+            )
         )
 
         result = self.session.execute(statement)
@@ -150,6 +160,7 @@ class DiaryService(BaseService):
                 ai_emotion_confidence=diary_create.ai_emotion_confidence,
                 ai_generated_text=diary_create.ai_generated_text,
                 keywords=diary_create.keywords,
+                diary_date=diary_create.diary_date,
             )
 
             # 데이터베이스에 저장
