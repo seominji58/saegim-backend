@@ -61,6 +61,9 @@ pipeline {
         // 1. 소스 코드 체크아웃 및 환경 설정
         stage('🔄 Clone Repository & Setup') {
             steps {
+                // SCM에서 소스 코드 체크아웃
+                checkout scm
+                
                 script {
                     echo "🚀 Saegim 배포 빌드 시작"
                     

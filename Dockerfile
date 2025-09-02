@@ -5,7 +5,7 @@
 # ==============================================================================
 # Stage 1: Builder (의존성 설치 및 빌드)
 # ==============================================================================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # 빌드 인수
 ARG BUILDPLATFORM
@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # ==============================================================================
 # Stage 2: Runtime (실행 환경)
 # ==============================================================================
-FROM python:3.11-slim as runtime
+FROM python:3.11-slim AS runtime
 
 # 런타임 환경변수
 ENV PYTHONUNBUFFERED=1 \
