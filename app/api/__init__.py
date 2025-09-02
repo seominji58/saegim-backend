@@ -13,7 +13,6 @@ from app.api.auth.authentication import router as auth_router
 from app.api.auth.oauth import router as oauth_router
 from app.api.auth.registration import router as registration_router
 from app.api.diary import router as diary_router
-from app.api.health import router as health_router
 from app.api.legacy import router as legacy_router
 from app.api.notification import public_router as notification_public_router
 from app.api.notification import router as notification_router
@@ -21,7 +20,6 @@ from app.api.public import router as public_router
 
 router = APIRouter()
 
-router.include_router(health_router)
 router.include_router(public_router, prefix="/api/public", tags=["public"])
 router.include_router(ai_router, prefix="/api")
 router.include_router(diary_router, prefix="/api/diary")

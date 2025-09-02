@@ -3,8 +3,10 @@
 """
 
 import logging
+import os
 from datetime import datetime
 
+import psutil
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -18,6 +20,7 @@ from app.constants import HTTPHeaders
 from app.core.config import get_settings
 from app.core.env_config import load_env_file
 from app.core.lifespan import lifespan
+from app.schemas.base import BaseResponse
 
 # 환경 변수 먼저 로드
 load_env_file()
@@ -29,9 +32,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
-
-
-# lifespan은 app.core.lifespan에서 import
 
 
 # FastAPI 애플리케이션 인스턴스 생성
@@ -100,7 +100,7 @@ app.add_middleware(
     if settings.is_development
     else settings.cors_origins,  # 개발환경에서는 모든 origin 허용
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=[
         HTTPHeaders.AUTHORIZATION,
         HTTPHeaders.CONTENT_TYPE,
@@ -134,24 +134,33 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 기존 deprecated 이벤트 핸들러 제거됨 - lifespan으로 대체
+def _get_uptime() -> int:
+    """애플리케이션 업타임 계산 (초 단위)"""
+    try:
+        # 프로세스 시작 시간 기반 업타임 계산
+        process = psutil.Process(os.getpid())
+        create_time = datetime.fromtimestamp(process.create_time())
+        uptime = datetime.now() - create_time
+        return int(uptime.total_seconds())
+    except Exception:
+        return 0
 
 
-# 기본 라우트
-@app.get("/", tags=["root"])
-async def root():
-    return {"message": "새김 API에 오신 것을 환영합니다!"}
-
-
-# 상태 확인 라우트
-@app.get("/status", tags=["status"])
-async def status():
-    return {
+# 통합 헬스체크 라우트
+@app.get("/", tags=["health"], response_model=BaseResponse[dict])
+async def health_check() -> BaseResponse[dict]:
+    """통합 헬스체크 엔드포인트 - 애플리케이션 상태 확인"""
+    health_data = {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "app_name": settings.app_name,
         "version": settings.version,
         "environment": settings.environment,
+        "uptime": _get_uptime(),
     }
+
+    return BaseResponse(
+        data=health_data, message="새김 백엔드가 정상적으로 실행 중입니다."
+    )
 
 
 # API 라우터 등록
