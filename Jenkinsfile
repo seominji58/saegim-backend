@@ -1,21 +1,8 @@
 pipeline {
     agent any
 
-    // 파라미터 정의 (수동 빌드 시 브랜치 선택 가능            steps {
-                // SCM에서 소스 코드 체크아웃
-                checkout scm
-                
-                script {
-                    echo "🚀 Saegim 배포 빌드 시작"
-                    
-                    // Jenkins가 자동으로 감지한 브랜치 정보 출력 + 디버깅
-                    echo "📋 BRANCH_NAME: ${env.BRANCH_NAME}"
-                    echo "📋 GIT_BRANCH: ${env.GIT_BRANCH}"
-                    echo "📋 GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
-                    echo "📋 CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
-                    echo "📋 파라미터 BRANCH_TO_BUILD: ${params.BRANCH_TO_BUILD}"
-                    echo "🔖 커밋: ${env.GIT_COMMIT}"
-                    echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"eters {
+    // 파라미터 정의 (수동 빌드 시 브랜치 선택 가능)
+    parameters {
         choice(
             name: 'BRANCH_TO_BUILD',
             choices: ['develop', 'main', 'release/latest'],
@@ -81,9 +68,9 @@ pipeline {
                     echo "📋 BRANCH_NAME: ${env.BRANCH_NAME}"
                     echo "📋 GIT_BRANCH: ${env.GIT_BRANCH}"
                     echo "📋 GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
-                    echo "� CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
+                    echo "📋 CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
                     echo "📋 파라미터 BRANCH_TO_BUILD: ${params.BRANCH_TO_BUILD}"
-                    echo "�🔖 커밋: ${env.GIT_COMMIT}"
+                    echo "🔖 커밋: ${env.GIT_COMMIT}"
                     echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"
                     
                     // 브랜치 이름 결정 로직 개선 (GitHub Webhook 우선)
@@ -121,7 +108,7 @@ pipeline {
                         currentBranch = currentBranch.replace('origin/', '')
                     }
                     
-                    echo "� 정리된 브랜치: ${currentBranch}"
+                    echo "🔍 최종 브랜치: ${currentBranch}"
                     env.CURRENT_BRANCH = currentBranch
 
                     // Git 정보 가져오기
