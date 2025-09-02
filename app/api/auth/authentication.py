@@ -1258,7 +1258,7 @@ async def reset_password(
             )
 
         # 비밀번호 해시화 및 업데이트
-        user.password_hash = password_hasher.get_password_hash(request.new_password)
+        user.password_hash = password_hasher.hash_password(request.new_password)
 
         # 토큰 사용 처리
         token.is_used = True
@@ -1320,7 +1320,7 @@ async def change_password(
             )
 
         # 새 비밀번호 해시화 및 업데이트
-        current_user.password_hash = password_hasher.get_password_hash(request.new_password)
+        current_user.password_hash = password_hasher.hash_password(request.new_password)
         db.commit()
 
         return BaseResponse(
