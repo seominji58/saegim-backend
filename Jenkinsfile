@@ -73,26 +73,26 @@ pipeline {
                     echo "�🔖 커밋: ${env.GIT_COMMIT}"
                     echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"
                     
-                    // 브랜치 이름 결정 로직 개선
+                    // 브랜치 이름 결정 로직 개선 (GitHub Webhook 우선)
                     def currentBranch = ''
                     
-                    // 1. 파라미터가 설정된 경우 (수동 빌드)
-                    if (params.BRANCH_TO_BUILD && params.BRANCH_TO_BUILD != 'develop') {
-                        currentBranch = params.BRANCH_TO_BUILD
-                        echo "✅ 파라미터에서 브랜치 선택: ${currentBranch}"
+                    // 1. GitHub Webhook에서 오는 정보를 최우선으로 확인
+                    if (env.GIT_BRANCH) {
+                        currentBranch = env.GIT_BRANCH
+                        echo "✅ GIT_BRANCH에서 감지: ${currentBranch}"
                     }
-                    // 2. GitHub Webhook에서 오는 정보 확인
                     else if (env.BRANCH_NAME) {
                         currentBranch = env.BRANCH_NAME
                         echo "✅ BRANCH_NAME에서 감지: ${currentBranch}"
                     }
-                    else if (env.GIT_BRANCH) {
-                        currentBranch = env.GIT_BRANCH
-                        echo "✅ GIT_BRANCH에서 감지: ${currentBranch}"
-                    }
                     else if (env.CHANGE_BRANCH) {
                         currentBranch = env.CHANGE_BRANCH
                         echo "✅ CHANGE_BRANCH에서 감지: ${currentBranch}"
+                    }
+                    // 2. 파라미터는 수동 빌드 시에만 사용 (기본값이 아닌 경우)
+                    else if (params.BRANCH_TO_BUILD && params.BRANCH_TO_BUILD != 'develop') {
+                        currentBranch = params.BRANCH_TO_BUILD
+                        echo "✅ 파라미터에서 브랜치 선택: ${currentBranch}"
                     }
                     // 3. 기본값
                     else {
