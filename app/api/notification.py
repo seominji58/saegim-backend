@@ -37,19 +37,6 @@ router = APIRouter(tags=["Notifications"])
 # ==================== FCM 토큰 관리 ====================
 
 
-@public_router.get(
-    "/health",
-    response_model=BaseResponse[str],
-    summary="알림 서비스 상태 확인",
-    description="알림 서비스가 정상 작동하는지 확인합니다.",
-)
-async def notification_health_check():
-    """알림 서비스 상태 확인"""
-    return BaseResponse(
-        success=True, message="알림 서비스가 정상 작동 중입니다.", data="healthy"
-    )
-
-
 @router.post(
     "/tokens",
     response_model=BaseResponse[FCMTokenResponse],
