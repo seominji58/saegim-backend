@@ -3,6 +3,7 @@ AI 관련 API 라우터
 AI 텍스트 생성 및 사용 로그 관리
 """
 
+import asyncio
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -111,23 +112,34 @@ async def stream_ai_text(
 
     async def generate_stream():
         try:
+            # 즉시 연결 확립 신호 전송 (브라우저 대기 상태 해제)
+            keepalive = 'data: {"type": "connected"}\n\n'
+            yield keepalive.encode("utf-8")
+            await asyncio.sleep(0.01)  # 즉시 플러시
+
             async for chunk in ai_service.stream_ai_text(user_id, data):
-                yield f"data: {chunk}\n\n"
+                chunk_data = f"data: {chunk}\n\n"
+                yield chunk_data.encode("utf-8")  # 바이트 기반 전송으로 강제 플러싱
         except Exception as e:
             error_message = (
                 f'{{"error": "AI 텍스트 생성 중 오류가 발생했습니다: {str(e)}"}}'
             )
-            yield f"data: {error_message}\n\n"
-            yield "event: error\n"
-            yield f"data: {error_message}\n\n"
+            yield f"data: {error_message}\n\n".encode()
+            yield b"event: error\n"
+            yield f"data: {error_message}\n\n".encode()
 
     return StreamingResponse(
         generate_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
+            "X-Accel-Buffering": "no",  # Nginx 버퍼링 방지
+            "Transfer-Encoding": "chunked",  # 청크 기반 전송 명시
+            "Pragma": "no-cache",  # HTTP/1.0 호환성
+            "Expires": "0",  # 즉시 만료
+            "Content-Encoding": "identity",  # 압축 방지
         },
     )
 
@@ -143,24 +155,35 @@ async def stream_regenerate_ai_text(
 
     async def regenerate_stream():
         try:
+            # 즉시 연결 확립 신호 전송 (브라우저 대기 상태 해제)
+            keepalive = 'data: {"type": "connected"}\n\n'
+            yield keepalive.encode("utf-8")
+            await asyncio.sleep(0.01)  # 즉시 플러시
+
             async for chunk in ai_service.stream_regenerate_by_session_id(
                 user_id, session_id
             ):
-                yield f"data: {chunk}\n\n"
+                chunk_data = f"data: {chunk}\n\n"
+                yield chunk_data.encode("utf-8")  # 바이트 기반 전송으로 강제 플러싱
         except Exception as e:
             error_message = (
                 f'{{"error": "AI 텍스트 재생성 중 오류가 발생했습니다: {str(e)}"}}'
             )
-            yield f"data: {error_message}\n\n"
-            yield "event: error\n"
-            yield f"data: {error_message}\n\n"
+            yield f"data: {error_message}\n\n".encode()
+            yield b"event: error\n"
+            yield f"data: {error_message}\n\n".encode()
 
     return StreamingResponse(
         regenerate_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
+            "X-Accel-Buffering": "no",  # Nginx 버퍼링 방지
+            "Transfer-Encoding": "chunked",  # 청크 기반 전송 명시
+            "Pragma": "no-cache",  # HTTP/1.0 호환성
+            "Expires": "0",  # 즉시 만료
+            "Content-Encoding": "identity",  # 압축 방지
         },
     )
