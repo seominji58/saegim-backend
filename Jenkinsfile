@@ -5,7 +5,7 @@ pipeline {
     parameters {
         choice(
             name: 'BRANCH_TO_BUILD',
-            choices: ['main', 'develop', 'release/latest'],
+            choices: ['develop', 'main', 'release/latest'],
             description: '빌드할 브랜치를 선택하세요 (GitHub Webhook에서는 자동 감지)'
         )
         booleanParam(
@@ -61,30 +61,55 @@ pipeline {
         // 1. 소스 코드 체크아웃 및 환경 설정
         stage('🔄 Clone Repository & Setup') {
             steps {
-                // 더 간단한 체크아웃 방식 사용
-                script {
-                    def branchName = params.BRANCH_TO_BUILD ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
-
-                    // refs/heads/ 및 origin/ 제거
-                    if (branchName?.startsWith('refs/heads/')) {
-                        branchName = branchName.replace('refs/heads/', '')
-                    }
-                    if (branchName?.startsWith('origin/')) {
-                        branchName = branchName.replace('origin/', '')
-                    }
-
-                    echo "🔍 체크아웃할 브랜치: ${branchName}"
-                    echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"
-                }
-
-                // 간단한 Git 체크아웃
-                git branch: "${params.BRANCH_TO_BUILD ?: 'main'}",
-                    url: "${env.GIT_REPOSITORY_URL}"
-
                 script {
                     echo "🚀 Saegim 배포 빌드 시작"
-                    echo "📋 브랜치: ${env.GIT_BRANCH}"
-                    echo "🔖 커밋: ${env.GIT_COMMIT}"
+                    
+                    // Jenkins가 자동으로 감지한 브랜치 정보 출력 + 디버깅
+                    echo "📋 BRANCH_NAME: ${env.BRANCH_NAME}"
+                    echo "📋 GIT_BRANCH: ${env.GIT_BRANCH}"
+                    echo "📋 GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
+                    echo "� CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
+                    echo "📋 파라미터 BRANCH_TO_BUILD: ${params.BRANCH_TO_BUILD}"
+                    echo "�🔖 커밋: ${env.GIT_COMMIT}"
+                    echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"
+                    
+                    // 브랜치 이름 결정 로직 개선
+                    def currentBranch = ''
+                    
+                    // 1. 파라미터가 설정된 경우 (수동 빌드)
+                    if (params.BRANCH_TO_BUILD && params.BRANCH_TO_BUILD != 'develop') {
+                        currentBranch = params.BRANCH_TO_BUILD
+                        echo "✅ 파라미터에서 브랜치 선택: ${currentBranch}"
+                    }
+                    // 2. GitHub Webhook에서 오는 정보 확인
+                    else if (env.BRANCH_NAME) {
+                        currentBranch = env.BRANCH_NAME
+                        echo "✅ BRANCH_NAME에서 감지: ${currentBranch}"
+                    }
+                    else if (env.GIT_BRANCH) {
+                        currentBranch = env.GIT_BRANCH
+                        echo "✅ GIT_BRANCH에서 감지: ${currentBranch}"
+                    }
+                    else if (env.CHANGE_BRANCH) {
+                        currentBranch = env.CHANGE_BRANCH
+                        echo "✅ CHANGE_BRANCH에서 감지: ${currentBranch}"
+                    }
+                    // 3. 기본값
+                    else {
+                        currentBranch = 'develop'
+                        echo "⚠️ 브랜치 감지 실패, 기본값 사용: ${currentBranch}"
+                    }
+                    
+                    // 브랜치 이름 정리 (refs/heads/, origin/ 제거)
+                    if (currentBranch?.startsWith('refs/heads/')) {
+                        currentBranch = currentBranch.replace('refs/heads/', '')
+                    }
+                    if (currentBranch?.startsWith('origin/')) {
+                        currentBranch = currentBranch.replace('origin/', '')
+                    }
+                    
+                    echo "� 정리된 브랜치: ${currentBranch}"
+                    env.CURRENT_BRANCH = currentBranch
 
                     // Git 정보 가져오기
                     env.GIT_COMMIT_SHORT = sh(
@@ -92,16 +117,18 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    echo "✅ Git 체크아웃 완료"
+                    echo "✅ 브랜치 감지 완료: ${env.CURRENT_BRANCH}"
                 }
 
                 // 환경별 .env 파일 생성
                 script {
-                    def currentBranch = env.GIT_BRANCH ?: 'develop'
+                    // 실제 체크아웃된 브랜치 정보 사용
+                    def currentBranch = env.CURRENT_BRANCH ?: 'develop'
                     def envType = currentBranch.contains('main') ? 'production' : 'development'
                     def credentialsId = "saegim-backend"
 
-                    echo "� 환경 설정: ${envType}"
+                    echo "🌿 현재 브랜치: ${currentBranch}"
+                    echo "🏗️ 환경 설정: ${envType}"
 
                     try {
                         withCredentials([
@@ -166,7 +193,7 @@ pipeline {
                                 app.push("${BUILD_NUMBER}")
 
                                 // main 브랜치는 latest 태그도 푸시
-                                def currentBranch = env.GIT_BRANCH ?: 'develop'
+                                def currentBranch = env.CURRENT_BRANCH ?: 'develop'
                                 if (currentBranch.contains('main')) {
                                     app.push("latest")
                                     echo "✅ latest 태그 푸시 완료"
@@ -193,12 +220,13 @@ pipeline {
             }
             steps {
                 script {
-                    def currentBranch = env.GIT_BRANCH ?: 'develop'
+                    def currentBranch = env.CURRENT_BRANCH ?: 'develop'
                     def deployEnv = currentBranch.contains('main') ? 'production' : 'development'
                     def containerName = "${CONTAINER_NAME}-${deployEnv}"
                     def dockerNetwork = 'saegim-net'
 
                     echo "🚀 배포 시작: ${deployEnv} 환경"
+                    echo "🌿 현재 브랜치: ${currentBranch}"
                     echo "📦 컨테이너: ${containerName}"
                     echo "🌐 네트워크: ${dockerNetwork}"
                     echo "📦 이미지: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
@@ -264,7 +292,7 @@ pipeline {
         success {
             echo '✅ 파이프라인 완료!'
             script {
-                def currentBranch = env.GIT_BRANCH ?: 'develop'
+                def currentBranch = env.CURRENT_BRANCH ?: 'develop'
                 def deployEnv = currentBranch.contains('main') ? 'production' : 'development'
                 echo "🌐 Saegim Backend 애플리케이션이 ${deployEnv} 환경에 배포되었습니다"
                 echo "📚 배포된 이미지: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
