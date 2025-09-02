@@ -281,15 +281,20 @@ class AIService(BaseService):
 
             # 생성된 텍스트에 대해 별도로 감정 분석과 키워드 추출
             try:
-                # 간단한 감정 분석 (기본값 사용)
-                emotion = "평온"  # 기본 감정으로 설정
-                # 간단한 키워드 추출 (원본 프롬프트에서)
-                keywords = data.prompt.split()[:5] if data.prompt else []
+                # 통합 분석을 통한 감정 분석 및 키워드 추출
+                analysis_result = await self._integrated_analysis(
+                    data.prompt, data.style, data.length
+                )
+                emotion = analysis_result["emotion"]
+                keywords = analysis_result["keywords"]
+                logger.info(f"스트리밍 후 감정 분석 완료: emotion='{emotion}', keywords={keywords}")
 
             except Exception as e:
                 logger.warning(f"스트리밍 후 분석 실패: {str(e)}")
-                emotion = "평온"
-                keywords = []
+                # Fallback: 키워드 기반 감정 분석
+                emotion = self._analyze_emotion_from_keywords(data.prompt)
+                keywords = data.prompt.split()[:5] if data.prompt else []
+                logger.info(f"Fallback 감정 분석: emotion='{emotion}', keywords={keywords}")
 
             # 스트리밍 로그 저장
             ai_usage_log = AIUsageLog(
@@ -630,38 +635,31 @@ class AIService(BaseService):
             )
             length_guide = length_info.get(length, {"name": "중문", "desc": "3-5문장"})
 
-            system_message = f"""당신은 감성을 분석하고 그 감성을 표현하는 글을 쓰는 전문 작가입니다.
+            system_message = f"""당신은 감정 분석 전문가입니다. 주어진 텍스트의 감정을 정확히 분석하세요.
 
-**감정 분석 규칙:**
-1. 텍스트에서 가장 강한 감정을 찾아 다음 중 하나로 분류:
-   - 행복: 기쁨, 만족, 희망, 긍정적
-   - 슬픔: 우울, 절망, 아쉬움, 상실감, 눈물
-   - 화남: 분노, 짜증, 불만, 억울함, 격분
-   - 불안: 걱정, 두려움, 긴장, 초조함, 불안정함
-   - 평온: 차분함, 안정감, 편안함 (중립적이거나 감정이 불분명할 때만)
+**감정 분류 (반드시 다음 중 하나만 선택):**
+- 행복: 기쁨, 만족, 희망, 긍정적
+- 슬픔: 우울, 절망, 아쉬움, 상실감, 눈물
+- 화남: 분노, 짜증, 불만, 억울함, 격분
+- 불안: 걱정, 두려움, 긴장, 초조함, 불안정함
+- 평온: 차분함, 안정감, 편안함 (감정이 불분명할 때만)
 
-2. **중요**: 다음 키워드가 있으면 반드시 해당 감정으로 분류:
-   - "화가 난다", "짜증", "분노", "억울" → 화남
-   - "슬프다", "우울", "눈물", "아쉽다" → 슬픔
-   - "걱정", "불안", "두렵다", "초조" → 불안
-   - "기쁘다", "행복", "좋다", "즐겁다" → 행복
+**강제 분류 규칙:**
+- "화가 난다" 또는 "짜증" → 반드시 "화남"
+- "슬프다" 또는 "우울" → 반드시 "슬픔"
+- "걱정" 또는 "불안" → 반드시 "불안"
+- "기쁘다" 또는 "행복" → 반드시 "행복"
 
-3. 키워드 추출: 감정 단어 제외한 핵심 명사 5개
+**작업:**
+1. 감정 분석 (위 규칙 적용)
+2. 키워드 추출 (감정 단어 제외한 명사 5개)
+3. 글귀 생성 ({style_guide["name"]} 문체, {length_guide["name"]} 길이)
 
-4. 글귀 생성: {style_guide["name"]} 문체, {length_guide["name"]} 길이, 위로가 되는 톤
-
-**예시:**
-- 입력: "오늘 정말 화가 난다. 짜증이 나서 미치겠어"
-- 출력: {{"emotion": "화남", "keywords": ["오늘", "짜증"], "generated_text": "..."}}
-
-- 입력: "너무 슬프다. 눈물이 난다"
-- 출력: {{"emotion": "슬픔", "keywords": ["눈물"], "generated_text": "..."}}
-
-**응답 형식 (반드시 JSON):**
+**응답 형식 (JSON만):**
 {{
-    "emotion": "분석된_감정",
+    "emotion": "감정명",
     "keywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"],
-    "generated_text": "생성된_글귀"
+    "generated_text": "생성된 글귀"
 }}"""
 
             messages = [
@@ -674,6 +672,8 @@ class AIService(BaseService):
                 messages=messages, max_completion_tokens=500
             )
             logger.info(f"OpenAI API 응답: {response}")
+            logger.info(f"원본 프롬프트: {prompt}")
+            logger.info(f"AI 응답 내용: {response.get('content', '')}")
 
             # JSON 파싱 (json_repair 라이브러리 사용으로 LLM 응답 특화 처리)
             try:
@@ -703,8 +703,26 @@ class AIService(BaseService):
                 if result is None or not isinstance(result, dict):
                     raise ValueError("파싱된 결과가 유효한 딕셔너리가 아닙니다")
 
+                                # 감정 분석 결과 검증 및 수정
+                emotion = result.get("emotion", "").strip()
+                logger.info(f"AI 원본 감정 응답: '{emotion}' (타입: {type(emotion)})")
+                logger.info(f"원본 프롬프트: '{prompt}'")
+
+                # AI가 잘못된 감정을 반환한 경우 키워드 기반으로 재분석
+                if emotion not in ["행복", "슬픔", "화남", "불안", "평온"]:
+                    logger.warning(f"AI가 잘못된 감정을 반환: '{emotion}', 키워드 기반 재분석 시도")
+                    emotion = self._analyze_emotion_from_keywords(prompt)
+                    logger.info(f"키워드 기반 재분석 결과: '{emotion}'")
+                # AI가 "평온"을 반환했지만 명확한 감정 키워드가 있는 경우 재분석
+                elif emotion == "평온" and self._has_strong_emotion_keywords(prompt):
+                    logger.warning(f"AI가 '평온'을 반환했지만 강한 감정 키워드 감지, 키워드 기반 재분석 시도")
+                    emotion = self._analyze_emotion_from_keywords(prompt)
+                    logger.info(f"키워드 기반 재분석 결과: '{emotion}'")
+                else:
+                    logger.info(f"AI 감정 분석 유효: '{emotion}'")
+
                 return {
-                    "emotion": result.get("emotion", "평온"),
+                    "emotion": emotion,
                     "keywords": result.get("keywords", [])[:5],
                     "generated_text": result.get("generated_text", ""),
                     "confidence": 0.9,
@@ -905,3 +923,63 @@ class AIService(BaseService):
                 "error": f"재생성 중 오류가 발생했습니다: {str(e)}",
             }
             yield json.dumps(error_data, ensure_ascii=False)
+
+    def _analyze_emotion_from_keywords(self, text: str) -> str:
+        """키워드 기반 감정 분석 (AI 실패 시 fallback)"""
+        text_lower = text.lower()
+        logger.info(f"키워드 기반 분석 시작: '{text}' -> '{text_lower}'")
+
+        # 화남 키워드
+        anger_keywords = ["화가 난다", "짜증", "분노", "억울", "격분", "열받다", "빡친다", "화나다", "화남"]
+        anger_matches = [keyword for keyword in anger_keywords if keyword in text_lower]
+        if anger_matches:
+            logger.info(f"화남 키워드 매칭: {anger_matches}")
+            return "화남"
+
+                # 슬픔 키워드
+        sadness_keywords = ["슬프다", "우울", "눈물", "아쉽다", "서운", "울고 싶다", "힘들다", "슬픔"]
+        sadness_matches = [keyword for keyword in sadness_keywords if keyword in text_lower]
+        if sadness_matches:
+            logger.info(f"슬픔 키워드 매칭: {sadness_matches}")
+            return "슬픔"
+
+        # 불안 키워드
+        anxiety_keywords = ["걱정", "불안", "두렵다", "초조", "긴장", "무서워", "떨린다", "조마조마", "불안정"]
+        anxiety_matches = [keyword for keyword in anxiety_keywords if keyword in text_lower]
+        if anxiety_matches:
+            logger.info(f"불안 키워드 매칭: {anxiety_matches}")
+            return "불안"
+
+        # 행복 키워드
+        happiness_keywords = ["기쁘다", "행복", "좋다", "즐겁다", "신나다", "뿌듯하다", "웃음", "행복하다"]
+        happiness_matches = [keyword for keyword in happiness_keywords if keyword in text_lower]
+        if happiness_matches:
+            logger.info(f"행복 키워드 매칭: {happiness_matches}")
+            return "행복"
+
+        # 평온 키워드
+        peaceful_keywords = ["편안하다", "차분하다", "안정적", "조용하다", "평화롭다", "고요하다", "만족"]
+        peaceful_matches = [keyword for keyword in peaceful_keywords if keyword in text_lower]
+        if peaceful_matches:
+            logger.info(f"평온 키워드 매칭: {peaceful_matches}")
+            return "평온"
+
+        # 기본값: 평온
+        logger.info("키워드 매칭 없음, 기본값 평온 반환")
+        return "평온"
+
+    def _has_strong_emotion_keywords(self, text: str) -> bool:
+        """강한 감정 키워드가 있는지 확인"""
+        text_lower = text.lower()
+
+        # 모든 강한 감정 키워드 수집
+        strong_keywords = [
+            "화가 난다", "짜증", "분노", "억울", "격분", "열받다", "빡친다", "화나다", "화남",
+            "슬프다", "우울", "눈물", "아쉽다", "서운", "울고 싶다", "힘들다", "슬픔",
+            "걱정", "불안", "두렵다", "초조", "긴장", "무서워", "떨린다", "조마조마", "불안정",
+            "기쁘다", "행복", "좋다", "즐겁다", "신나다", "뿌듯하다", "웃음", "행복하다"
+        ]
+
+        has_strong_keyword = any(keyword in text_lower for keyword in strong_keywords)
+        logger.info(f"강한 감정 키워드 감지: {has_strong_keyword}")
+        return has_strong_keyword
