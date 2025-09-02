@@ -866,18 +866,24 @@ class AIService(BaseService):
 
             # 생성된 텍스트에 대해 별도로 감정 분석과 키워드 추출
             try:
-                # 간단한 감정 분석 (기본값 사용)
-                emotion = "평온"
-                # 간단한 키워드 추출 (원본 프롬프트에서)
+                # 통합 분석을 통한 감정 분석 및 키워드 추출
+                analysis_result = await self._integrated_analysis(
+                    original_request.prompt, original_request.style, original_request.length
+                )
+                emotion = analysis_result["emotion"]
+                keywords = analysis_result["keywords"]
+                logger.info(f"재생성 후 감정 분석 완료: emotion='{emotion}', keywords={keywords}")
+
+            except Exception as e:
+                logger.warning(f"재생성 스트리밍 후 분석 실패: {str(e)}")
+                # Fallback: 키워드 기반 감정 분석
+                emotion = self._analyze_emotion_from_keywords(original_request.prompt)
                 keywords = (
                     original_request.prompt.split()[:5]
                     if original_request.prompt
                     else []
                 )
-            except Exception as e:
-                logger.warning(f"재생성 스트리밍 후 분석 실패: {str(e)}")
-                emotion = "평온"
-                keywords = []
+                logger.info(f"재생성 Fallback 감정 분석: emotion='{emotion}', keywords={keywords}")
 
             # 재생성 스트리밍 로그 저장
             ai_usage_log = AIUsageLog(
