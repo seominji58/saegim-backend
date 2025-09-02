@@ -1,8 +1,21 @@
 pipeline {
     agent any
 
-    // 파라미터 정의 (수동 빌드 시 브랜치 선택 가능)
-    parameters {
+    // 파라미터 정의 (수동 빌드 시 브랜치 선택 가능            steps {
+                // SCM에서 소스 코드 체크아웃
+                checkout scm
+                
+                script {
+                    echo "🚀 Saegim 배포 빌드 시작"
+                    
+                    // Jenkins가 자동으로 감지한 브랜치 정보 출력 + 디버깅
+                    echo "📋 BRANCH_NAME: ${env.BRANCH_NAME}"
+                    echo "📋 GIT_BRANCH: ${env.GIT_BRANCH}"
+                    echo "📋 GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
+                    echo "📋 CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
+                    echo "📋 파라미터 BRANCH_TO_BUILD: ${params.BRANCH_TO_BUILD}"
+                    echo "🔖 커밋: ${env.GIT_COMMIT}"
+                    echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"eters {
         choice(
             name: 'BRANCH_TO_BUILD',
             choices: ['develop', 'main', 'release/latest'],
