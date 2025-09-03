@@ -8,7 +8,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user_id
@@ -369,4 +369,58 @@ async def mark_all_notifications_as_read(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"전체 알림 읽음 처리 중 오류가 발생했습니다: {str(e)}",
+        ) from e
+
+
+# ==================== 알림 삭제 ====================
+
+
+@router.delete(
+    "/{notification_id}",
+    response_model=BaseResponse[dict],
+    summary="알림 삭제",
+    description="지정된 알림을 삭제합니다 (관련 히스토리도 함께 정리).",
+)
+async def delete_notification(
+    notification_id: UUID,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """알림 삭제 처리"""
+    try:
+        # 1) 해당 사용자의 알림인지 확인
+        notification_stmt = select(Notification).where(
+            Notification.id == notification_id, Notification.user_id == user_id
+        )
+        notification = session.execute(notification_stmt).scalar_one_or_none()
+
+        if not notification:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다."
+            )
+
+        # 2) 관련 history 정리 (존재 시)
+        history_delete_stmt = delete(NotificationHistory).where(
+            NotificationHistory.notification_id == notification_id
+        )
+        session.execute(history_delete_stmt)
+
+        # 3) 알림 삭제
+        session.delete(notification)
+        session.commit()
+
+        return BaseResponse(
+            success=True,
+            message="알림이 삭제되었습니다.",
+            data={"notification_id": str(notification_id), "deleted": True},
+        )
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알림 삭제 중 오류가 발생했습니다: {str(e)}",
         ) from e
