@@ -54,30 +54,6 @@ async def create_ai_usage_log(
     return BaseResponse(data=result, message="AI 사용 로그가 생성되었습니다.")
 
 
-@router.post("/generate", response_model=BaseResponse[dict])
-async def generate_ai_text(
-    data: CreateDiaryRequest,
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
-    db: Annotated[Session, Depends(get_session)],
-) -> BaseResponse[dict]:
-    """AI 텍스트 생성"""
-    ai_service = AIService(db)
-    result = await ai_service.generate_ai_text(user_id, data)
-    return BaseResponse(data=result, message="AI 텍스트가 생성되었습니다.")
-
-
-@router.post("/regenerate/{session_id}", response_model=BaseResponse[dict])
-async def regenerate_ai_text(
-    session_id: str,
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
-    db: Annotated[Session, Depends(get_session)],
-) -> BaseResponse[dict]:
-    """세션 ID 기반 AI 텍스트 재생성"""
-    ai_service = AIService(db)
-    result = await ai_service.regenerate_by_session_id(user_id, session_id)
-    return BaseResponse(data=result, message="AI 텍스트가 재생성되었습니다.")
-
-
 @router.get("/session/{session_id}/original-input", response_model=BaseResponse[dict])
 async def get_original_user_input(
     *,
