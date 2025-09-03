@@ -17,6 +17,7 @@ from app.api.legacy import router as legacy_router
 from app.api.notification import public_router as notification_public_router
 from app.api.notification import router as notification_router
 from app.api.public import router as public_router
+from app.api.support import router as support_router
 
 router = APIRouter()
 
@@ -30,6 +31,7 @@ router.include_router(
     notification_router, prefix="/api/notifications"
 )  # 인증된 알림 API
 router.include_router(legacy_router)  # 레거시 리다이렉트
+router.include_router(support_router, prefix="/api/support")  # 고객센터 API
 
 # Auth 라우터들을 /api/auth prefix로 통일
 router.include_router(auth_router, prefix="/api/auth")

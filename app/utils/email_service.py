@@ -75,6 +75,31 @@ class EmailService:
             logger.error(f"Email change verification sending failed: {to_email} - {e}")
             return False
 
+    async def send_email(self, to_email: str, subject: str, body: str, html: bool = False) -> bool:
+        """
+        일반 이메일 발송
+        
+        Args:
+            to_email: 수신자 이메일
+            subject: 이메일 제목
+            body: 이메일 내용
+            html: HTML 이메일 여부 (기본값: False)
+            
+        Returns:
+            발송 성공 여부
+        """
+        try:
+            # SendGrid API 키가 있으면 SendGrid 사용
+            if self.sendgrid_api_key:
+                return await self._send_general_with_sendgrid(to_email, subject, body, html)
+            else:
+                # 기존 SMTP 방식 사용 (fallback)
+                return await self._send_general_with_smtp(to_email, subject, body, html)
+                
+        except Exception as e:
+            logger.error(f"General email sending failed: {to_email} - {e}")
+            return False
+
     async def _send_with_sendgrid(self, to_email: str, verification_code: str, email_type: str = "signup") -> bool:
         """SendGrid를 사용한 이메일 발송"""
         try:
@@ -878,6 +903,85 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"SMTP social error email sending failed: {e}")
+            return False
+
+    async def _send_general_with_sendgrid(self, to_email: str, subject: str, body: str, html: bool = False) -> bool:
+        """SendGrid를 사용한 일반 이메일 발송"""
+        try:
+            import httpx
+            
+            # SendGrid API 엔드포인트
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            # 이메일 타입에 따른 content 설정
+            if html:
+                content_type = "text/html"
+            else:
+                content_type = "text/plain"
+            
+            # SendGrid API 요청 데이터
+            data = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}]
+                    }
+                ],
+                "from": {"email": self.sendgrid_from_email},
+                "subject": subject,
+                "content": [
+                    {
+                        "type": content_type,
+                        "value": body
+                    }
+                ]
+            }
+            
+            # SendGrid API 호출
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {self.sendgrid_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                if response.status_code == 202:
+                    logger.info(f"General email sent successfully to {to_email}")
+                    return True
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"SendGrid general email sending failed: {e}")
+            return False
+
+    async def _send_general_with_smtp(self, to_email: str, subject: str, body: str, html: bool = False) -> bool:
+        """SMTP를 사용한 일반 이메일 발송 (fallback)"""
+        try:
+            # MIME 메시지 생성
+            if html:
+                msg = MIMEText(body, 'html')
+            else:
+                msg = MIMEText(body, 'plain')
+            
+            msg['Subject'] = subject
+            msg['From'] = self.smtp_username
+            msg['To'] = to_email
+            
+            # SMTP 서버 연결 및 이메일 발송
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+            
+            logger.info(f"General email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"SMTP general email sending failed: {e}")
             return False
 
 
