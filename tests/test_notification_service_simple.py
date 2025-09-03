@@ -163,14 +163,22 @@ class TestNotificationServiceSimple:
 
     def test_notification_settings_update_validation(self):
         """알림 설정 업데이트 유효성 검증 테스트"""
-        # 정상적인 업데이트 요청 생성
+        # 정상적인 업데이트 요청 생성 - 새로운 스키마 필드 사용
         update_request = NotificationSettingsUpdate(
-            enabled=True,
-            diary_reminder=False,
-            ai_content_ready=True,
+            push_enabled=True,
+            diary_reminder_enabled=False,
+            diary_reminder_time="19:30",
+            diary_reminder_days=["monday", "wednesday", "friday"],
+            ai_processing_enabled=True,
+            report_notification_enabled=True,
+            browser_push_enabled=False,
         )
 
         # 검증
-        assert update_request.enabled is True
-        assert update_request.diary_reminder is False
-        assert update_request.ai_content_ready is True
+        assert update_request.push_enabled is True
+        assert update_request.diary_reminder_enabled is False
+        assert update_request.diary_reminder_time == "19:30"
+        assert update_request.diary_reminder_days == ["monday", "wednesday", "friday"]
+        assert update_request.ai_processing_enabled is True
+        assert update_request.report_notification_enabled is True
+        assert update_request.browser_push_enabled is False

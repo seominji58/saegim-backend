@@ -24,6 +24,14 @@ class CreateDiaryRequest(BaseModel):
     @field_validator("prompt")
     @classmethod
     def validate_prompt(cls, v: str) -> str:
+        # None 값 체크
+        if v is None:
+            raise ValueError("프롬프트는 필수입니다.")
+
+        # 빈 문자열 체크
+        if not isinstance(v, str):
+            raise ValueError("프롬프트는 유효한 문자열이어야 합니다.")
+
         if not v or len(v.strip()) < 2:
             raise ValueError("프롬프트는 최소 2자 이상이어야 합니다.")
         if len(v) > 1000:
@@ -50,6 +58,14 @@ class AIUsageLogCreate(BaseModel):
     @classmethod
     def validate_api_type(cls, v):
         """API 타입 검증"""
+        # None 값 체크
+        if v is None:
+            raise ValueError("API 타입은 필수입니다.")
+
+        # 문자열 타입 체크
+        if not isinstance(v, str):
+            raise ValueError("API 타입은 유효한 문자열이어야 합니다.")
+
         if v not in ["generate", "keywords"]:
             raise ValueError("API 타입은 'generate' 또는 'keywords'여야 합니다.")
         return v
@@ -58,6 +74,14 @@ class AIUsageLogCreate(BaseModel):
     @classmethod
     def validate_regeneration_count(cls, v):
         """재생성 횟수 검증"""
+        # None 값 체크
+        if v is None:
+            raise ValueError("재생성 횟수는 필수입니다.")
+
+        # 숫자 타입 체크
+        if not isinstance(v, int):
+            raise ValueError("재생성 횟수는 정수여야 합니다.")
+
         if not (1 <= v <= 5):
             raise ValueError("재생성 횟수는 1-5 범위 내여야 합니다.")
         return v
@@ -66,6 +90,14 @@ class AIUsageLogCreate(BaseModel):
     @classmethod
     def validate_tokens_used(cls, v):
         """토큰 수 검증"""
+        # None 값 체크
+        if v is None:
+            raise ValueError("토큰 수는 필수입니다.")
+
+        # 숫자 타입 체크
+        if not isinstance(v, int):
+            raise ValueError("토큰 수는 정수여야 합니다.")
+
         if v < 0:
             raise ValueError("토큰 수는 0 이상이어야 합니다.")
         return v
@@ -74,6 +106,14 @@ class AIUsageLogCreate(BaseModel):
     @classmethod
     def validate_uuid_format(cls, v):
         """UUID 형식 검증"""
+        # None 값 체크
+        if v is None:
+            raise ValueError("UUID는 필수입니다.")
+
+        # 문자열 타입 체크
+        if not isinstance(v, str):
+            raise ValueError("UUID는 유효한 문자열이어야 합니다.")
+
         from app.utils.validators import validate_uuid
 
         try:

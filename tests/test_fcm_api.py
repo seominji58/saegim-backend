@@ -32,7 +32,9 @@ class TestFCMAPI:
     @pytest.fixture
     def mock_user_id(self):
         """테스트용 사용자 ID"""
-        return "test-user-123"
+        import uuid
+
+        return uuid.uuid4()
 
     @pytest.fixture
     def mock_session(self):
@@ -47,26 +49,27 @@ class TestFCMAPI:
         yield
         app.dependency_overrides.clear()
 
-    def test_fcm_health_check(self, client):
-        """FCM 헬스체크 테스트"""
-        response = client.get("/api/fcm/health")
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "FCM 서비스가 정상 작동 중입니다."
-        assert data["data"] == "healthy"
+    def test_notification_endpoint_available(self, client):
+        """알림 엔드포인트 기본 접근성 테스트"""
+        # 인증이 필요한 엔드포인트이므로 401 또는 422 응답이 정상
+        response = client.get("/api/notifications/settings")
+        # 인증 없이 접근하면 401 Unauthorized가 정상적인 응답
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ]
 
     @patch.object(NotificationService, "register_token")
-    def test_register_fcm_token_success(self, mock_register, client):
+    def test_register_fcm_token_success(self, mock_register, client, mock_user_id):
         """FCM 토큰 등록 성공 테스트"""
+        import uuid
+
         # Mock 서비스 응답
         mock_response = FCMTokenResponse(
-            id="token-id-123",
-            user_id="test-user-123",
+            id=uuid.uuid4(),
             token="test-fcm-token-12345",
             device_type="web",
-            device_id="test-device-456",
+            device_info={"device_id": "test-device-456", "user_agent": "test-browser"},
             is_active=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -80,7 +83,7 @@ class TestFCMAPI:
             "device_id": "test-device-456",
         }
 
-        response = client.post("/api/fcm/register-token", json=request_data)
+        response = client.post("/api/notifications/register-token", json=request_data)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -95,32 +98,32 @@ class TestFCMAPI:
         # 잘못된 요청 데이터 (토큰 누락)
         request_data = {"device_type": "web", "device_id": "test-device-456"}
 
-        response = client.post("/api/fcm/register-token", json=request_data)
+        response = client.post("/api/notifications/register-token", json=request_data)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         mock_register.assert_not_called()
 
     @patch.object(NotificationService, "get_user_tokens")
-    def test_get_fcm_tokens(self, mock_get_tokens, client):
+    def test_get_fcm_tokens(self, mock_get_tokens, client, mock_user_id):
         """FCM 토큰 목록 조회 테스트"""
+        import uuid
+
         # Mock 서비스 응답
         mock_tokens = [
             FCMTokenResponse(
-                id="token-id-1",
-                user_id="test-user-123",
+                id=uuid.uuid4(),
                 token="token-1",
                 device_type="web",
-                device_id="device-1",
+                device_info={"device_id": "device-1", "user_agent": "test-browser-1"},
                 is_active=True,
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             ),
             FCMTokenResponse(
-                id="token-id-2",
-                user_id="test-user-123",
+                id=uuid.uuid4(),
                 token="token-2",
-                device_type="mobile",
-                device_id="device-2",
+                device_type="android",
+                device_info={"device_id": "device-2", "user_agent": "test-mobile-2"},
                 is_active=True,
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
@@ -128,7 +131,7 @@ class TestFCMAPI:
         ]
         mock_get_tokens.return_value = mock_tokens
 
-        response = client.get("/api/fcm/tokens")
+        response = client.get("/api/notifications/tokens")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -138,18 +141,21 @@ class TestFCMAPI:
         assert data["data"][1]["device_type"] == "mobile"
 
     @patch.object(NotificationService, "delete_token")
-    def test_delete_fcm_token_success(self, mock_delete, client):
+    def test_delete_fcm_token_success(self, mock_delete, client, mock_user_id):
         """FCM 토큰 삭제 성공 테스트"""
-        mock_delete.return_value = True
+        import uuid
 
-        response = client.delete("/api/fcm/tokens/token-id-123")
+        mock_delete.return_value = True
+        test_token_id = str(uuid.uuid4())
+
+        response = client.delete(f"/api/notifications/tokens/{test_token_id}")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["success"] is True
         assert data["data"] is True
         mock_delete.assert_called_once_with(
-            "test-user-123", "token-id-123", mock_delete.call_args[0][2]
+            str(mock_user_id), test_token_id, mock_delete.call_args[0][2]
         )
 
     @patch.object(NotificationService, "delete_token")
@@ -161,61 +167,80 @@ class TestFCMAPI:
             status_code=404, detail="토큰을 찾을 수 없습니다."
         )
 
-        response = client.delete("/api/fcm/tokens/nonexistent-token")
+        response = client.delete("/api/notifications/tokens/nonexistent-token")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @patch.object(NotificationService, "get_notification_settings")
     def test_get_notification_settings(self, mock_get_settings, client):
         """알림 설정 조회 테스트"""
+        import uuid
+
         mock_settings = NotificationSettingsResponse(
-            id="settings-id-123",
-            user_id="test-user-123",
-            diary_reminder=True,
-            ai_content_ready=True,
-            weekly_summary=False,
-            is_active=True,
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            push_enabled=True,
+            diary_reminder_enabled=True,
+            diary_reminder_time="21:00",
+            diary_reminder_days=[
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+            ],
+            ai_processing_enabled=True,
+            report_notification_enabled=False,
+            browser_push_enabled=False,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
         mock_get_settings.return_value = mock_settings
 
-        response = client.get("/api/fcm/settings")
+        response = client.get("/api/notifications/settings")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["diary_reminder"] is True
-        assert data["data"]["weekly_summary"] is False
+        assert data["data"]["diary_reminder_enabled"] is True
+        assert data["data"]["report_notification_enabled"] is False
 
     @patch.object(NotificationService, "update_notification_settings")
     def test_update_notification_settings(self, mock_update_settings, client):
         """알림 설정 업데이트 테스트"""
+        import uuid
+
         mock_settings = NotificationSettingsResponse(
-            id="settings-id-123",
-            user_id="test-user-123",
-            diary_reminder=False,
-            ai_content_ready=True,
-            weekly_summary=True,
-            is_active=True,
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            push_enabled=True,
+            diary_reminder_enabled=False,
+            diary_reminder_time="20:00",
+            diary_reminder_days=["saturday", "sunday"],
+            ai_processing_enabled=True,
+            report_notification_enabled=True,
+            browser_push_enabled=False,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
         mock_update_settings.return_value = mock_settings
 
         request_data = {
-            "diary_reminder": False,
-            "ai_content_ready": True,
-            "weekly_summary": True,
+            "push_enabled": True,
+            "diary_reminder_enabled": False,
+            "diary_reminder_time": "20:00",
+            "diary_reminder_days": ["saturday", "sunday"],
+            "ai_processing_enabled": True,
+            "report_notification_enabled": True,
         }
 
-        response = client.put("/api/fcm/settings", json=request_data)
+        response = client.put("/api/notifications/settings", json=request_data)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["diary_reminder"] is False
-        assert data["data"]["weekly_summary"] is True
+        assert data["data"]["diary_reminder_enabled"] is False
+        assert data["data"]["report_notification_enabled"] is True
 
     @patch.object(NotificationService, "send_notification")
     @pytest.mark.asyncio
@@ -238,7 +263,9 @@ class TestFCMAPI:
             "data": {"type": "test"},
         }
 
-        response = client.post("/api/fcm/send-notification", json=request_data)
+        response = client.post(
+            "/api/notifications/send-notification", json=request_data
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -259,7 +286,7 @@ class TestFCMAPI:
         )
         mock_send_reminder.return_value = mock_response
 
-        response = client.post("/api/fcm/send-diary-reminder/user-123")
+        response = client.post("/api/notifications/send-diary-reminder/user-123")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -279,7 +306,9 @@ class TestFCMAPI:
         )
         mock_send_ai.return_value = mock_response
 
-        response = client.post("/api/fcm/send-ai-content-ready/user-123/diary-456")
+        response = client.post(
+            "/api/notifications/send-ai-content-ready/user-123/diary-456"
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -287,12 +316,14 @@ class TestFCMAPI:
         assert data["data"]["success_count"] == 1
 
     @patch.object(NotificationService, "get_notification_history")
-    def test_get_notification_history(self, mock_get_history, client):
+    def test_get_notification_history(self, mock_get_history, client, mock_user_id):
         """알림 기록 조회 테스트"""
+        import uuid
+
         mock_history = [
             NotificationHistoryResponse(
-                id="history-1",
-                user_id="test-user-123",
+                id=uuid.uuid4(),
+                user_id=mock_user_id,
                 title="다이어리 알림",
                 body="오늘의 감정을 기록해보세요",
                 notification_type="diary_reminder",
@@ -300,8 +331,8 @@ class TestFCMAPI:
                 created_at=datetime.now(UTC),
             ),
             NotificationHistoryResponse(
-                id="history-2",
-                user_id="test-user-123",
+                id=uuid.uuid4(),
+                user_id=mock_user_id,
                 title="AI 콘텐츠 준비",
                 body="새로운 AI 콘텐츠가 준비되었습니다",
                 notification_type="ai_content_ready",
@@ -312,7 +343,7 @@ class TestFCMAPI:
         ]
         mock_get_history.return_value = mock_history
 
-        response = client.get("/api/fcm/history")
+        response = client.get("/api/notifications/history")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -323,7 +354,7 @@ class TestFCMAPI:
 
     def test_get_notification_history_with_pagination(self, client):
         """알림 기록 조회 페이지네이션 테스트"""
-        response = client.get("/api/fcm/history?limit=5&offset=10")
+        response = client.get("/api/notifications/history?limit=5&offset=10")
 
         # 요청이 정상적으로 처리되는지만 확인 (실제 서비스는 Mock됨)
         assert response.status_code == status.HTTP_200_OK
@@ -333,7 +364,7 @@ class TestFCMAPI:
         # 의존성 오버라이드 제거
         app.dependency_overrides.clear()
 
-        response = client.get("/api/fcm/tokens")
+        response = client.get("/api/notifications/tokens")
 
         # 인증 관련 에러가 발생해야 함 (실제 구현에 따라 상태 코드가 다를 수 있음)
         assert response.status_code in [

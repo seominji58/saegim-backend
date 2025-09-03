@@ -204,6 +204,7 @@ class NotificationService(BaseService):
                 # 기본 설정 생성
                 settings = NotificationSettings(
                     user_id=user_id,
+                    push_enabled=True,
                     diary_reminder_enabled=True,
                     ai_processing_enabled=True,
                     report_notification_enabled=True,
@@ -213,18 +214,7 @@ class NotificationService(BaseService):
                 session.commit()
                 session.refresh(settings)
 
-            return NotificationSettingsResponse(
-                diary_reminder=settings.diary_reminder_enabled,
-                ai_content_ready=settings.ai_processing_enabled,
-                weekly_report=settings.report_notification_enabled,
-                marketing=settings.browser_push_enabled,
-                # 다이어리 리마인더 상세 설정 추가
-                diary_reminder_time=settings.diary_reminder_time,
-                diary_reminder_days=settings.diary_reminder_days or [],
-                # 기존 필드 (하위 호환성)
-                quiet_hours_start=settings.diary_reminder_time,
-                quiet_hours_end=settings.diary_reminder_time,
-            )
+            return NotificationSettingsResponse.model_validate(settings)
 
         except Exception as e:
             logger.error(f"Error getting notification settings: {str(e)}")
@@ -254,44 +244,19 @@ class NotificationService(BaseService):
                 settings = NotificationSettings(user_id=user_id)
                 session.add(settings)
 
-            # 스키마 필드를 모델 필드로 매핑하여 설정 업데이트
+            # 스키마 필드와 모델 필드가 일치하므로 직접 업데이트
             update_data = settings_data.model_dump(exclude_unset=True)
 
-            # 필드명 매핑 처리
-            field_mapping = {
-                "enabled": "push_enabled",
-                "diary_reminder": "diary_reminder_enabled",
-                "ai_content_ready": "ai_processing_enabled",
-                "emotion_trend": "report_notification_enabled",  # 임시 매핑
-                "anniversary": "report_notification_enabled",  # 임시 매핑
-                "friend_share": "report_notification_enabled",  # 임시 매핑
-                "quiet_hours_enabled": "browser_push_enabled",  # 임시 매핑
-                "quiet_start_time": "diary_reminder_time",  # 임시 매핑
-                "quiet_end_time": "diary_reminder_time",  # 임시 매핑
-            }
-
-            for schema_field, value in update_data.items():
-                model_field = field_mapping.get(schema_field)
-                if model_field and hasattr(settings, model_field):
-                    setattr(settings, model_field, value)
+            for field_name, value in update_data.items():
+                if hasattr(settings, field_name):
+                    setattr(settings, field_name, value)
 
             settings.updated_at = datetime.now(UTC)
             session.add(settings)
             session.commit()
             session.refresh(settings)
 
-            return NotificationSettingsResponse(
-                diary_reminder=settings.diary_reminder_enabled,
-                ai_content_ready=settings.ai_processing_enabled,
-                weekly_report=settings.report_notification_enabled,
-                marketing=settings.browser_push_enabled,
-                # 다이어리 리마인더 상세 설정 추가
-                diary_reminder_time=settings.diary_reminder_time,
-                diary_reminder_days=settings.diary_reminder_days or [],
-                # 기존 필드 (하위 호환성)
-                quiet_hours_start=settings.diary_reminder_time,
-                quiet_hours_end=settings.diary_reminder_time,
-            )
+            return NotificationSettingsResponse.model_validate(settings)
 
         except Exception as e:
             session.rollback()

@@ -60,6 +60,14 @@ class TestNotificationService:
             user_id=sample_user_id,
             push_enabled=True,
             diary_reminder_enabled=True,
+            diary_reminder_time="21:00",
+            diary_reminder_days=[
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+            ],
             report_notification_enabled=True,
             ai_processing_enabled=True,
             browser_push_enabled=False,
@@ -251,25 +259,40 @@ class TestNotificationService:
             sample_user_id, mock_session
         )
 
-        # 검증
+        # 검증 - 새로운 스키마 필드들 확인
+        assert settings.push_enabled == sample_notification_settings.push_enabled
         assert (
-            settings.diary_reminder
+            settings.diary_reminder_enabled
             == sample_notification_settings.diary_reminder_enabled
         )
         assert (
-            settings.ai_content_ready
+            settings.diary_reminder_time
+            == sample_notification_settings.diary_reminder_time
+        )
+        assert (
+            settings.diary_reminder_days
+            == sample_notification_settings.diary_reminder_days
+        )
+        assert (
+            settings.ai_processing_enabled
             == sample_notification_settings.ai_processing_enabled
         )
         assert (
-            settings.weekly_report
+            settings.report_notification_enabled
             == sample_notification_settings.report_notification_enabled
         )
-        assert settings.marketing == sample_notification_settings.browser_push_enabled
+        assert (
+            settings.browser_push_enabled
+            == sample_notification_settings.browser_push_enabled
+        )
 
     def test_get_notification_settings_create_default(
         self, notification_service, sample_user_id
     ):
         """기본 알림 설정 생성 테스트"""
+        import uuid
+        from datetime import UTC, datetime
+
         # Mock 데이터베이스 세션 생성
         mock_session = Mock(spec=Session)
 
@@ -278,10 +301,17 @@ class TestNotificationService:
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
-        # DB Mock 설정
+        # DB Mock 설정 - refresh 메서드가 데이터베이스 필드를 시뮬레이션하도록 설정
         mock_session.add = Mock()
         mock_session.commit = Mock()
-        mock_session.refresh = Mock()
+
+        def mock_refresh(settings):
+            """데이터베이스가 설정하는 필드들을 시뮬레이션"""
+            settings.id = uuid.uuid4()
+            settings.created_at = datetime.now(UTC)
+            settings.updated_at = datetime.now(UTC)
+
+        mock_session.refresh = Mock(side_effect=mock_refresh)
 
         # 테스트 실행
         settings = notification_service.get_notification_settings(
@@ -302,6 +332,12 @@ class TestNotificationService:
         assert added_settings.ai_processing_enabled is True  # 기본값
         assert added_settings.report_notification_enabled is True  # 기본값
 
+        # 반환된 응답 객체 검증 (NotificationSettingsResponse)
+        assert hasattr(settings, "user_id")
+        assert hasattr(settings, "diary_reminder_enabled")
+        assert hasattr(settings, "ai_processing_enabled")
+        assert hasattr(settings, "report_notification_enabled")
+
     def test_update_notification_settings(
         self, notification_service, sample_user_id, sample_notification_settings
     ):
@@ -319,11 +355,14 @@ class TestNotificationService:
         mock_session.commit = Mock()
         mock_session.refresh = Mock()
 
-        # 업데이트 요청
+        # 업데이트 요청 - 새로운 스키마 필드 사용
         update_request = NotificationSettingsUpdate(
-            enabled=True,
-            diary_reminder=False,
-            ai_content_ready=True,
+            push_enabled=True,
+            diary_reminder_enabled=False,
+            diary_reminder_time="20:00",
+            diary_reminder_days=["saturday", "sunday"],
+            ai_processing_enabled=True,
+            report_notification_enabled=False,
         )
 
         # 테스트 실행
