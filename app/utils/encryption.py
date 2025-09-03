@@ -32,6 +32,14 @@ class PasswordHasher:
         Returns:
             해싱된 비밀번호
         """
+        # None 값 체크
+        if password is None:
+            raise ValueError("비밀번호는 None일 수 없습니다")
+
+        # 빈 문자열 체크
+        if not isinstance(password, str):
+            raise ValueError("비밀번호는 문자열이어야 합니다")
+
         # bcrypt.gensalt()로 salt 생성 (rounds=12)
         salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
         # 비밀번호를 bytes로 인코딩하고 해싱
@@ -52,10 +60,18 @@ class PasswordHasher:
             검증 결과
         """
         try:
+            # None 값 체크
+            if plain_password is None or hashed_password is None:
+                return False
+
+            # 빈 문자열 체크
+            if not plain_password or not hashed_password:
+                return False
+
             return bcrypt.checkpw(
                 plain_password.encode("utf-8"), hashed_password.encode("utf-8")
             )
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, AttributeError):
             return False
 
     @staticmethod
@@ -137,6 +153,14 @@ class DataEncryption:
         if not plaintext:
             return ""
 
+        # None 값 체크
+        if plaintext is None:
+            return ""
+
+        # 문자열 타입 체크
+        if not isinstance(plaintext, str):
+            raise ValueError("평문 데이터는 문자열이어야 합니다")
+
         # 96-bit nonce 생성 (GCM 권장)
         nonce = os.urandom(12)
 
@@ -162,6 +186,14 @@ class DataEncryption:
         """
         if not encrypted_data:
             return ""
+
+        # None 값 체크
+        if encrypted_data is None:
+            return ""
+
+        # 문자열 타입 체크
+        if not isinstance(encrypted_data, str):
+            raise ValueError("암호화된 데이터는 문자열이어야 합니다")
 
         try:
             # Base64 디코딩

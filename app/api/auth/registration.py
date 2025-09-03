@@ -38,6 +38,14 @@ class SignupRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v):
+        # None 값 체크
+        if v is None:
+            raise ValueError("비밀번호는 필수입니다")
+
+        # 빈 문자열 체크
+        if not v or not isinstance(v, str):
+            raise ValueError("비밀번호는 유효한 문자열이어야 합니다")
+
         if len(v) < 9:
             raise ValueError("비밀번호는 9자 이상이어야 합니다")
 
@@ -54,6 +62,14 @@ class SignupRequest(BaseModel):
     @field_validator("nickname")
     @classmethod
     def validate_nickname(cls, v):
+        # None 값 체크
+        if v is None:
+            raise ValueError("닉네임은 필수입니다")
+
+        # 빈 문자열 체크
+        if not v or not isinstance(v, str):
+            raise ValueError("닉네임은 유효한 문자열이어야 합니다")
+
         if len(v) < 2 or len(v) > 10:
             raise ValueError("닉네임은 2-10자 사이여야 합니다")
 
