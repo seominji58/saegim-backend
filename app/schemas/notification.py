@@ -88,22 +88,62 @@ class NotificationSendRequest(BaseModel):
 
 
 class NotificationSettingsUpdate(BaseModel):
-    """알림 설정 업데이트 요청"""
+    """알림 설정 업데이트 요청 - notification_settings 테이블 구조와 일치"""
 
     model_config = ConfigDict(from_attributes=True)
 
-    enabled: bool | None = Field(None, description="알림 활성화")
-    diary_reminder: bool | None = Field(None, description="다이어리 리마인더")
-    ai_content_ready: bool | None = Field(None, description="AI 콘텐츠 준비 완료")
-    emotion_trend: bool | None = Field(None, description="감정 트렌드")
-    anniversary: bool | None = Field(None, description="기념일")
-    friend_share: bool | None = Field(None, description="친구 공유")
-    quiet_hours_enabled: bool | None = Field(None, description="조용 시간 활성화")
-    quiet_start_time: str | None = Field(
-        None, description="조용 시간 시작", max_length=5
+    push_enabled: bool | None = Field(None, description="푸시 알림 전체 활성화")
+    diary_reminder_enabled: bool | None = Field(
+        None, description="다이어리 리마인더 활성화"
     )
-    quiet_end_time: str | None = Field(None, description="조용 시간 종료", max_length=5)
-    frequency: NotificationFrequency | None = Field(None, description="알림 주기")
+    diary_reminder_time: str | None = Field(
+        None, description="다이어리 리마인더 시간 (HH:MM 형식)", max_length=5
+    )
+    diary_reminder_days: list[str] | None = Field(
+        None,
+        description="다이어리 리마인더 요일 ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']",
+    )
+    report_notification_enabled: bool | None = Field(
+        None, description="리포트 알림 활성화"
+    )
+    ai_processing_enabled: bool | None = Field(
+        None, description="AI 처리 완료 알림 활성화"
+    )
+    browser_push_enabled: bool | None = Field(
+        None, description="브라우저 푸시 알림 활성화"
+    )
+
+    @field_validator("diary_reminder_time")
+    @classmethod
+    def validate_time_format(cls, v):
+        """시간 형식 검증 (HH:MM)"""
+        if v is not None:
+            import re
+
+            if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+                raise ValueError("시간은 HH:MM 형식이어야 합니다 (예: 21:00)")
+        return v
+
+    @field_validator("diary_reminder_days")
+    @classmethod
+    def validate_weekdays(cls, v):
+        """요일 배열 검증"""
+        if v is not None:
+            valid_days = {
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            }
+            for day in v:
+                if day.lower() not in valid_days:
+                    raise ValueError(
+                        f"유효하지 않은 요일: {day}. 가능한 값: {valid_days}"
+                    )
+        return v
 
 
 class TestNotificationCreate(BaseModel):
@@ -145,28 +185,31 @@ class FCMTokenResponse(BaseModel):
 
 
 class NotificationSettingsResponse(BaseModel):
-    """알림 설정 응답"""
+    """알림 설정 응답 - notification_settings 테이블 구조와 일치"""
 
     model_config = ConfigDict(from_attributes=True)
 
-    diary_reminder: bool
-    ai_content_ready: bool
-    weekly_report: bool
-    marketing: bool
-
-    # 다이어리 리마인더 상세 설정
+    id: UUID
+    user_id: UUID
+    push_enabled: bool
+    diary_reminder_enabled: bool
     diary_reminder_time: str | None = Field(
-        None, description="다이어리 리마인더 시간 (HH:MM)"
+        None, description="다이어리 리마인더 시간 (HH:MM 형식)"
     )
     diary_reminder_days: list[str] | None = Field(
-        None, description="다이어리 리마인더 요일 ['mon','tue',...]"
+        None, description="다이어리 리마인더 요일 ['monday','tuesday',...]"
     )
+    report_notification_enabled: bool
+    ai_processing_enabled: bool
+    browser_push_enabled: bool
+    created_at: datetime
+    updated_at: datetime
 
-    # 기존 필드 (하위 호환성)
-    quiet_hours_start: str | None = Field(
-        None, description="조용 시간 시작 (deprecated)"
-    )
-    quiet_hours_end: str | None = Field(None, description="조용 시간 종료 (deprecated)")
+    @field_validator("id", "user_id", mode="before")
+    @classmethod
+    def validate_uuid(cls, v):
+        """UUID를 문자열로 변환"""
+        return convert_uuid_to_string(v)
 
 
 class NotificationSendResponse(BaseModel):
