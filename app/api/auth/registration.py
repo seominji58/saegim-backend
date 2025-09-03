@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,8 @@ class SignupRequest(BaseModel):
     password: str
     nickname: str
 
-    @validator("password")
+    @field_validator("password")
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 9:
             raise ValueError("비밀번호는 9자 이상이어야 합니다")
@@ -50,7 +51,8 @@ class SignupRequest(BaseModel):
 
         return v
 
-    @validator("nickname")
+    @field_validator("nickname")
+    @classmethod
     def validate_nickname(cls, v):
         if len(v) < 2 or len(v) > 10:
             raise ValueError("닉네임은 2-10자 사이여야 합니다")

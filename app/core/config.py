@@ -2,6 +2,7 @@
 
 import os
 from functools import lru_cache
+from typing import Any, cast
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     minio_bucket_name: str = os.getenv("MINIO_BUCKET_NAME", "saegim")
 
     # CORS 설정 (환경변수에서 쉼표로 구분된 문자열을 리스트로 변환)
-    allowed_hosts: list[str] | str = os.getenv(
+    allowed_hosts: Any = os.getenv(
         "ALLOWED_HOSTS",
         "http://localhost:3000,http://localhost:3001,http://localhost:8080",
     )
@@ -127,13 +128,7 @@ class Settings(BaseSettings):
         """ALLOWED_HOSTS 환경변수를 리스트로 파싱"""
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
-        return v
-
-    def _parse_cors_origins(self, v: str) -> list[str]:
-        """CORS origins 문자열을 리스트로 파싱 (deprecated: field_validator 사용)"""
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",") if item.strip()]
-        return v
+        return v if isinstance(v, list) else []
 
     @property
     def is_development(self) -> bool:
@@ -148,11 +143,8 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """CORS origins 반환"""
-        # allowed_hosts가 이미 field_validator로 처리되었으므로 그대로 반환
-        if isinstance(self.allowed_hosts, list):
-            return self.allowed_hosts
-        # 혹시 모를 경우를 대비한 fallback
-        return self._parse_cors_origins(self.allowed_hosts)
+        # allowed_hosts가 field_validator로 처리되어 항상 list 타입임
+        return cast(list[str], self.allowed_hosts)
 
     model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
 

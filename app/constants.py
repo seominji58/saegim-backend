@@ -163,14 +163,6 @@ class SystemConstants:
     MAX_PAGE_SIZE = 100
     MIN_PAGE_SIZE = 1
 
-    # 인증 (deprecated - AuthConstants 사용 권장)
-    ACCESS_TOKEN_EXPIRE_MINUTES = 30
-    REFRESH_TOKEN_EXPIRE_DAYS = 30
-
-    # 파일 업로드 (deprecated - FileConstants 사용 권장)
-    MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB (FileConstants와 통일)
-    ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-
     # AI 모델
     DEFAULT_AI_EMOTION_CONFIDENCE = 0.5
     MIN_CONTENT_LENGTH_FOR_KEYWORDS = 2

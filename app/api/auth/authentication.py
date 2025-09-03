@@ -13,7 +13,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from jose.exceptions import JWTError
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -89,7 +89,8 @@ class ResetPasswordRequest(BaseModel):
     verification_code: str
     new_password: str
 
-    @validator("new_password")
+    @field_validator("new_password")
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 9:
             raise ValueError("비밀번호는 9자 이상이어야 합니다")
@@ -108,7 +109,8 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-    @validator("new_password")
+    @field_validator("new_password")
+    @classmethod
     def validate_new_password(cls, v):
         if len(v) < 9:
             raise ValueError("비밀번호는 9자 이상이어야 합니다")
@@ -235,7 +237,7 @@ async def login(
             content={
                 "success": True,
                 "message": "로그인이 성공적으로 완료되었습니다.",
-                "data": response_data.dict(),
+                "data": response_data.model_dump(),
             }
         )
 
@@ -531,36 +533,6 @@ async def get_current_user_info(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="사용자 정보 조회 중 오류가 발생했습니다.",
-        )
-
-
-@authenticated_router.get("/profile", response_model=BaseResponse[Dict[str, Any]])
-async def get_user_profile(
-    current_user: User = Depends(get_current_user),
-) -> BaseResponse[Dict[str, Any]]:
-    """사용자 프로필 정보 조회 API (deprecated: /me 사용 권장)"""
-    try:
-        user_data = {
-            "user_id": str(current_user.id),
-            "email": current_user.email,
-            "nickname": current_user.nickname,
-            "account_type": current_user.account_type,
-            "provider": current_user.provider,
-            "is_active": current_user.is_active,
-            "created_at": current_user.created_at.isoformat()
-            if current_user.created_at
-            else None,
-        }
-
-        return BaseResponse(data=user_data, message="프로필 정보를 성공적으로 조회했습니다.")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"프로필 정보 조회 실패: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="프로필 정보 조회 중 오류가 발생했습니다.",
         )
 
 
@@ -1080,11 +1052,11 @@ async def send_password_reset_email(
 
         for token in existing_tokens:
             token.is_used = True
-            token.used_at = datetime.utcnow()
+            token.used_at = datetime.now(timezone.utc)
 
         # 새로운 토큰 생성
         token_value = str(uuid4())
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
         reset_token = PasswordResetToken(
             user_id=user.id, token=token_value, expires_at=expires_at, is_used=False
@@ -1180,7 +1152,7 @@ async def verify_password_reset_code(
             PasswordResetToken.user_id == user.id,
             PasswordResetToken.token == request.verification_code,
             PasswordResetToken.is_used.is_(False),
-            PasswordResetToken.expires_at > datetime.utcnow(),
+            PasswordResetToken.expires_at > datetime.now(timezone.utc),
         )
         result = db.execute(stmt)
         token = result.scalar_one_or_none()
@@ -1246,7 +1218,7 @@ async def reset_password(
             PasswordResetToken.user_id == user.id,
             PasswordResetToken.token == request.verification_code,
             PasswordResetToken.is_used.is_(False),
-            PasswordResetToken.expires_at > datetime.utcnow(),
+            PasswordResetToken.expires_at > datetime.now(timezone.utc),
         )
         result = db.execute(stmt)
         token = result.scalar_one_or_none()
@@ -1262,7 +1234,7 @@ async def reset_password(
 
         # 토큰 사용 처리
         token.is_used = True
-        token.used_at = datetime.utcnow()
+        token.used_at = datetime.now(timezone.utc)
 
         db.commit()
 
