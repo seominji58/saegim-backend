@@ -323,7 +323,7 @@ async def mark_all_notifications_as_read(
 
         # 1. 모든 읽지 않은 notification 조회
         unread_notifications_stmt = select(Notification).where(
-            Notification.user_id == user_id, not Notification.is_read
+            Notification.user_id == user_id, Notification.is_read.is_(False)
         )
         unread_notifications = (
             session.execute(unread_notifications_stmt).scalars().all()

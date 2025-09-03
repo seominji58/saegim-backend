@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, select
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -536,70 +536,99 @@ class NotificationService(BaseService):
     def get_notification_history(
         self, user_id: UUID, limit: int, offset: int, session: Session = None
     ) -> list[NotificationHistoryResponse]:
-        """사용자 알림 기록 조회 - JOIN으로 notification 데이터 포함"""
+        """사용자 알림 기록 조회 - notifications 기준으로 조회
+
+        요구사항 변경: notification_history가 아닌 notifications 테이블을 기준으로 조회하고,
+        각 notification에 대한 최신 history(있다면)를 LEFT JOIN하여 상태/타임스탬프를 보강합니다.
+        """
         if session is None:
             session = self.db
 
         try:
+            from sqlalchemy import func
+            from sqlalchemy.orm import aliased
+
             from app.models.notification import Notification
 
-            # notification_history와 notification을 LEFT JOIN
-            stmt = (
+            # 각 notification_id별 최신(created_at 최대) history를 구하는 서브쿼리
+            latest_hist_subq = (
                 select(
-                    NotificationHistory.id,
-                    NotificationHistory.notification_id,
-                    NotificationHistory.notification_type,
-                    NotificationHistory.status,
-                    NotificationHistory.sent_at,
-                    NotificationHistory.delivered_at,
-                    NotificationHistory.opened_at,
-                    NotificationHistory.created_at,
-                    NotificationHistory.error_message,
-                    NotificationHistory.data_payload,  # data_payload에서 title, body 가져오기
-                    Notification.title,
-                    Notification.message,
-                    Notification.is_read,
-                )
-                .select_from(NotificationHistory)
-                .outerjoin(
-                    Notification, NotificationHistory.notification_id == Notification.id
+                    NotificationHistory.notification_id.label("lh_notification_id"),
+                    func.max(NotificationHistory.created_at).label("lh_max_created_at"),
                 )
                 .where(NotificationHistory.user_id == user_id)
-                .order_by(desc(NotificationHistory.created_at))
+                .group_by(NotificationHistory.notification_id)
+                .subquery()
+            )
+
+            # 최신 history 레코드 자체와 조인하기 위한 별칭
+            LatestHistory = aliased(NotificationHistory)
+
+            # notifications를 기준으로 LEFT JOIN
+            stmt = (
+                select(
+                    # Notification 컬럼들 (필요한 컬럼만)
+                    Notification.id.label("n_id"),
+                    Notification.type.label("n_type"),
+                    Notification.title.label("n_title"),
+                    Notification.message.label("n_message"),
+                    Notification.data.label("n_data"),
+                    Notification.is_read.label("n_is_read"),
+                    Notification.created_at.label("n_created_at"),
+                    # LatestHistory 컬럼들 (필요한 컬럼만)
+                    LatestHistory.status.label("h_status"),
+                    LatestHistory.data_payload.label("h_data_payload"),
+                )
+                .select_from(Notification)
+                .outerjoin(
+                    latest_hist_subq,
+                    Notification.id == latest_hist_subq.c.lh_notification_id,
+                )
+                .outerjoin(
+                    LatestHistory,
+                    and_(
+                        LatestHistory.notification_id
+                        == latest_hist_subq.c.lh_notification_id,
+                        LatestHistory.created_at
+                        == latest_hist_subq.c.lh_max_created_at,
+                    ),
+                )
+                .where(
+                    and_(
+                        Notification.user_id == user_id,
+                        # 논리적으로 '보낸' 알림만: 예약 시간이 미래인 항목 제외
+                        or_(
+                            Notification.scheduled_at.is_(None),
+                            Notification.scheduled_at <= datetime.now(UTC),
+                        ),
+                    )
+                )
+                .order_by(desc(Notification.created_at))
                 .limit(limit)
                 .offset(offset)
             )
 
-            results = session.execute(stmt).all()
+            rows = session.execute(stmt).all()
 
-            return [
-                NotificationHistoryResponse(
-                    id=str(result.id),
-                    notification_id=str(result.notification_id)
-                    if result.notification_id
-                    else None,
-                    notification_type=result.notification_type,
-                    status=result.status,
-                    sent_at=result.sent_at,
-                    delivered_at=result.delivered_at,
-                    opened_at=result.opened_at,
-                    created_at=result.created_at,
-                    error_message=result.error_message,
-                    # notification이 있으면 그것을 우선 사용, 없으면 data_payload에서 가져오기
-                    title=result.title
-                    or (
-                        result.data_payload.get("title")
-                        if result.data_payload
-                        else None
-                    ),
-                    message=result.message
-                    or (
-                        result.data_payload.get("body") if result.data_payload else None
-                    ),
-                    is_read=result.is_read,
+            response: list[NotificationHistoryResponse] = []
+            for row in rows:
+                derived_status = "opened" if row.n_is_read else (row.h_status or "sent")
+
+                response.append(
+                    NotificationHistoryResponse(
+                        id=str(row.n_id),
+                        title=row.n_title,
+                        body=row.n_message,
+                        notification_type=row.n_type,
+                        status=derived_status,
+                        created_at=row.n_created_at,
+                        fcm_response=row.h_data_payload
+                        if row.h_data_payload
+                        else row.n_data,
+                    )
                 )
-                for result in results
-            ]
+
+            return response
 
         except Exception as e:
             logger.error(f"Error getting notification history: {str(e)}")
