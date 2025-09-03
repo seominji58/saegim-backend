@@ -112,12 +112,54 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v):
+        # None 값 체크
+        if v is None:
+            raise ValueError("새 비밀번호는 필수입니다")
+
+        # 빈 문자열 체크
+        if not v or not isinstance(v, str):
+            raise ValueError("새 비밀번호는 유효한 문자열이어야 합니다")
+
         if len(v) < 9:
             raise ValueError("비밀번호는 9자 이상이어야 합니다")
+
+        # 영문, 숫자, 특수문자 포함 검증
+        if not re.match(
+            r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{9,}$", v
+        ):
+            raise ValueError("비밀번호는 영문, 숫자, 특수문자를 포함해야 합니다")
+
+        return v
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, v):
+        # None 값 체크
+        if v is None:
+            raise ValueError("현재 비밀번호는 필수입니다")
+
+        # 빈 문자열 체크
+        if not v or not isinstance(v, str):
+            raise ValueError("현재 비밀번호는 유효한 문자열이어야 합니다")
+
+        return v
 
 # 비밀번호 확인 전용 모델
 class VerifyPasswordRequest(BaseModel):
     current_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, v):
+        # None 값 체크
+        if v is None:
+            raise ValueError("현재 비밀번호는 필수입니다")
+
+        # 빈 문자열 체크
+        if not v or not isinstance(v, str):
+            raise ValueError("현재 비밀번호는 유효한 문자열이어야 합니다")
+
+        return v
 
 
 # 계정 복구 관련 모델
@@ -1283,6 +1325,7 @@ async def change_password(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 계정 사용자는 비밀번호 변경이 불가능합니다.",
             )
+
 
         # 현재 비밀번호 확인
         if not password_hasher.verify_password(request.current_password, current_user.password_hash):
