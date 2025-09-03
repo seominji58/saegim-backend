@@ -106,8 +106,8 @@ class EmailService:
             import httpx
             
             # 디버깅을 위한 로그 추가
-            logger.info(f"SendGrid 발신자 이메일: {self.sendgrid_from_email}")
-            logger.info(f"수신자 이메일: {to_email}")
+            logger.info(f"SendGrid sender email: {self.sendgrid_from_email}")
+            logger.info(f"Recipient email: {to_email}")
             
             # SendGrid API 엔드포인트
             url = "https://api.sendgrid.com/v3/mail/send"
@@ -168,27 +168,27 @@ class EmailService:
                 </html>
                 """
             else:
-                subject = "[Saegim] Email Verification Code"
+                subject = "[Saegim] 이메일 인증 코드"
                 html_content = f"""
                 <html>
                 <body>
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #5C8D89;">Saegim Email Verification</h2>
-                        <p>Hello! Thank you for signing up for Saegim service.</p>
-                        <p>Please enter the verification code below to complete your email verification.</p>
+                        <h2 style="color: #5C8D89;">Saegim 이메일 인증</h2>
+                        <p>안녕하세요! Saegim 서비스 회원가입을 환영합니다.</p>
+                        <p>아래 인증 코드를 입력하여 이메일 인증을 완료해주세요.</p>
                         
                         <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
                             <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
                         </div>
                         
-                        <p><strong>This verification code will expire in 10 minutes.</strong></p>
+                        <p><strong>이 인증 코드는 10분 후에 만료됩니다.</strong></p>
                         
-                        <p>If you did not request this, please ignore this email.</p>
+                        <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
                         
                         <hr style="margin: 30px 0;">
                         <p style="color: #666; font-size: 12px;">
-                            This email was sent from Saegim service.<br>
-                            If you have any questions, please contact our customer service.
+                            이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                            문의사항이 있으시면 고객센터에 연락해주세요.
                         </p>
                     </div>
                 </body>
@@ -226,7 +226,7 @@ class EmailService:
                 logger.info(f"SendGrid verification email sent successfully: {to_email}")
                 return True
             else:
-                logger.error(f"SendGrid API 오류: {response.status_code} - {response.text}")
+                logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
@@ -241,28 +241,28 @@ class EmailService:
         """기존 SMTP를 사용한 이메일 발송"""
         try:
             # 이메일 제목과 내용
-            subject = "[Saegim] Email Verification Code"
+            subject = "[Saegim] 이메일 인증 코드"
             
             html_content = f"""
             <html>
             <body>
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #5C8D89;">Saegim Email Verification</h2>
-                    <p>Hello! Thank you for signing up for Saegim service.</p>
-                    <p>Please enter the verification code below to complete your email verification.</p>
+                    <h2 style="color: #5C8D89;">Saegim 이메일 인증</h2>
+                    <p>안녕하세요! Saegim 서비스 회원가입을 환영합니다.</p>
+                    <p>아래 인증 코드를 입력하여 이메일 인증을 완료해주세요.</p>
                     
                     <div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
                         <h3 style="color: #5C8D89; font-size: 24px; letter-spacing: 5px;">{verification_code}</h3>
                     </div>
                     
-                    <p><strong>This verification code will expire in 10 minutes.</strong></p>
+                    <p><strong>이 인증 코드는 10분 후에 만료됩니다.</strong></p>
                     
-                    <p>If you did not request this, please ignore this email.</p>
+                    <p>본인이 요청하지 않은 경우 이 이메일을 무시하세요.</p>
                     
                     <hr style="margin: 30px 0;">
                     <p style="color: #666; font-size: 12px;">
-                        This email was sent from Saegim service.<br>
-                        If you have any questions, please contact our customer service.
+                        이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                        문의사항이 있으시면 고객센터에 연락해주세요.
                     </p>
                 </div>
             </body>
@@ -285,11 +285,11 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             
-            logger.info(f"SMTP 인증 이메일 발송 성공: {to_email}")
+            logger.info(f"SMTP verification email sent successfully: {to_email}")
             return True
             
         except Exception as e:
-            logger.error(f"SMTP 이메일 발송 실패: {to_email} - {e}")
+            logger.error(f"SMTP email sending failed: {to_email} - {e}")
             return False
 
     async def send_welcome_email(self, to_email: str, nickname: str) -> bool:
@@ -370,40 +370,40 @@ class EmailService:
             import httpx
             
             url = "https://api.sendgrid.com/v3/mail/send"
-            subject = "[Saegim] Welcome to Saegim!"
+            subject = "[Saegim] Saegim 서비스에 오신 것을 환영합니다!"
             
             html_content = f"""
             <html>
             <body>
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #5C8D89;">Welcome to Saegim!</h2>
-                    <p>Hello, <strong>{nickname}</strong>!</p>
-                    <p>Your Saegim service registration has been completed successfully.</p>
+                    <h2 style="color: #5C8D89;">Saegim 서비스에 오신 것을 환영합니다!</h2>
+                    <p>안녕하세요, <strong>{nickname}</strong>님!</p>
+                    <p>Saegim 서비스 회원가입이 성공적으로 완료되었습니다.</p>
                     
                     <div style="background-color: #f0f8f7; padding: 20px; margin: 20px 0; border-radius: 10px;">
-                        <h3 style="color: #5C8D89;">What you can do with Saegim</h3>
+                        <h3 style="color: #5C8D89;">Saegim에서 할 수 있는 것들</h3>
                         <ul>
-                            <li>Write emotional diaries with AI</li>
-                            <li>Emotion analysis and keyword extraction</li>
-                            <li>Monthly emotion report</li>
-                            <li>Personalized AI style settings</li>
+                            <li>AI와 함께 감정 일기 작성하기</li>
+                            <li>감정 분석 및 키워드 추출</li>
+                            <li>월간 감정 리포트</li>
+                            <li>개인화된 AI 스타일 설정</li>
                         </ul>
                     </div>
                     
-                    <p>Start using Saegim now!</p>
+                    <p>지금 바로 Saegim을 시작해보세요!</p>
                     
                     <div style="text-align: center; margin: 30px 0;">
                         <a href="{settings.frontend_url}" 
                            style="background-color: #5C8D89; color: white; padding: 12px 30px; 
                                   text-decoration: none; border-radius: 5px; display: inline-block;">
-                            Start Saegim
+                            Saegim 시작하기
                         </a>
                     </div>
                     
                     <hr style="margin: 30px 0;">
                     <p style="color: #666; font-size: 12px;">
-                        This email was sent from Saegim service.<br>
-                        If you have any questions, please contact our customer service.
+                        이 이메일은 Saegim 서비스에서 발송되었습니다.<br>
+                        문의사항이 있으시면 고객센터에 연락해주세요.
                     </p>
                 </div>
             </body>
@@ -439,7 +439,7 @@ class EmailService:
                 logger.info(f"SendGrid welcome email sent successfully: {to_email}")
                 return True
             else:
-                logger.error(f"SendGrid API 오류: {response.status_code} - {response.text}")
+                logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
@@ -505,11 +505,11 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             
-            logger.info(f"SMTP 환영 이메일 발송 성공: {to_email}")
+            logger.info(f"SMTP welcome email sent successfully: {to_email}")
             return True
             
         except Exception as e:
-            logger.error(f"SMTP 환영 이메일 발송 실패: {to_email} - {e}")
+            logger.error(f"SMTP welcome email sending failed: {to_email} - {e}")
             return False
 
     async def _send_email_change_with_sendgrid(self, to_email: str, verification_url: str, current_email: str) -> bool:
