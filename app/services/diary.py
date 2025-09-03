@@ -78,13 +78,17 @@ class DiaryService(BaseService):
             )
 
         # 정렬 적용 (diary_date 우선, 없으면 created_at 사용)
+        # 1차: diary_date (내림차순/오름차순)
+        # 2차: created_at (내림차순/오름차순) - 같은 날짜 내에서 시간순 정렬
         if sort_order.lower() == SortOrder.DESC.value:
             statement = statement.order_by(
-                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).desc()
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).desc(),
+                DiaryEntry.created_at.desc()  # 2차 정렬: 같은 날짜 내에서 최신순
             )
         else:
             statement = statement.order_by(
-                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).asc()
+                func.coalesce(DiaryEntry.diary_date, func.date(DiaryEntry.created_at)).asc(),
+                DiaryEntry.created_at.asc()  # 2차 정렬: 같은 날짜 내에서 오래된순
             )
 
         # 전체 개수 조회 (user_id 필터 적용, Soft Delete 제외)
