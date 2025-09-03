@@ -6,7 +6,7 @@
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import jwt
@@ -64,6 +64,7 @@ class LoginResponse(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     nickname: str = Field(min_length=1, max_length=50)
+    profile_image_url: Optional[str] = Field(None, max_length=500)
 
 
 # 비밀번호 재설정 관련 모델
@@ -588,6 +589,11 @@ async def update_user_profile(
     try:
         # 닉네임 업데이트
         current_user.nickname = request.nickname
+        
+        # 프로필 이미지 URL 업데이트 (제공된 경우)
+        if request.profile_image_url is not None:
+            current_user.profile_image_url = request.profile_image_url
+            
         current_user.updated_at = datetime.now(timezone.utc)
 
         db.commit()
@@ -599,6 +605,7 @@ async def update_user_profile(
             data={
                 "user_id": str(current_user.id),
                 "nickname": current_user.nickname,
+                "profile_image_url": current_user.profile_image_url,
                 "updated_at": current_user.updated_at.isoformat(),
             },
             message="프로필이 성공적으로 업데이트되었습니다.",
