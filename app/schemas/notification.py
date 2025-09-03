@@ -83,7 +83,7 @@ class NotificationSendRequest(BaseModel):
     title: str = Field(..., description="알림 제목", max_length=255)
     body: str = Field(..., description="알림 내용", max_length=1000)
     notification_type: str = Field(..., description="알림 타입")
-    user_ids: list[str] = Field(..., description="대상 사용자 ID 목록")
+    user_ids: list[UUID] = Field(..., description="대상 사용자 ID 목록")
     data: dict[str, Any] | None = Field(None, description="추가 데이터")
 
 
@@ -225,26 +225,19 @@ class NotificationSendResponse(BaseModel):
 
 
 class NotificationHistoryResponse(BaseModel):
-    """알림 기록 응답 - notification과 FK 관계를 통한 데이터 조회"""
+    """알림 목록 응답 (프론트 사용 필드만)"""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    notification_id: str | None = Field(None, description="연결된 알림 ID")
+    title: str
+    body: str
     notification_type: str
     status: str
-    sent_at: datetime | None = Field(None, description="전송 시간")
-    delivered_at: datetime | None = Field(None, description="전달 시간")
-    opened_at: datetime | None = Field(None, description="열람 시간")
     created_at: datetime
-    error_message: str | None = Field(None, description="에러 메시지")
+    fcm_response: dict[str, Any] | None = Field(None, description="FCM/부가 데이터")
 
-    # notification 테이블에서 가져올 데이터
-    title: str | None = Field(None, description="알림 제목 (from notification)")
-    message: str | None = Field(None, description="알림 내용 (from notification)")
-    is_read: bool | None = Field(None, description="읽음 상태 (from notification)")
-
-    @field_validator("id", "notification_id", mode="before")
+    @field_validator("id", mode="before")
     @classmethod
     def validate_uuid(cls, v):
         """UUID를 문자열로 변환"""

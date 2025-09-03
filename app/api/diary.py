@@ -328,10 +328,10 @@ async def upload_temporary_images(
 ) -> BaseResponse[list[dict]]:
     """AI 글 생성용 임시 이미지 업로드 (다이어리 저장 시 연결됨)"""
 
-    if len(images) > 3:
+    if len(images) > 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="최대 3개의 이미지만 업로드할 수 있습니다.",
+            detail="최대 10개의 이미지만 업로드할 수 있습니다.",
         )
 
     uploaded_images = []
