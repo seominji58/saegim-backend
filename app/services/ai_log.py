@@ -294,7 +294,7 @@ class AIService(BaseService):
                 logger.warning(f"스트리밍 후 분석 실패: {str(e)}")
                 # Fallback: 키워드 기반 감정 분석
                 emotion = self._analyze_emotion_from_keywords(data.prompt)
-                keywords = data.prompt.split()[:5] if data.prompt else []
+                keywords = self._extract_emotion_keywords_fallback(data.prompt)
                 logger.info(f"Fallback 감정 분석: emotion='{emotion}', keywords={keywords}")
 
             # 스트리밍 로그 저장
@@ -673,9 +673,16 @@ class AIService(BaseService):
 - "걱정" 또는 "불안" → 반드시 "불안"
 - "기쁘다" 또는 "행복" → 반드시 "행복"
 
+**키워드 추출 우선순위 (감정 분석 가능한 키워드 우선):**
+1. **감정 관련 키워드**: 감정을 유발하거나 표현하는 단어/구절 (예: "스트레스", "기대", "실망", "만족", "걱정거리")
+2. **상황/경험 키워드**: 구체적인 상황이나 경험을 나타내는 단어 (예: "시험", "면접", "여행", "이별", "취업")
+3. **인물/관계 키워드**: 사람이나 관계를 나타내는 단어 (예: "가족", "친구", "상사", "연인")
+4. **장소/환경 키워드**: 장소나 환경을 나타내는 단어 (예: "회사", "학교", "집", "카페")
+5. **시간/시점 키워드**: 시간이나 시점을 나타내는 단어 (예: "아침", "저녁", "주말", "휴가")
+
 **작업:**
 1. 감정 분석 (위 규칙 적용)
-2. 키워드 추출 (감정 단어 제외한 명사 5개)
+2. 키워드 추출 (위 우선순위에 따라 감정 분석 가능한 키워드 5개 추출)
 3. 글귀 생성 ({style_guide["name"]} 문체, {length_guide["name"]} 길이)
 
 **응답 형식 (JSON만):**
@@ -923,11 +930,7 @@ class AIService(BaseService):
                 logger.warning(f"재생성 스트리밍 후 분석 실패: {str(e)}")
                 # Fallback: 키워드 기반 감정 분석
                 emotion = self._analyze_emotion_from_keywords(original_request.prompt)
-                keywords = (
-                    original_request.prompt.split()[:5]
-                    if original_request.prompt
-                    else []
-                )
+                keywords = self._extract_emotion_keywords_fallback(original_request.prompt)
                 logger.info(f"재생성 Fallback 감정 분석: emotion='{emotion}', keywords={keywords}")
 
             # 재생성 스트리밍 로그 저장
@@ -1002,7 +1005,7 @@ class AIService(BaseService):
             return "불안"
 
         # 행복 키워드
-        happiness_keywords = ["기쁘다", "행복", "좋다", "즐겁다", "신나다", "뿌듯하다", "웃음", "행복하다"]
+        happiness_keywords = ["기쁘다", "행복", "좋다", "즐겁다", "즐거웠다", "신나다", "뿌듯하다", "웃음", "행복하다"]
         happiness_matches = [keyword for keyword in happiness_keywords if keyword in text_lower]
         if happiness_matches:
             logger.info(f"행복 키워드 매칭: {happiness_matches}")
@@ -1028,9 +1031,244 @@ class AIService(BaseService):
             "화가 난다", "짜증", "분노", "억울", "격분", "열받다", "빡친다", "화나다", "화남",
             "슬프다", "우울", "눈물", "아쉽다", "서운", "울고 싶다", "힘들다", "슬픔",
             "걱정", "불안", "두렵다", "초조", "긴장", "무서워", "떨린다", "조마조마", "불안정",
-            "기쁘다", "행복", "좋다", "즐겁다", "신나다", "뿌듯하다", "웃음", "행복하다"
+            "기쁘다", "행복", "좋다", "즐겁다", "즐거웠다", "신나다", "뿌듯하다", "웃음", "행복하다"
         ]
 
         has_strong_keyword = any(keyword in text_lower for keyword in strong_keywords)
         logger.info(f"강한 감정 키워드 감지: {has_strong_keyword}")
         return has_strong_keyword
+
+    def _extract_emotion_keywords_fallback(self, text: str) -> list[str]:
+        """감정 분석 가능한 키워드를 우선적으로 추출하는 fallback 메서드"""
+        if not text:
+            return []
+        
+        # 감정 관련 키워드 사전
+        emotion_keywords = {
+            "감정_긍정": ["기쁨", "행복", "만족", "뿌듯", "신남", "즐거움", "희망", "기대", "설렘", "웃음"],
+            "감정_부정": ["슬픔", "우울", "실망", "아쉬움", "서운", "힘듦", "절망", "눈물", "울음", "상실감"],
+            "감정_화남": ["화남", "분노", "짜증", "억울", "격분", "열받음", "불만", "빡침", "화가남"],
+            "감정_불안": ["걱정", "불안", "두려움", "초조", "긴장", "무서움", "떨림", "조마조마", "불안정"],
+            "감정_평온": ["편안", "차분", "안정", "조용", "평화", "고요", "만족", "평온"],
+        }
+        
+        # 상황/경험 키워드
+        situation_keywords = [
+            "시험", "면접", "취업", "이별", "만남", "여행", "휴가", "출장", "회의", "프로젝트",
+            "결혼", "이사", "전학", "졸업", "입학", "취직", "퇴사", "승진", "해고", "사직",
+            "병원", "치료", "수술", "회복", "건강", "운동", "다이어트", "요리", "쇼핑", "영화"
+        ]
+        
+        # 인물/관계 키워드
+        relationship_keywords = [
+            "가족", "부모", "어머니", "아버지", "형제", "자매", "친구", "동료", "상사", "부하",
+            "연인", "남자친구", "여자친구", "남편", "아내", "선생님", "학생", "의사", "간호사"
+        ]
+        
+        # 장소/환경 키워드
+        place_keywords = [
+            "회사", "학교", "집", "카페", "식당", "병원", "공원", "도서관", "영화관", "쇼핑몰",
+            "지하철", "버스", "택시", "차", "비행기", "기차", "호텔", "펜션", "해변", "산"
+        ]
+        
+        # 시간/시점 키워드
+        time_keywords = [
+            "아침", "점심", "저녁", "밤", "새벽", "주말", "평일", "휴일", "휴가", "방학",
+            "봄", "여름", "가을", "겨울", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"
+        ]
+        
+        # 모든 키워드를 하나의 리스트로 통합 (우선순위 순)
+        all_keywords = []
+        for category in emotion_keywords.values():
+            all_keywords.extend(category)
+        all_keywords.extend(situation_keywords)
+        all_keywords.extend(relationship_keywords)
+        all_keywords.extend(place_keywords)
+        all_keywords.extend(time_keywords)
+        
+        # 텍스트에서 키워드 찾기
+        found_keywords = []
+        text_lower = text.lower()
+        
+        # 우선순위에 따라 키워드 검색
+        for keyword in all_keywords:
+            if keyword in text_lower and keyword not in found_keywords:
+                found_keywords.append(keyword)
+                if len(found_keywords) >= 5:  # 최대 5개
+                    break
+        
+        # 키워드가 5개 미만인 경우, 나머지는 일반 명사로 채움
+        if len(found_keywords) < 5:
+            # 간단한 명사 추출 (띄어쓰기로 분리된 단어 중 2글자 이상)
+            words = text.split()
+            for word in words:
+                if len(word) >= 2 and word not in found_keywords and len(found_keywords) < 5:
+                    found_keywords.append(word)
+        
+        logger.info(f"Fallback 키워드 추출 결과: {found_keywords}")
+        return found_keywords[:5]
+
+    async def _integrated_analysis(
+        self, prompt: str, style: str, length: str
+    ) -> dict[str, Any]:
+        """
+        통합 분석을 통한 감정 분석 및 키워드 추출 (스트리밍 후 분석용)
+        """
+        try:
+            # 스타일 및 길이 매핑
+            style_info = {
+                "poem": {
+                    "name": "시",
+                    "desc": "시적이고 운율이 있는 표현으로, 은유와 상징을 사용",
+                },
+                "short_story": {
+                    "name": "단편글",
+                    "desc": "자연스럽고 따뜻한 문체로, 이야기하듯 편안하게",
+                },
+            }
+
+            length_info = {
+                "short": {"name": "단문", "desc": "1-2문장, 최대 50자 이내"},
+                "medium": {"name": "중문", "desc": "3-5문장, 최대 150자 이내"},
+                "long": {"name": "장문", "desc": "6-10문장, 최대 300자 이내"},
+            }
+
+            style_guide = style_info.get(
+                style, {"name": "단편글", "desc": "자연스럽고 따뜻한 문체로"}
+            )
+            length_guide = length_info.get(length, {"name": "중문", "desc": "3-5문장"})
+
+            system_message = f"""당신은 감정 분석 전문가입니다. 주어진 텍스트의 감정을 정확히 분석하세요.
+
+**감정 분류 (반드시 다음 중 하나만 선택):**
+- 행복: 기쁨, 만족, 희망, 긍정적
+- 슬픔: 우울, 절망, 아쉬움, 상실감, 눈물
+- 화남: 분노, 짜증, 불만, 억울함, 격분
+- 불안: 걱정, 두려움, 긴장, 초조함, 불안정함
+- 평온: 차분함, 안정감, 편안함 (감정이 불분명할 때만)
+
+**강제 분류 규칙:**
+- "화가 난다" 또는 "짜증" → 반드시 "화남"
+- "슬프다" 또는 "우울" → 반드시 "슬픔"
+- "걱정" 또는 "불안" → 반드시 "불안"
+- "기쁘다" 또는 "행복" → 반드시 "행복"
+
+**키워드 추출 우선순위 (감정 분석 가능한 키워드 우선):**
+1. **감정 관련 키워드**: 감정을 유발하거나 표현하는 단어/구절 (예: "스트레스", "기대", "실망", "만족", "걱정거리")
+2. **상황/경험 키워드**: 구체적인 상황이나 경험을 나타내는 단어 (예: "시험", "면접", "여행", "이별", "취업")
+3. **인물/관계 키워드**: 사람이나 관계를 나타내는 단어 (예: "가족", "친구", "상사", "연인")
+4. **장소/환경 키워드**: 장소나 환경을 나타내는 단어 (예: "회사", "학교", "집", "카페")
+5. **시간/시점 키워드**: 시간이나 시점을 나타내는 단어 (예: "아침", "저녁", "주말", "휴가")
+
+**작업:**
+1. 감정 분석 (위 규칙 적용)
+2. 키워드 추출 (위 우선순위에 따라 감정 분석 가능한 키워드 5개 추출)
+
+**응답 형식 (JSON만):**
+{{
+    "emotion": "감정명",
+    "keywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]
+}}"""
+
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"사용자 입력: {prompt}"},
+            ]
+
+            # 재시도 로직 추가
+            max_retries = 3
+            retry_delay = 1  # 초기 지연 시간 (초)
+
+            for attempt in range(max_retries):
+                try:
+                    client = get_openai_client()
+                    response = await client.async_chat_completion(
+                        messages=messages, max_completion_tokens=200
+                    )
+                    logger.info(f"통합 분석 OpenAI API 응답: {response}")
+
+                    # 성공적으로 완료되면 루프 종료
+                    break
+
+                except Exception as e:
+                    error_message = str(e)
+                    logger.warning(f"통합 분석 OpenAI API 호출 실패 (시도 {attempt + 1}/{max_retries}): {error_message}")
+
+                    # 마지막 시도이거나 재시도할 수 없는 오류인 경우
+                    if attempt == max_retries - 1:
+                        logger.error(f"통합 분석 실패: {error_message}")
+                        raise
+
+                    # 재시도 가능한 오류인 경우 지연 후 재시도
+                    await asyncio.sleep(retry_delay * (2 ** attempt))  # 지수 백오프
+                    logger.info(f"재시도 중... ({retry_delay * (2 ** attempt)}초 후)")
+
+            # JSON 파싱
+            try:
+                result_json = response["content"].strip()
+                result = None
+
+                try:
+                    # json_repair를 사용한 견고한 파싱
+                    from json_repair import repair_json
+
+                    result = repair_json(result_json, return_objects=True)
+                except ImportError:
+                    # json_repair가 없는 경우 기존 방식 사용
+                    logger.warning(
+                        "json_repair 라이브러리를 찾을 수 없어 기본 방식을 사용합니다"
+                    )
+                    import re
+
+                    result_json = re.sub(
+                        r"[\x00-\x1f\x7f-\x9f\u200b-\u200d\ufeff\u00a0\u2000-\u200a\u2028\u2029]",
+                        "",
+                        result_json,
+                    )
+                    result = json.loads(result_json)
+
+                # result가 성공적으로 파싱되었는지 확인
+                if result is None or not isinstance(result, dict):
+                    raise ValueError("파싱된 결과가 유효한 딕셔너리가 아닙니다")
+
+                # 감정 분석 결과 검증 및 수정
+                emotion = result.get("emotion", "").strip()
+                logger.info(f"통합 분석 AI 원본 감정 응답: '{emotion}' (타입: {type(emotion)})")
+
+                # AI가 잘못된 감정을 반환한 경우 키워드 기반으로 재분석
+                if emotion not in ["행복", "슬픔", "화남", "불안", "평온"]:
+                    logger.warning(f"통합 분석 AI가 잘못된 감정을 반환: '{emotion}', 키워드 기반 재분석 시도")
+                    emotion = self._analyze_emotion_from_keywords(prompt)
+                    logger.info(f"통합 분석 키워드 기반 재분석 결과: '{emotion}'")
+                # AI가 "평온"을 반환했지만 명확한 감정 키워드가 있는 경우 재분석
+                elif emotion == "평온" and self._has_strong_emotion_keywords(prompt):
+                    logger.warning(f"통합 분석 AI가 '평온'을 반환했지만 강한 감정 키워드 감지, 키워드 기반 재분석 시도")
+                    emotion = self._analyze_emotion_from_keywords(prompt)
+                    logger.info(f"통합 분석 키워드 기반 재분석 결과: '{emotion}'")
+                else:
+                    logger.info(f"통합 분석 AI 감정 분석 유효: '{emotion}'")
+
+                return {
+                    "emotion": emotion,
+                    "keywords": result.get("keywords", [])[:5],
+                }
+
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"통합 분석 JSON 파싱 실패: {result_json}, 오류: {str(e)}")
+                # 파싱 실패 시 fallback
+                emotion = self._analyze_emotion_from_keywords(prompt)
+                keywords = self._extract_emotion_keywords_fallback(prompt)
+                return {
+                    "emotion": emotion,
+                    "keywords": keywords,
+                }
+
+        except Exception as e:
+            logger.error(f"통합 분석 실패: {str(e)}")
+            # 최종 fallback
+            emotion = self._analyze_emotion_from_keywords(prompt)
+            keywords = self._extract_emotion_keywords_fallback(prompt)
+            return {
+                "emotion": emotion,
+                "keywords": keywords,
+            }
