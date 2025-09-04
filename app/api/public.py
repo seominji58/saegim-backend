@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
 
-router = APIRouter()
+router = APIRouter(tags=["Public"])
 
 
 @router.get("/image-proxy")

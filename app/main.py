@@ -44,8 +44,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# MinIO를 사용하므로 정적 파일 서빙 불필요
-
 
 def custom_openapi():
     """
@@ -147,7 +145,7 @@ def _get_uptime() -> int:
 
 
 # 통합 헬스체크 라우트
-@app.get("/", tags=["health"], response_model=BaseResponse[dict])
+@app.get("/", tags=["Health"], response_model=BaseResponse[dict])
 async def health_check() -> BaseResponse[dict]:
     """통합 헬스체크 엔드포인트 - 애플리케이션 상태 확인"""
     health_data = {

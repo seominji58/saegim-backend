@@ -45,7 +45,7 @@ from app.utils.validators import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Diary"])
 
 
 @router.get("", response_model=BaseResponse[list[DiaryListResponse]])

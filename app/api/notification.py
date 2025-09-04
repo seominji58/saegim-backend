@@ -27,9 +27,6 @@ from app.schemas.notification import (
 )
 from app.services.notification_service import NotificationService
 
-# Public endpoints (no auth required)
-public_router = APIRouter(tags=["Notifications"])
-
 # Protected endpoints (auth required)
 router = APIRouter(tags=["Notifications"])
 
