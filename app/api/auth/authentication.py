@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, File, UploadFile
 from fastapi.responses import JSONResponse
 from jose.exceptions import JWTError
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -35,6 +35,8 @@ from app.models.user import User
 from app.schemas.base import BaseResponse
 from app.utils.email_service import EmailService
 from app.utils.encryption import password_hasher
+from app.utils.minio_upload import upload_image_with_thumbnail_to_minio
+from app.utils.validators import validate_image_file
 
 from app.utils.error_handlers import StandardHTTPException, unauthorized_exception
 
@@ -559,6 +561,7 @@ async def get_current_user_info(
             "user_id": str(current_user.id),
             "email": current_user.email,
             "nickname": current_user.nickname,
+            "profile_image_url": current_user.profile_image_url,
             "account_type": current_user.account_type,
             "provider": current_user.provider,
             "is_active": current_user.is_active,
@@ -619,6 +622,52 @@ async def update_user_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="프로필 업데이트 중 오류가 발생했습니다.",
+        )
+
+
+# === 프로필 이미지 업로드 엔드포인트 ===
+@authenticated_router.post("/profile/upload-image", response_model=BaseResponse[Dict[str, Any]])
+async def upload_profile_image(
+    *,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+    image: UploadFile = File(description="프로필 이미지 파일"),
+) -> BaseResponse[Dict[str, Any]]:
+    """프로필 이미지 업로드 API"""
+    try:
+        # 이미지 파일 검증
+        validate_image_file(image.content_type, image.size)
+        
+        # MinIO에 이미지와 썸네일 업로드
+        file_id, original_url, thumbnail_url = await upload_image_with_thumbnail_to_minio(image)
+        
+        # 사용자 프로필에 이미지 URL 저장 (썸네일 사용)
+        current_user.profile_image_url = thumbnail_url
+        current_user.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"프로필 이미지 업로드 성공: {current_user.email} -> {thumbnail_url}")
+        
+        return BaseResponse(
+            data={
+                "image_url": thumbnail_url,
+                "file_id": file_id,
+                "user_id": str(current_user.id),
+                "updated_at": current_user.updated_at.isoformat(),
+            },
+            message="프로필 이미지가 성공적으로 업로드되었습니다.",
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"프로필 이미지 업로드 실패: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="프로필 이미지 업로드 중 오류가 발생했습니다.",
         )
 
 
