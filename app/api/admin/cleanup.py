@@ -11,7 +11,7 @@ from app.core.deps import get_session
 from app.schemas.base import BaseResponse
 from app.services.cleanup_service import CleanupService
 
-router = APIRouter()
+router = APIRouter(tags=["Admin"])
 
 
 @router.post("/cleanup/expired-data", response_model=BaseResponse[dict])

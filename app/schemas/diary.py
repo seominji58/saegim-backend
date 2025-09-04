@@ -129,6 +129,7 @@ class DiaryUpdateRequest(BaseModel):
 
     title: str | None = None
     content: str | None = None
+    ai_generated_text: str | None = None
     user_emotion: str | None = None
     keywords: list[str] | None = None
 

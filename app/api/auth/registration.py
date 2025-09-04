@@ -25,7 +25,7 @@ from app.utils.encryption import password_hasher
 
 from app.utils.error_handlers import StandardHTTPException, bad_request_exception
 
-router = APIRouter(tags=["registration"])
+router = APIRouter(tags=["Registration"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
 

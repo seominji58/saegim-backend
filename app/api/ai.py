@@ -20,7 +20,6 @@ from app.services.ai_log import AIService
 from app.services.create_diary import diary_service
 
 router = APIRouter(
-    prefix="/ai",
     tags=["AI"],
 )
 

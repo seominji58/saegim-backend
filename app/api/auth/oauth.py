@@ -17,7 +17,7 @@ from app.services.oauth import GoogleOAuthService
 
 from app.utils.error_handlers import StandardHTTPException, unauthorized_exception
 
-router = APIRouter(prefix="/google", tags=["oauth"])
+router = APIRouter(prefix="/google", tags=["Oauth"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
 

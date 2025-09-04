@@ -14,22 +14,16 @@ from app.api.auth.oauth import router as oauth_router
 from app.api.auth.registration import router as registration_router
 from app.api.diary import router as diary_router
 from app.api.legacy import router as legacy_router
-from app.api.notification import public_router as notification_public_router
 from app.api.notification import router as notification_router
 from app.api.public import router as public_router
 from app.api.support import router as support_router
 
 router = APIRouter()
 
-router.include_router(public_router, prefix="/api/public", tags=["public"])
-router.include_router(ai_router, prefix="/api")
+router.include_router(public_router, prefix="/api/public")
+router.include_router(ai_router, prefix="/api/ai")
 router.include_router(diary_router, prefix="/api/diary")
-router.include_router(
-    notification_public_router, prefix="/api/notifications"
-)  # 공개 알림 API
-router.include_router(
-    notification_router, prefix="/api/notifications"
-)  # 인증된 알림 API
+router.include_router(notification_router, prefix="/api/notifications")
 router.include_router(legacy_router)  # 레거시 리다이렉트
 router.include_router(support_router, prefix="/api/support")  # 고객센터 API
 

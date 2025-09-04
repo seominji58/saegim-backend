@@ -40,11 +40,11 @@ from app.utils.validators import validate_image_file
 
 from app.utils.error_handlers import StandardHTTPException, unauthorized_exception
 
-router = APIRouter(tags=["authentication"])
+router = APIRouter(tags=["Authentication"])
 
 # 인증이 필요한 라우터
 authenticated_router = APIRouter(
-    tags=["authentication"],
+    tags=["Authentication"],
     dependencies=[Depends(get_current_user)],
 )
 
@@ -592,11 +592,11 @@ async def update_user_profile(
     try:
         # 닉네임 업데이트
         current_user.nickname = request.nickname
-        
+
         # 프로필 이미지 URL 업데이트 (제공된 경우)
         if request.profile_image_url is not None:
             current_user.profile_image_url = request.profile_image_url
-            
+
         current_user.updated_at = datetime.now(timezone.utc)
 
         db.commit()
