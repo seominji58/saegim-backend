@@ -94,7 +94,7 @@ app.openapi = custom_openapi
 # 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"]
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"]
     if settings.is_development
     else settings.cors_origins,  # 개발환경에서는 모든 origin 허용
     allow_credentials=True,
